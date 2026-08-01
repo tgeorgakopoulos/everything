@@ -188,6 +188,8 @@
   .bkhint{width:100%;font-size:10.5px;color:var(--faint);padding:7px 4px 0;
     line-height:1.4;text-align:center}
   .bkhint.warn{color:var(--accent);font-weight:560}
+  /* fixed width so a changing label can't reflow the settings row */
+  .syncbtn{min-width:92px;text-align:center;white-space:nowrap}
   .syncbtn.busy{color:var(--accent);border-color:var(--accent)}
   .syncbtn.err{color:var(--red);border-color:var(--red)}
   .syncbtn.out{border-style:dashed}
@@ -819,7 +821,6 @@
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
         </div>
       </div>
-      <button class="ghost" id="resetbtn">Reset</button>
       <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
       <div class="bkhint" id="bkhint"></div>
       <div class="bkhint warn" id="fonthint" style="display:none">
@@ -2101,7 +2102,10 @@ function applyIncoming(rows){
     var incoming=normalizeItem(row.data);
     if(!incoming) return;
     if(!here){
-      S.items.push(incoming); rebuildIndex(); changed++;
+      /* Arrive at the top, not the bottom. Array order is the manual order,
+         and the device that made this put it at the front — appending here
+         meant the same note sat first on one machine and last on another. */
+      S.items.unshift(incoming); rebuildIndex(); changed++;
     } else if((incoming.modified||0)>(here.modified||0)){
       // don't clobber something being edited right now
       if(S.editing===incoming.id) return;
@@ -3733,13 +3737,15 @@ function paintSync(){
   var b=document.getElementById("syncbtn");
   if(!b) return;
   if(!SYNC.on){ b.style.display="none"; return }
+  /* Short, and all roughly the same length — the label changes several times
+     a minute, and a button that resizes each time reads as a fault. */
   var waiting=Object.keys(SYNC.queue).length;
   var label, cls="";
-  if(!SYNC.session){ label="☁ Sign in to sync"; cls="out" }
-  else if(SYNC.status==="busy"){ label="☁ Syncing…"; cls="busy" }
-  else if(SYNC.status==="offline"){ label="☁ Offline"+(waiting?" · "+waiting:""); cls="err" }
-  else if(SYNC.status==="error"){ label="☁ Sync failed"+(waiting?" · "+waiting:""); cls="err" }
-  else if(waiting){ label="☁ "+waiting+" waiting"; cls="busy" }
+  if(!SYNC.session){ label="☁ Sign in"; cls="out" }
+  else if(SYNC.status==="busy"){ label="☁ Syncing"; cls="busy" }
+  else if(SYNC.status==="offline"){ label="☁ Offline"; cls="err" }
+  else if(SYNC.status==="error"){ label="☁ Failed"; cls="err" }
+  else if(waiting){ label="☁ "+waiting+" to go"; cls="busy" }
   else label="☁ Synced";
   b.textContent=label;
   b.className="ghost syncbtn"+(cls?" "+cls:"");
@@ -3796,19 +3802,11 @@ document.getElementById("syncbtn").addEventListener("click",function(){
 document.getElementById("szdown").addEventListener("click",function(){ setNoteSize(sizeIx-1) });
 document.getElementById("szup").addEventListener("click",function(){ setNoteSize(sizeIx+1) });
 
-document.getElementById("resetbtn").addEventListener("click",function(){
-  // this wipes real work now, not just demo data — make it deliberate
-  askChoice("Reset to the demo library?",
-    "Your <b>"+S.items.length+"</b> current item"+(S.items.length===1?"":"s")
-    +" will be discarded and replaced with the sample content. "
-    +"There is no undo — export first if you want them back.",
-    [{label:"Cancel",value:false,kind:"sec"},{label:"Reset",value:true,kind:"dan"}],
-    function(go){
-      if(!go) return;
-      S.items=enrich(seed()); S.sel={}; save(); render(); toast("Demo data restored");
-      setTimeout(backfill,300);
-    });
-});
+/* The Reset button lived here. It replaced the library with sample content —
+   harmless when that library was a demo, and actively hazardous now: with
+   sync on, a reset would push twelve sample notes to every device you own and
+   delete everything real in the process. There is no undo, and nothing it did
+   that Import can't do better. Removed rather than guarded. */
 
 var tEl=document.getElementById("toast"), tTimer;
 function toast(msg){
