@@ -310,7 +310,7 @@
   .row-item .rdue .due{background:none;border:0;padding:0;font-weight:600;
     display:inline;white-space:nowrap}
   .row-item .quick{position:static;transform:none;flex:none;box-shadow:none;
-    background:none;border:0;padding:0;width:52px;justify-content:flex-end}
+    background:none;border:0;padding:0;width:52px;justify-content:flex-end;z-index:4}
   .row-item:hover .quick{transform:none}
   .row-item .pinned{top:50%;margin-top:-10px}
   .row-item.done .rtitle{text-decoration:line-through;color:var(--faint)}
@@ -473,6 +473,11 @@
   .cbody a,.ebody a{color:var(--blue);text-decoration:underline;
     text-underline-offset:2px;text-decoration-thickness:1px}
   .cbody a:hover,.ebody a:hover{text-decoration-thickness:2px}
+  .cbody ul,.cbody ol,.ebody ul,.ebody ol{margin:6px 0 6px 1.15em;padding:0}
+  .cbody li,.ebody li{margin:2px 0}
+  .cbody ul,.ebody ul{list-style:disc}
+  .cbody ol,.ebody ol{list-style:decimal}
+  .ebody li{line-height:1.6}
   .ebody a{cursor:pointer}
 
   /* Short, text-only notes get set large — a stray thought should look like one,
@@ -535,13 +540,23 @@
   .tag{font-size:10.5px;font-weight:570;color:var(--ui);background:var(--line);
     padding:2px 7px;border-radius:99px;border:1px solid var(--line-strong)}
 
+  /* The toolbox is a lot of small targets. Rather than make it louder, hovering
+     washes the card back toward its own colour so the tools are what your eye
+     lands on. The veil takes the card's background, so a tinted card fades to
+     its tint rather than to white. */
+  .card::after,.row-item::after{content:"";position:absolute;inset:0;
+    background:inherit;opacity:0;pointer-events:none;border-radius:inherit;
+    transition:opacity .16s;z-index:1}
+  .card:hover::after{opacity:.58}
+  .row-item:hover::after{opacity:.42}
+
   /* quick facet toggles on hover — conversion in one click */
-  .quick{position:absolute;top:8px;right:8px;display:flex;gap:2px;padding:2px;
-    background:var(--surface);border:1px solid var(--line);border-radius:9px;
-    box-shadow:var(--shadow);opacity:0;transform:translateY(-3px);
-    transition:opacity .14s,transform .14s;z-index:2}
-  .card:hover .quick{opacity:1;transform:translateY(0)}
-  .quick button{width:24px;height:22px;border-radius:6px;font-size:11px;color:var(--ui);
+  .quick{position:absolute;top:7px;right:7px;display:flex;gap:2px;padding:3px;
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;
+    box-shadow:var(--shadow-lg);opacity:0;transform:translateY(-3px) scale(.97);
+    transition:opacity .14s,transform .14s;z-index:4}
+  .card:hover .quick{opacity:1;transform:translateY(0) scale(1)}
+  .quick button{width:26px;height:24px;border-radius:7px;font-size:12px;color:var(--ui);
     display:grid;place-items:center}
   .quick button:hover{background:var(--line);color:var(--ink)}
   .quick button.on{color:var(--accent)}
@@ -551,7 +566,7 @@
     background:var(--accent)}
 
   /* selection */
-  .pick{position:absolute;top:8px;left:8px;width:21px;height:21px;border-radius:50%;
+  .pick{position:absolute;top:8px;left:8px;z-index:4;width:21px;height:21px;border-radius:50%;
     border:1.8px solid var(--line-strong);background:var(--surface);color:transparent;
     display:grid;place-items:center;font-size:11px;z-index:3;
     opacity:0;transform:scale(.85);transition:.12s}
@@ -1530,7 +1545,7 @@ function setNoteSize(ix){
    md() below is kept only to upgrade older plain-text notes on first load,
    and would be reused by a Markdown export.
    --------------------------------------------------------------------- */
-var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1};
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1};
 var SAFE_HREF=/^(https?:|mailto:)/i;
 // these are removed along with everything inside them, rather than unwrapped
 var RICH_DROP={SCRIPT:1,STYLE:1,NOSCRIPT:1,IFRAME:1,OBJECT:1,EMBED:1,TEMPLATE:1,
@@ -2517,6 +2532,8 @@ function openEditor(id){
       +'<button class="facet fmt" id="e-bold" title="Bold — ⌘B"><b>B</b></button>'
       +'<button class="facet fmt" id="e-ital" title="Italic — ⌘I"><i>I</i></button>'
       +'<button class="facet fmt" id="e-link" title="Link the selected text — ⌘K">⚭</button>'
+      +'<button class="facet fmt" id="e-ul" title="Bulleted list">•—</button>'
+      +'<button class="facet fmt" id="e-ol" title="Numbered list">1—</button>'
       +'<span class="wc" id="e-wc"></span>'
     +'</div>'
     +'<div class="cklist" id="e-cklist"></div>'
@@ -2648,6 +2665,8 @@ function openEditor(id){
   q("#e-bold").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("bold") });
   q("#e-ital").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("italic") });
   q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
+  q("#e-ul").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertUnorderedList") });
+  q("#e-ol").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertOrderedList") });
   body.addEventListener("keydown",function(e){
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
       e.preventDefault(); e.stopPropagation();   // don't fall through to capture
