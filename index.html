@@ -1,0 +1,3798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#F3F5F4">
+<title>Everything</title>
+<!-- Four things in a square: a collection. Same mark as the All icon, inline
+     so the app stays a single file. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231F6B63'/%3E%3Cg fill='%23F3F5F4'%3E%3Crect x='13' y='13' width='17' height='17' rx='5'/%3E%3Crect x='34' y='13' width='17' height='17' rx='5'/%3E%3Crect x='13' y='34' width='17' height='17' rx='5'/%3E%3Crect x='34' y='34' width='17' height='17' rx='5'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="Everything">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cookie&display=swap">
+<style>
+  :root{
+    --bg:#F3F5F4; --surface:#FFFFFF; --surface-2:#FAFCFB;
+    --ink:#161A19; --muted:#616D6B; --faint:#7F8B89;
+    /* body copy on cards — clearly readable, still subordinate to the title */
+    --read:#3C4544;
+    /* controls: nav rows, buttons, toggles. Deliberately darker than --muted
+       so you never have to hunt for an interactive element. */
+    --ui:#4C5755;
+    /* app-wide text scale, driven by the A− / A+ controls in the sidebar */
+    --tscale:1;
+    --line:rgba(22,26,25,.13); --line-strong:rgba(22,26,25,.26);
+    --accent:#1F6B63; --accent-soft:rgba(31,107,99,.12);
+    --blue:#44579F; --green:#5F8442; --red:#B4443A;
+    --shadow:0 1px 2px rgba(22,26,25,.04), 0 6px 20px -8px rgba(22,26,25,.10);
+    --shadow-lg:0 10px 40px -12px rgba(22,26,25,.22);
+    --r:14px;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+    /* what your writing is set in. The chrome always uses --sans; only this
+       follows the typeface switch. */
+    --content:var(--sans);
+  }
+  /* The previous palette, kept for reference. Warmer, and by your account
+     better in daily use than the teal that replaced it — paste back over the
+     light and dark blocks above to return to it.
+       light  bg #F7F6F3  surface #FFFFFF  surface-2 #FDFCFA
+              ink #1A1917  muted #6E6A62  faint #89847C  read #45433D  ui #57534B
+              line rgba(26,25,23,.13)  line-strong rgba(26,25,23,.26)
+              accent #C2683F  accent-soft rgba(194,104,63,.10)
+              blue #3E6EA8  green #4B7B52  red #B4443A
+       dark   bg #131211  surface #1C1B19  surface-2 #211F1D
+              ink #EDEBE6  muted #ABA69C  faint #837E75  read #C6C2BA  ui #BDB8AE
+              accent #E08A5F  accent-soft rgba(224,138,95,.14)
+              blue #7FA8D8  green #7FB088  red #E0736A                        */
+  /* Everything you write. The interface around it is deliberately excluded —
+     the sidebar, buttons and headings stay on the system face, which keeps
+     the chrome quiet and lets the typeface switch be about your words. */
+  .ctitle,.cbody,.desc,.etitle,.ebody,.rtitle,.rexc,.chk,.ckin,
+  .cap textarea{font-family:var(--content)}
+
+  /* Geologica at ExtraLight (200), scoped to that content only. */
+  [data-font="geologica"]{
+    --content:"Geologica",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  }
+  /* Light (300) rather than ExtraLight (200) for anything you write in.
+     ExtraLight is lovely on a logo and thin on a paragraph — it sat below the
+     system face's natural weight and made writing feel faint. Change 300 to
+     200 here to go back. */
+  [data-font="geologica"] .cbody,
+  [data-font="geologica"] .ebody,
+  [data-font="geologica"] .desc,
+  [data-font="geologica"] .rexc,
+  [data-font="geologica"] .chk,
+  [data-font="geologica"] .cap textarea{font-weight:300;letter-spacing:.004em}
+  /* Titles need real weight against a 200 body. 360 was too close to the
+     body text to read as a heading, and collapses entirely if only the
+     ExtraLight cut of Geologica is installed rather than the variable font. */
+  [data-font="geologica"] .ctitle,
+  [data-font="geologica"] .etitle,
+  [data-font="geologica"] .rtitle,
+  [data-font="geologica"] .ckin{font-weight:500;letter-spacing:.002em}
+  [data-font="geologica"] .cbody strong,
+  [data-font="geologica"] .cbody b,
+  [data-font="geologica"] .ebody strong,
+  [data-font="geologica"] .ebody b{font-weight:600}
+  [data-theme="dark"]{
+    --bg:#101413; --surface:#181E1D; --surface-2:#1D2423;
+    --ink:#E8EDEC; --muted:#9EAAA8; --faint:#798482; --read:#BFC8C7;
+    --ui:#B4BFBD;
+    --line:rgba(232,237,236,.14); --line-strong:rgba(232,237,236,.28);
+    --accent:#4FB3A6; --accent-soft:rgba(79,179,166,.16);
+    --blue:#95A6E4; --green:#9BBA72; --red:#E0736A;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px -8px rgba(0,0,0,.5);
+    --shadow-lg:0 10px 40px -12px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;
+    line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+  button,input,textarea,select{font:inherit;color:inherit}
+  button{background:none;border:0;cursor:pointer}
+  ::selection{background:var(--accent-soft)}
+
+  /* ---------- shell ---------- */
+  .app{display:grid;grid-template-columns:236px 1fr;height:100vh;height:100dvh}
+  .sidebar{border-right:1px solid var(--line);display:flex;flex-direction:column;
+    padding:14px 10px 10px;gap:2px;overflow-y:auto}
+  .brand{display:block;padding:2px 6px 18px;width:100%;text-align:center;
+    user-select:none;border-radius:9px}
+  /* Cookie is a script face — it carries far less optical weight per point
+     than the UI type, so it needs real size to outrank the view heading.
+     The size is a starting point: fitBrand() steps it down if the actual
+     font metrics turn out wider than the sidebar. */
+  .brand h1{font-family:"Cookie","Snell Roundhand","Brush Script MT",cursive;
+    font-size:52px;font-weight:400;line-height:1;letter-spacing:.005em;
+    color:var(--ink);padding:2px 0 12px;white-space:nowrap;overflow:hidden;
+    transition:color .14s,transform .16s cubic-bezier(.2,.8,.3,1);
+    transform-origin:center}
+  .brand:hover h1{color:var(--accent);transform:rotate(-1.2deg) scale(1.02)}
+  .navsec{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--muted);padding:16px 12px 6px;font-weight:600;display:flex;align-items:center;gap:6px}
+  /* padding-right reserves a gutter for the disclosure arrow on every row,
+     so the counts line up in one column whether a row has an arrow or not */
+  .nav{display:flex;align-items:center;gap:9px;padding:7px 26px 7px 10px;border-radius:9px;
+    color:var(--ui);font-weight:520;transition:background .12s,color .12s;
+    width:100%;text-align:left;position:relative}
+  .nav:hover{background:var(--line);color:var(--ink)}
+  .nav.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:560}
+  /* Drawn icons rather than typographic symbols — consistent stroke and
+     optical weight, and they carry the accent, which is the only colour in
+     the sidebar besides the tag dots. */
+  .nav .ico{width:18px;height:18px;flex:none;display:grid;place-items:center;
+    color:var(--accent);opacity:.85;transition:opacity .12s,transform .12s}
+  .nav .ico svg{width:18px;height:18px;fill:none;stroke:currentColor;
+    stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+  .nav:hover .ico{opacity:1}
+  .nav.on .ico{opacity:1}
+  .nav.sub .ico,.nav.sub .ico svg{width:16px;height:16px}
+  .nav .n{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .nav.on .n{color:var(--muted)}
+  /* one level of nesting, no more — deeper is where sidebars start to rot */
+  .nav.sub{padding-left:29px;font-size:13px}
+  .nav.sub .ico{font-size:11.5px;opacity:.7}
+  .navgroup{position:relative}
+  .navgroup::before{content:"";position:absolute;left:19px;top:2px;bottom:2px;
+    width:1px;background:var(--line)}
+  .navgroup.closed{display:none}
+  .caret{position:absolute;right:3px;top:50%;margin-top:-11px;
+    width:22px;height:22px;line-height:21px;text-align:center;font-size:13px;
+    color:var(--ui);transition:transform .15s,background .12s,color .12s;border-radius:6px}
+  .caret:hover{color:var(--ink);background:var(--line-strong)}
+  .caret.closed{transform:rotate(-90deg)}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none}
+  /* a tag the app assigns and you can't edit — the glyph replaces the dot */
+  .nav.auto .lock{width:8px;font-size:10px;color:var(--accent);flex:none;text-align:center}
+  .nav.auto{font-style:italic}
+  .tag.docmark{cursor:pointer}
+  .tag.docmark:hover{border-color:var(--accent);color:var(--accent)}
+  /* settings sit above a fence; the footer hangs below it */
+  .sidefoot{margin-top:auto;padding:11px 4px 12px;display:flex;gap:3px;align-items:center;
+    flex-wrap:wrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .sidefooter{padding:11px 8px 4px;color:var(--faint);font-size:10px;
+    line-height:1.5;letter-spacing:.01em;text-align:center}
+  .sidefooter .tagline{font-style:italic;color:var(--muted);margin-top:2px;font-size:10.5px}
+  .ghost{padding:5px 8px;border-radius:8px;color:var(--ui);font-size:11.5px;font-weight:540;
+    border:1px solid transparent;transition:.12s}
+  .ghost:hover{background:var(--line);color:var(--ink);border-color:var(--line-strong)}
+
+  .main{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:flex-start;gap:12px;padding:16px 26px 0}
+  .title{font-size:22px;font-weight:660;letter-spacing:-.02em}
+  .lensnote{color:var(--faint);font-size:12px;margin-top:2px}
+  /* the toggle and the search field share a row and a baseline */
+  .topright{margin-left:auto;display:flex;gap:10px;align-items:center;flex:none}
+  .compilewrap{position:relative}
+  .compilebtn{height:34px;padding:0 12px;border:1px solid var(--line-strong);
+    border-radius:10px;font-size:12.5px;background:var(--surface)}
+  .compilebtn.on{border-color:var(--accent);color:var(--accent)}
+  .menu{position:absolute;top:40px;right:0;min-width:212px;z-index:45;
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;
+    box-shadow:var(--shadow-lg);padding:5px;display:none}
+  .menu.on{display:block}
+  .menu button{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px}
+  .menu button:hover{background:var(--line)}
+  .menu button b{display:block;font-size:12.5px;font-weight:590;color:var(--ink)}
+  .menu button span{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+  .menuwrap{position:relative}
+  .menu.up{top:auto;bottom:32px;left:0;right:auto;min-width:196px}
+
+  .bkhint{width:100%;font-size:10.5px;color:var(--faint);padding:7px 4px 0;
+    line-height:1.4;text-align:center}
+  .bkhint.warn{color:var(--accent);font-weight:560}
+  .syncbtn.busy{color:var(--accent);border-color:var(--accent)}
+  .syncbtn.err{color:var(--red);border-color:var(--red)}
+  .syncbtn.out{border-style:dashed}
+
+  /* a small dialog for choices that need more than yes/no */
+  .askbox{background:var(--surface);border-radius:16px;padding:22px 24px;
+    width:min(430px,100%);box-shadow:var(--shadow-lg);
+    animation:pop .18s cubic-bezier(.2,.8,.3,1)}
+  .askbox h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin-bottom:8px}
+  .askbox p{font-size:13px;color:var(--read);line-height:1.6}
+  .askbox p b{color:var(--ink)}
+  .askrow{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+  .askchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+  .askin{width:100%;margin-top:12px;padding:10px 13px;border-radius:10px;
+    border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);
+    font-size:15px;font-weight:560;outline:none}
+  .askin:focus{border-color:var(--accent)}
+
+  .titlerow{display:flex;align-items:center;gap:9px}
+  .tagedit{font-size:11.5px;padding:4px 9px}
+  .search{position:relative;display:flex;align-items:center}
+  .search input{width:210px;height:34px;padding:0 11px 0 30px;border-radius:10px;
+    border:1px solid var(--line-strong);background:var(--surface);outline:none;
+    transition:width .18s,border-color .15s}
+  .search input:focus{width:260px;border-color:var(--accent)}
+  .search .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);
+    color:var(--ui);font-size:13px}
+
+  /* ---------- capture ---------- */
+  .capwrap{padding:14px 26px 10px}
+  .cap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    box-shadow:var(--shadow);padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+  .cap:focus-within{border-color:var(--line-strong);box-shadow:var(--shadow-lg)}
+  .caprow{display:flex;align-items:flex-start;gap:10px}
+  .capicon{width:20px;height:20px;display:grid;place-items:center;flex:none;margin-top:2px;
+    color:var(--accent);opacity:.85}
+  .capicon svg{width:20px;height:20px;fill:none;stroke:currentColor;
+    stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}
+  .cap textarea{flex:1;border:0;outline:none;background:none;resize:none;overflow:hidden;
+    font-size:calc(14.5px*var(--tscale));line-height:1.55;min-height:22px;max-height:180px}
+  .cap textarea::placeholder{color:var(--muted)}
+  .capmeta{display:flex;align-items:center;gap:6px;padding-top:9px;margin-top:8px;
+    border-top:1px solid var(--line);flex-wrap:wrap}
+  .capmeta.hide{display:none}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:99px;
+    font-size:11.5px;font-weight:560;background:var(--line);color:var(--ui);
+    border:1px solid var(--line-strong)}
+  .chip.acc{background:var(--accent-soft);color:var(--accent)}
+  .chip.blue{background:rgba(68,87,159,.12);color:var(--blue)}
+  .chip.red{background:rgba(180,68,58,.12);color:var(--red)}
+  .chip.green{background:rgba(95,132,66,.13);color:var(--green)}
+  .chip.tog{cursor:pointer;transition:.12s}
+  .chip.tog:hover{border-color:var(--accent);color:var(--accent)}
+  .chip.tog.acc{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .capsave{margin-left:auto;background:var(--ink);color:var(--bg);padding:5px 13px;
+    border-radius:8px;font-size:12px;font-weight:580}
+  .capsave:hover{opacity:.88}
+  .hint{color:var(--muted);font-size:11.5px}
+  kbd{font-family:var(--sans);font-size:10.5px;border:1px solid var(--line-strong);
+    border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--ui);font-weight:560}
+
+  /* ---------- board ---------- */
+  .board{flex:1;overflow-y:auto;padding:6px 26px 80px}
+  .grouphead{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);
+    font-weight:640;margin:18px 2px 10px;display:flex;align-items:center;gap:8px}
+  .grouphead .gn{color:var(--faint);opacity:.7;font-weight:500;letter-spacing:0;text-transform:none}
+  /* ---- three layouts ---- */
+  /* Moodboard: masonry columns, images at their natural proportions */
+  .grid.mood{columns:4 250px;column-gap:14px}
+  /* Cards: every card exactly the same height. The title takes up to three
+     lines; whatever it doesn't use, the body gets. Adjust --cardh to taste. */
+  .grid.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));
+    gap:14px;align-items:start;--cardh:334px}
+  .grid.cards .card{margin-bottom:0;height:var(--cardh);
+    display:flex;flex-direction:column;overflow:hidden}
+  /* image block is a constant, so the text area below it is constant too */
+  .grid.cards .photos,.grid.cards .thumb{flex:none}
+  .grid.cards .photos.n1 .ph{aspect-ratio:auto!important;height:130px}
+  .grid.cards .photos.n2,.grid.cards .photos.n3,.grid.cards .photos.nx{height:130px}
+  .grid.cards .thumb,.grid.cards .thumb.tall{height:130px}
+  .grid.cards .head,.grid.cards .foot{flex:none}
+  .grid.cards .ctitle{display:-webkit-box;-webkit-line-clamp:3;
+    -webkit-box-orient:vertical;overflow:hidden}
+  /* body absorbs the leftover space and fades out rather than cutting mid-line */
+  .grid.cards .cbody,.grid.cards .desc{flex:1 1 auto;min-height:0;display:block;
+    overflow:hidden;-webkit-line-clamp:unset;
+    -webkit-mask-image:linear-gradient(#000 76%,transparent 100%);
+    mask-image:linear-gradient(#000 76%,transparent 100%)}
+
+  /* List: columns, like a mail client. Title and excerpt share the width, and
+     tags and dates align into their own right-hand columns — so a wide window
+     buys you more of the note rather than more empty space. */
+  /* A single column at a comfortable measure, left aligned. Multiple columns
+     turned a sorted list into something you had to navigate rather than read;
+     a list should go straight down. Extra window width is left as margin. */
+  .list{display:flex;flex-direction:column;gap:1px;max-width:880px}
+  .row-item{margin-bottom:0;
+    display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:10px;
+    cursor:pointer;position:relative;border:1px solid transparent;
+    transition:border-color .12s,box-shadow .12s,opacity .12s,transform .14s,
+      margin .19s cubic-bezier(.2,.8,.3,1)}
+  .row-item:hover{border-color:var(--line);box-shadow:var(--shadow)}
+  .row-item .box{margin-top:0}
+  .rthumb{width:40px;height:40px;border-radius:8px;overflow:hidden;flex:none;
+    background:var(--line);position:relative}
+  .rthumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .rtitle{flex:0 1 40%;min-width:104px;font-weight:570;font-size:calc(13.5px*var(--tscale));letter-spacing:-.005em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rexc{flex:1 1 auto;min-width:0;font-size:calc(12.5px*var(--tscale));color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rexc strong,.rexc b,.rexc em,.rexc i{font-weight:inherit;font-style:inherit;color:inherit}
+  .rsrc{color:var(--muted);font-weight:560}
+  .rtags{flex:none;display:flex;gap:5px;max-width:150px;overflow:hidden}
+  .rdue{flex:none;width:104px;text-align:right;font-size:11px}
+  /* In a row the date is a column, not a badge — it needs no pill around it.
+     This selector has to out-rank .due.today / .due.past, which are defined
+     further down the stylesheet, hence the extra .row-item. */
+  .row-item .rdue .due{background:none;border:0;padding:0;font-weight:600;
+    display:inline;white-space:nowrap}
+  .row-item .quick{position:static;transform:none;flex:none;box-shadow:none;
+    background:none;border:0;padding:0;width:52px;justify-content:flex-end}
+  .row-item:hover .quick{transform:none}
+  .row-item .pinned{top:50%;margin-top:-10px}
+  .row-item.done .rtitle{text-decoration:line-through;color:var(--faint)}
+  .row-item.done{opacity:.55}
+
+  .lay{display:flex;background:var(--line);border:1px solid var(--line-strong);
+    border-radius:10px;padding:2px;flex:none;height:34px;align-items:center}
+  .lay button{height:26px;padding:0 10px;border-radius:7px;font-size:13px;
+    color:var(--ui);display:flex;align-items:center;transition:.12s}
+  .lay button:hover{color:var(--ink)}
+  .lay button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+
+  /* ---------- ONE card, slots appear per facet ---------- */
+  .card{break-inside:avoid;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r);padding:13px 14px;margin-bottom:14px;cursor:pointer;position:relative;
+    transition:transform .14s cubic-bezier(.2,.7,.3,1),box-shadow .14s,border-color .14s,
+      margin .19s cubic-bezier(.2,.8,.3,1)}
+  .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:var(--line-strong)}
+  .card.haslink{padding-top:13px}
+
+  /* cover — link facet. Full-bleed too, so covers and photos read the same. */
+  .thumb{position:relative;height:132px;overflow:hidden;
+    margin:-13px -14px 12px;border-radius:13px 13px 0 0}
+  .thumb.tall{height:178px}
+  .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    opacity:0;transition:opacity .4s ease}
+  .thumb img.in{opacity:1}
+  .skel{position:absolute;inset:0;background-image:linear-gradient(90deg,
+    transparent,rgba(255,255,255,.55),transparent);background-size:220% 100%;
+    animation:sweep 1.3s ease-in-out infinite}
+  [data-theme="dark"] .skel{background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent)}
+  @keyframes sweep{0%{background-position:220% 0}100%{background-position:-120% 0}}
+
+  /* photos — user-attached images, full-bleed to the card edges.
+     Negative margins cancel the card's padding so the image meets the border. */
+  .photos{display:grid;gap:3px;overflow:hidden;
+    margin:-13px -14px 12px;border-radius:13px 13px 0 0}
+  .photos.n1{grid-template-columns:1fr}
+  .photos.n2{grid-template-columns:1fr 1fr;height:148px}
+  .photos.n3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;height:172px}
+  .photos.n3 .ph:first-child{grid-row:span 2}
+  .photos.nx{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;height:172px}
+  /* width:100% is load-bearing. A grid item carrying aspect-ratio behaves like a
+     replaced element: if anything caps its height, it shrinks its WIDTH to keep
+     the ratio, leaving gaps at the sides. That only ever bit portrait images,
+     because they were the only ones tall enough to hit the cap. */
+  .ph{position:relative;overflow:hidden;background:var(--line);min-height:0;
+    width:100%;cursor:pointer}
+  .ph img{width:100%;height:100%;object-fit:cover;display:block}
+  .ph.more::after{content:"+"attr(data-more);position:absolute;inset:0;
+    background:rgba(26,25,23,.55);color:#fff;display:grid;place-items:center;
+    font-size:18px;font-weight:640;letter-spacing:-.02em}
+  .card.done .photos{filter:grayscale(1);opacity:.6}
+
+  /* Images must never be draggable themselves. A dragged <img> hands the
+     browser an image payload, which the file importer then treated as an
+     upload — that's how dragging a card's photo pasted it into another card. */
+  .card img,.row-item img{-webkit-user-drag:none;user-select:none}
+
+  /* ---- reordering ----
+     Two cues working together: the neighbours slide apart to open a real gap
+     where the card will land, and a thick line drops into that gap. The gap
+     says "there is room here"; the line says "exactly here". */
+  .card[draggable="true"],.row-item[draggable="true"]{cursor:grab}
+  .card[draggable="true"]:active,.row-item[draggable="true"]:active{cursor:grabbing}
+  .card.dragging,.row-item.dragging{opacity:.32;transform:scale(.98)}
+
+  /* the gap. Vertical flow in moodboard and list, horizontal in cards. */
+  .grid.mood .card.dropbefore{margin-top:44px}
+  .grid.mood .card.dropafter{margin-bottom:58px}   /* 14 base + 44 */
+  .grid.cards .card.dropbefore{margin-left:32px}
+  .grid.cards .card.dropafter{margin-right:32px}
+  .list .row-item.dropbefore{margin-top:40px}
+  .list .row-item.dropafter{margin-bottom:41px}    /* 1 base + 40 */
+
+  /* the line. Lives on <body> at fixed coordinates so no card's overflow
+     can clip it, and glides between positions instead of blinking. */
+  .dropline{position:fixed;z-index:66;background:var(--accent);border-radius:99px;
+    pointer-events:none;opacity:0;
+    box-shadow:0 0 0 4px var(--accent-soft),0 3px 12px -3px var(--accent);
+    transition:opacity .12s ease,top .13s cubic-bezier(.2,.8,.3,1),
+      left .13s cubic-bezier(.2,.8,.3,1),width .13s ease,height .13s ease}
+  .dropline.on{opacity:1}
+  .dropline::before,.dropline::after{content:"";position:absolute;
+    width:9px;height:9px;border-radius:50%;background:var(--accent)}
+  .dropline.horiz::before{left:-3px;top:50%;margin-top:-4.5px}
+  .dropline.horiz::after{right:-3px;top:50%;margin-top:-4.5px}
+  .dropline.vert::before{top:-3px;left:50%;margin-left:-4.5px}
+  .dropline.vert::after{bottom:-3px;left:50%;margin-left:-4.5px}
+
+  /* drop targets — a small hint pill, not a blocking overlay, so you can
+     still see which card you're aiming at */
+  .card.dropping{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+    transform:translateY(-2px) scale(1.012)}
+  .dropveil{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(14px);
+    z-index:70;background:var(--surface);color:var(--ink);padding:10px 20px;border-radius:12px;
+    font-size:13px;font-weight:580;box-shadow:var(--shadow-lg);border:1.5px dashed var(--accent);
+    pointer-events:none;opacity:0;transition:opacity .14s,transform .14s;white-space:nowrap}
+  .dropveil.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .dropveil.no{border-color:var(--line-strong);color:var(--faint);border-style:solid}
+  #board.armed{outline:2px dashed var(--accent-soft);outline-offset:-10px;border-radius:16px}
+
+  /* lightbox */
+  .light{position:fixed;inset:0;z-index:80;display:none;place-items:center;
+    background:rgba(12,11,10,.88);padding:28px}
+  .light.on{display:grid}
+  .light img{max-width:100%;max-height:100%;border-radius:10px;
+    box-shadow:0 20px 60px -20px rgba(0,0,0,.8)}
+  .light .nav{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);
+    display:flex;gap:6px;align-items:center;color:rgba(255,255,255,.8);font-size:12px}
+  .light .nav button{color:#fff;padding:5px 11px;border-radius:8px;background:rgba(255,255,255,.14)}
+
+  /* editor gallery — full-bleed to the sheet edges, same as on a card */
+  .egal{margin:-30px -34px 18px;border-radius:20px 20px 0 0;overflow:hidden;position:relative}
+  .egal .photos{margin:0;border-radius:0}
+  /* in the editor a fixed height is fine — set it explicitly rather than
+     capping an aspect-ratio, so the width still stretches edge to edge */
+  .egal .photos.n1 .ph{aspect-ratio:auto!important;height:min(50vh,440px)}
+  .egal .photos.n2{height:230px}
+  .egal .photos.n3,.egal .photos.nx{height:280px}
+  .egal .ph{cursor:zoom-in}
+  .egal .rm{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+    background:rgba(26,25,23,.62);color:#fff;font-size:11px;display:grid;place-items:center;
+    line-height:1;opacity:0;transition:opacity .12s;z-index:2}
+  .egal .ph:hover .rm{opacity:1}
+  .egal .rm:hover{background:var(--red)}
+  .egalbar{display:flex;gap:8px;align-items:center;margin:20px 0 6px;
+    padding-top:14px;border-top:1px solid var(--line)}
+  .addimg{padding:7px 13px;border-radius:9px;border:1px dashed var(--line-strong);
+    color:var(--ui);font-size:12.5px;font-weight:560}
+  .addimg:hover{border-color:var(--accent);color:var(--accent)}
+  .wc{margin-left:auto;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .szgrp{display:flex;gap:1px;align-items:center}
+  .szbtn{padding:5px 7px;font-size:11.5px;font-weight:600}
+  .szbtn:disabled{opacity:.3;cursor:default}
+  .szbtn:disabled:hover{background:none;color:var(--muted)}
+  .szval{font-size:10.5px;color:var(--faint);min-width:34px;text-align:center;
+    font-variant-numeric:tabular-nums}
+  .fmt{font-size:13px;min-width:30px;justify-content:center}
+  .fmt b{font-weight:800}
+  .fmt i{font-family:Georgia,serif}
+
+  /* head row */
+  .head{display:flex;gap:9px;align-items:flex-start}
+  .ctitle{font-weight:600;font-size:calc(14.5px*var(--tscale));letter-spacing:-.01em;line-height:1.35}
+  .srcline{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px}
+  .fav{width:15px;height:15px;border-radius:4px;flex:none;display:grid;place-items:center;
+    font-size:8.5px;font-weight:700;color:#fff;overflow:hidden;position:relative}
+  .fav img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fff}
+  /* the fetched excerpt stays quiet — it isn't your writing */
+  .desc{color:var(--muted);font-size:calc(12.5px*var(--tscale));line-height:1.52;margin-top:8px;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  /* your own words get real contrast */
+  .cbody{color:var(--read);font-size:calc(13.5px*var(--tscale));line-height:1.58;margin-top:7px;
+    display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;
+    word-break:break-word}
+  .cbody strong,.cbody b{font-weight:700;color:var(--ink)}
+  .cbody em,.cbody i{font-style:italic}
+  .cbody u{text-decoration:underline}
+  .cbody a,.ebody a{color:var(--blue);text-decoration:underline;
+    text-underline-offset:2px;text-decoration-thickness:1px}
+  .cbody a:hover,.ebody a:hover{text-decoration-thickness:2px}
+  .ebody a{cursor:pointer}
+
+  /* Short, text-only notes get set large — a stray thought should look like one,
+     not like a truncated paragraph. */
+  .card.display{padding:20px 20px}
+  .card.display .cbody{font-size:calc(18.5px*var(--tscale));line-height:1.46;color:var(--ink);
+    letter-spacing:-.011em;-webkit-line-clamp:12;margin-top:6px}
+  .card.display .ctitle{font-size:14px;font-weight:620;color:var(--muted);
+    text-transform:none;letter-spacing:0}
+  .card.display.xl .cbody{font-size:calc(23px*var(--tscale));line-height:1.38;letter-spacing:-.018em}
+  .card.display.titleonly .ctitle{font-size:calc(18.5px*var(--tscale));font-weight:600;color:var(--ink);
+    line-height:1.45;letter-spacing:-.011em}
+  .card.display.titleonly.xl .ctitle{font-size:calc(23px*var(--tscale));line-height:1.38;letter-spacing:-.018em}
+
+  /* action facet */
+  .box{width:17px;height:17px;border-radius:50%;border:1.8px solid var(--muted);
+    flex:none;margin-top:2px;display:grid;place-items:center;transition:.14s;
+    font-size:10px;color:transparent}
+  .box:hover{border-color:var(--accent);transform:scale(1.1)}
+  .card.done .box{background:var(--accent);border-color:var(--accent);color:#fff}
+  .card.done .ctitle{text-decoration:line-through;color:var(--faint)}
+  .card.done{opacity:.55}
+  .card.done .thumb{filter:grayscale(1);opacity:.6}
+
+  /* checklist inside an item — distinct from the item's own checkbox */
+  .checks{margin-top:9px;display:flex;flex-direction:column;gap:1px}
+  .chk{display:flex;gap:8px;align-items:flex-start;padding:2px 0;
+    font-size:calc(12.8px*var(--tscale));line-height:1.45;color:var(--read)}
+  .cbox{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--line-strong);
+    flex:none;margin-top:2px;display:grid;place-items:center;font-size:8px;
+    color:transparent;transition:.12s;cursor:pointer}
+  .cbox:hover{border-color:var(--accent)}
+  .chk.on .cbox{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chk.on span:last-child{text-decoration:line-through;color:var(--faint)}
+  .chkmore{font-size:11px;color:var(--faint);padding-left:22px;margin-top:2px}
+  .ckprog{font-size:11px;font-weight:600;color:var(--muted);background:var(--line);
+    border:1px solid var(--line-strong);padding:2px 7px;border-radius:99px;
+    font-variant-numeric:tabular-nums}
+  .ckprog.all{color:var(--green);border-color:rgba(95,132,66,.42)}
+
+  /* editor list */
+  .cklist{display:flex;flex-direction:column;gap:3px;margin:6px 0 8px}
+  .ckrow{display:flex;gap:9px;align-items:center}
+  .ckrow .cbox{width:17px;height:17px;font-size:10px;margin:0}
+  .ckin{flex:1;border:0;border-bottom:1px solid transparent;background:none;outline:none;
+    font-size:14px;padding:4px 2px;margin:0!important;color:var(--ink)}
+  .ckin:focus{border-bottom-color:var(--line-strong)}
+  .ckrow.done .ckin{text-decoration:line-through;color:var(--faint)}
+  .ckdel{width:22px;height:22px;border-radius:6px;color:var(--faint);font-size:11px;
+    flex:none;opacity:0;transition:.12s}
+  .ckrow:hover .ckdel{opacity:1}
+  .ckdel:hover{background:var(--line);color:var(--red)}
+
+  .foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+  .due{font-size:11px;font-weight:580;display:inline-flex;gap:4px;align-items:center;
+    padding:2px 7px;border-radius:99px;background:var(--line)}
+  .due.past{color:var(--red);background:rgba(180,68,58,.13)}
+  .due.today{color:var(--accent);background:var(--accent-soft)}
+  .due.later{color:var(--muted)}
+  .tag{font-size:10.5px;font-weight:570;color:var(--ui);background:var(--line);
+    padding:2px 7px;border-radius:99px;border:1px solid var(--line-strong)}
+
+  /* quick facet toggles on hover — conversion in one click */
+  .quick{position:absolute;top:8px;right:8px;display:flex;gap:2px;padding:2px;
+    background:var(--surface);border:1px solid var(--line);border-radius:9px;
+    box-shadow:var(--shadow);opacity:0;transform:translateY(-3px);
+    transition:opacity .14s,transform .14s;z-index:2}
+  .card:hover .quick{opacity:1;transform:translateY(0)}
+  .quick button{width:24px;height:22px;border-radius:6px;font-size:11px;color:var(--ui);
+    display:grid;place-items:center}
+  .quick button:hover{background:var(--line);color:var(--ink)}
+  .quick button.on{color:var(--accent)}
+  .quick button.go{color:var(--blue);font-weight:700}
+  .quick button.go:hover{background:rgba(68,87,159,.14);color:var(--blue)}
+  .pinned{position:absolute;top:10px;left:-1px;width:3px;height:20px;border-radius:0 3px 3px 0;
+    background:var(--accent)}
+
+  /* selection */
+  .pick{position:absolute;top:8px;left:8px;width:21px;height:21px;border-radius:50%;
+    border:1.8px solid var(--line-strong);background:var(--surface);color:transparent;
+    display:grid;place-items:center;font-size:11px;z-index:3;
+    opacity:0;transform:scale(.85);transition:.12s}
+  .card:hover .pick,.row-item:hover .pick{opacity:1;transform:scale(1)}
+  .pick:hover{border-color:var(--accent)}
+  .card.picked .pick,.row-item.picked .pick{opacity:1;transform:scale(1);
+    background:var(--accent);border-color:var(--accent);color:#fff}
+  .card.picked{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .row-item.picked{border-color:var(--accent);background:var(--accent-soft)}
+  .row-item .pick{position:static;flex:none;opacity:0;width:19px;height:19px}
+  .row-item:hover .pick,.row-item.picked .pick{opacity:1}
+  body.selecting .pick{opacity:1;transform:scale(1)}
+
+  .selbar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(24px);
+    background:var(--ink);color:var(--bg);border-radius:13px;padding:8px 10px 8px 16px;
+    display:none;align-items:center;gap:8px;z-index:75;box-shadow:var(--shadow-lg);
+    opacity:0;transition:opacity .16s,transform .16s}
+  .selbar.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
+  .selbar .cnt{font-size:12.5px;font-weight:600;margin-right:4px;white-space:nowrap}
+  .selbar button{padding:6px 12px;border-radius:9px;font-size:12px;font-weight:560;
+    background:rgba(255,255,255,.14);color:var(--bg);white-space:nowrap}
+  .selbar button:hover{background:rgba(255,255,255,.26)}
+  .selbar button.dan{color:#FF9A90}
+  .selbar button.dan:hover{background:rgba(255,120,110,.28)}
+  .refetch{font-size:10.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px}
+  .refetch:hover{color:var(--accent)}
+  .pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);
+    animation:blink 1.1s ease-in-out infinite;flex:none}
+  @keyframes blink{50%{opacity:.25}}
+  .empty{text-align:center;color:var(--faint);padding:70px 20px}
+  .empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
+
+  /* ---------- editor ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(26,25,23,.28);backdrop-filter:blur(3px);
+    display:none;place-items:center;z-index:50;padding:20px}
+  .scrim.on{display:grid}
+  .sheet{background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg);
+    width:min(820px,100%);max-height:88vh;overflow:auto;padding:30px 34px 0;
+    scroll-padding-bottom:120px;
+    animation:pop .18s cubic-bezier(.2,.8,.3,1)}
+  @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}}
+  .sheet input,.sheet textarea{width:100%;border:0;outline:none;background:none;margin-bottom:8px}
+  .etitle{font-size:calc(25px*var(--tscale));font-weight:660;letter-spacing:-.025em;line-height:1.25;
+    color:var(--ink);margin-bottom:12px}
+  /* the note body is the point of this window — give it room, weight and contrast */
+  .ebody{font-size:calc(16px*var(--tscale));line-height:1.72;min-height:46vh;width:100%;
+    color:var(--ink);font-family:var(--content);margin-bottom:4px;
+    outline:none;white-space:pre-wrap;word-break:break-word}
+  .ebody:empty:before{content:attr(data-ph);color:var(--faint)}
+  .ebody strong,.ebody b{font-weight:700}
+  .ebody em,.ebody i{font-style:italic}
+  .sheet ::placeholder{color:var(--faint)}
+  .readctx{font-size:13.5px;line-height:1.6;color:var(--muted);padding:11px 14px;
+    border-left:2px solid var(--line-strong);background:var(--surface-2);
+    border-radius:0 9px 9px 0;margin-bottom:14px}
+  .readctx a{color:var(--blue);text-decoration:none}
+  .facetbar{display:flex;gap:7px;margin:16px 0 0;padding-top:15px;
+    border-top:1px solid var(--line);flex-wrap:wrap;align-items:center}
+  .facet{display:inline-flex;gap:7px;align-items:center;padding:6px 13px;border-radius:99px;
+    border:1px solid var(--line-strong);background:var(--surface-2);font-size:12.5px;
+    font-weight:560;color:var(--ui);transition:.14s}
+  .facet:hover{border-color:var(--line-strong);color:var(--ink)}
+  .facet.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+  .facet .fi{font-size:13px}
+  .sticky{position:sticky;bottom:0;background:var(--surface);
+    padding-bottom:22px;margin-top:18px;z-index:2}
+  /* Formatting stays within reach of the cursor. Pinned just above the action
+     row, so editing the middle of a long note doesn't mean scrolling to the
+     end to find bold. */
+  .fmtbar{position:sticky;bottom:58px;z-index:3;background:inherit;
+    display:flex;gap:7px;align-items:center;padding:9px 0 10px;margin-top:4px;
+    border-top:1px solid var(--line)}
+  .sheet[class*="tint-"] .fmtbar{background:inherit}
+  .panel{display:none;padding:11px 12px;border-radius:11px;background:var(--surface-2);
+    border:1px solid var(--line);margin-top:8px}
+  .panel.on{display:block}
+  .panel label{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--faint);font-weight:640;display:block;margin-bottom:5px}
+  /* one-click shortcuts for the tags you actually use */
+  .tagsug{display:flex;gap:5px;flex:none}
+  .sug{font-size:11px;font-weight:560;color:var(--muted);background:var(--line);
+    border:1px solid var(--line-strong);border-radius:99px;padding:4px 10px;
+    transition:.12s;white-space:nowrap}
+  .sug:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  /* Our own date picker. The native one can't be restyled — its calendar and
+     buttons live in browser shadow DOM — and it ignores `step` on the minute
+     wheel. Building it means both problems go away. */
+  .dpick{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .dbtn{cursor:pointer;font-weight:560;color:var(--ink);min-width:170px;text-align:left}
+  .dbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .dbtn.none{color:var(--muted);font-weight:500}
+  .dpop{display:none;margin-top:11px;padding:12px;border-radius:12px;
+    background:var(--surface);border:1px solid var(--line-strong)}
+  .dpop.on{display:block}
+  .dquick{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px}
+  .dquick button{padding:5px 11px;border-radius:99px;font-size:11.5px;font-weight:560;
+    background:var(--line);color:var(--ui);border:1px solid var(--line-strong)}
+  .dquick button:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .dhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .dhead span{font-size:13px;font-weight:600;color:var(--ink)}
+  .dhead button{width:26px;height:26px;border-radius:7px;color:var(--ui);font-size:14px}
+  .dhead button:hover{background:var(--line);color:var(--ink)}
+  .dgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+  .dgrid .dow{font-size:10px;font-weight:640;color:var(--faint);text-align:center;
+    padding-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+  .dgrid button{height:30px;border-radius:8px;font-size:12px;color:var(--ink);
+    font-variant-numeric:tabular-nums}
+  .dgrid button:hover{background:var(--line)}
+  .dgrid button.dim{color:var(--faint)}
+  .dgrid button.today{color:var(--accent);font-weight:700}
+  .dgrid button.sel{background:var(--accent);color:#fff;font-weight:640}
+  .dtime{display:flex;align-items:center;gap:6px;margin-top:11px;padding-top:11px;
+    border-top:1px solid var(--line)}
+  .dtime label{margin:0;padding-right:2px}
+  .dtime select{border:1px solid var(--line-strong);border-radius:8px;padding:5px 6px;
+    font-size:12.5px;background:var(--surface);color:var(--ink);outline:none}
+  .dtime b{color:var(--muted)}
+  .dquickadd{padding:5px 11px;border-radius:99px;font-size:11.5px;font-weight:560;
+    background:var(--line);color:var(--ui);border:1px solid var(--lineStrong,var(--line-strong))}
+  .dquickadd:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .dtime .btn{margin-left:auto}
+
+  .urlrow{display:flex;gap:8px;align-items:center}
+  .urlrow input{flex:1;min-width:0;margin:0!important}
+  .urlrow .btn{flex:none;white-space:nowrap}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px;
+    padding-top:14px;border-top:1px solid var(--line)}
+  .swatches{display:flex;gap:5px}
+  .sw{width:19px;height:19px;border-radius:50%;border:1.5px solid var(--line-strong);cursor:pointer}
+  .sw.on{outline:2px solid var(--accent);outline-offset:2px}
+  .field{border:1px solid var(--line-strong);border-radius:8px;padding:5px 9px;font-size:12.5px;
+    background:var(--surface);width:auto!important;margin:0!important}
+  .btn{padding:6px 13px;border-radius:9px;font-size:12.5px;font-weight:580;
+    background:var(--ink);color:var(--bg)}
+  .btn.sec{background:var(--line);color:var(--ink);border:1px solid var(--line-strong)}
+  .btn.dan{background:none;color:var(--red)}
+  /* the quietest button in the app — present, not advertised */
+  .btn.quiet{background:none;border:0;color:var(--faint);font-weight:500}
+  .btn.quiet:hover{color:var(--ink)}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:11px;font-size:12.5px;
+    font-weight:540;opacity:0;transition:.22s;pointer-events:none;z-index:99;box-shadow:var(--shadow-lg)}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---- tints ----
+     Declared last so they win over .card, .row-item and .sheet backgrounds,
+     which lets a card keep its colour in the list and in the open editor. */
+  /* "doc" is reserved for compiled documents and is deliberately absent from
+     the colour picker, so a compiled page always looks like one. */
+  .tint-doc{background-color:#E2E8E6}
+  [data-theme="dark"] .tint-doc{background-color:#1C2422}
+  .card.tint-doc,.row-item.tint-doc{border-color:rgba(88,110,106,.34)}
+  .tag.docmark{background:rgba(88,110,106,.16);border-color:rgba(88,110,106,.36);
+    color:#4E5B59;letter-spacing:.03em}
+  [data-theme="dark"] .tag.docmark{color:#A6B7B4}
+
+  .tint-amber{background-color:#FCF3E3}
+  .tint-sage{background-color:#EDF3EC}
+  .tint-sky{background-color:#EAF1F8}
+  .tint-rose{background-color:#FAEDEC}
+  .tint-lilac{background-color:#F0EDF8}
+  [data-theme="dark"] .tint-amber{background-color:#2B2418}
+  [data-theme="dark"] .tint-sage{background-color:#1B2620}
+  [data-theme="dark"] .tint-sky{background-color:#1A2430}
+  [data-theme="dark"] .tint-rose{background-color:#2C1E1D}
+  [data-theme="dark"] .tint-lilac{background-color:#231F2E}
+  /* The action bar is sticky, so text scrolls beneath it — it has to stay
+     opaque. On a tinted sheet it takes the sheet's own colour rather than
+     going transparent, which is what let text show through it. */
+  .sheet[class*="tint-"] .sticky{background:inherit}
+  .sheet[class*="tint-"] .panel,
+  .sheet[class*="tint-"] .facet,
+  .sheet[class*="tint-"] .field{background:transparent}
+  .sheet[class*="tint-"] .facet.on{background:var(--accent-soft)}
+
+  .mobtabs{display:none}
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr}
+    .sidebar{display:none}
+    .topbar{padding:14px 16px 0}
+    .capwrap{padding:12px 16px 8px}
+    .board{padding:4px 16px 96px}
+    .grid.mood{columns:2 150px;column-gap:10px}
+    .grid.cards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .rthumb{width:36px;height:36px}
+    .row-item{padding:8px 10px;gap:10px}
+    .rtitle{flex:1 1 auto;min-width:0}
+    .rexc,.rtags{display:none}
+    .rdue{width:auto}
+    .row-item .quick{display:none}
+    .lay{margin-left:0!important}
+    .grid.cards{--cardh:300px}
+    .card{margin-bottom:10px}
+    .quick{opacity:.5;transform:none}
+    .search input{width:140px}.search input:focus{width:160px}
+    .scrim{padding:0}
+    .sheet{padding:22px 18px 0;border-radius:16px;max-height:96vh;width:100%}
+    .etitle{font-size:21px}
+    .ebody{font-size:15.5px;min-height:32vh}
+    .imgstrip .t,.addimg{width:70px;height:70px}
+    .facetbar .swatches{margin-left:0!important;width:100%;margin-top:4px}
+    .mobtabs{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);
+      border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:40}
+    .mobtabs button{flex:1;display:grid;gap:2px;justify-items:center;color:var(--faint);
+      font-size:10px;padding:3px}
+    .mobtabs button .ico{width:20px;height:20px;display:grid;place-items:center;color:inherit;opacity:1}
+    .mobtabs button .ico svg{width:20px;height:20px;fill:none;stroke:currentColor;
+      stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+    .mobtabs button.on{color:var(--accent)}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <button class="brand" id="brand" title="Click to switch the name">
+      <h1 id="brandname">Everything</h1>
+    </button>
+    <button class="nav" data-view="all"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></svg></span>All<span class="n" id="c-all"></span></button>
+    <button class="nav" data-view="notes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="4.5" y="3.5" width="15" height="17" rx="3.2"/><path d="M8.2 9h7.6M8.2 12.8h7.6M8.2 16.6h4.6"/></svg></span>Notes<span class="n" id="c-notes"></span></button>
+    <button class="nav" data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links<span class="n" id="c-links"></span></button>
+    <button class="nav" data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks<span class="n" id="c-tasks"></span>
+      <span class="caret" data-toggle="tasks">▾</span></button>
+    <div class="navgroup" id="grp-tasks">
+      <button class="nav sub" data-view="today"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.1 1.9"/></svg></span>Today<span class="n" id="c-today"></span></button>
+      <button class="nav sub" data-view="overdue" id="nav-overdue"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.9v4.6"/><path d="M12 16.1v.05"/></svg></span>Overdue<span class="n" id="c-overdue"></span></button>
+      <button class="nav sub" data-view="upcoming"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.7" y="5.4" width="16.6" height="15" rx="3.2"/><path d="M8.3 3.4v3.8M15.7 3.4v3.8M3.7 10.4h16.6"/></svg></span>Upcoming<span class="n" id="c-upcoming"></span></button>
+      <button class="nav sub" data-view="someday"><span class="ico"><svg viewBox="0 0 24 24"><path d="M19.2 14.4A7.6 7.6 0 0 1 9.6 4.8a7.6 7.6 0 1 0 9.6 9.6z"/></svg></span>Someday<span class="n" id="c-someday"></span></button>
+      <button class="nav sub" data-view="done"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M8.4 12.2l2.6 2.5 4.6-5"/></svg></span>Completed<span class="n" id="c-done"></span></button>
+    </div>
+    <button class="nav" data-view="archived" id="nav-archived"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.4" y="4.3" width="17.2" height="4.6" rx="1.9"/><path d="M5.4 8.9v9.3a2.2 2.2 0 0 0 2.2 2.2h8.8a2.2 2.2 0 0 0 2.2-2.2V8.9"/><path d="M10 12.8h4"/></svg></span>Archived<span class="n" id="c-archived"></span></button>
+    <div class="navsec">Tags</div>
+    <div id="taglist"></div>
+    <div class="sidefoot">
+      <button class="ghost" id="themebtn">◐ Theme</button>
+      <button class="ghost" id="fontbtn" title="Typeface for note text only">Aa System</button>
+      <button class="ghost" id="quotebtn">« » Greek</button>
+      <div class="szgrp">
+        <button class="ghost szbtn" id="szdown" title="Smaller text">A−</button>
+        <span class="szval" id="szval">16</span>
+        <button class="ghost szbtn" id="szup" title="Larger text">A+</button>
+      </div>
+      <div class="menuwrap">
+        <button class="ghost" id="backupbtn">⤓ Backup</button>
+        <div class="menu up" id="backupmenu">
+          <button data-bk="export"><b>Export everything</b><span>One .json file you own</span></button>
+          <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
+        </div>
+      </div>
+      <button class="ghost" id="resetbtn">Reset</button>
+      <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
+      <div class="bkhint" id="bkhint"></div>
+      <div class="bkhint warn" id="fonthint" style="display:none">
+        Logo font missing — see fonts/fonts.css</div>
+    </div>
+    <div class="sidefooter">
+      <div id="copyline">© 2026 Social Capital</div>
+      <div class="tagline" id="tagline">This is Everything</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="titlerow">
+          <div class="title" id="viewtitle">All</div>
+          <button class="ghost tagedit" id="tagedit" style="display:none">✎ Rename tag</button>
+        </div>
+        <div class="lensnote" id="lensnote"></div>
+      </div>
+      <div class="topright">
+        <div class="compilewrap">
+          <button class="ghost compilebtn" id="compilebtn" title="Turn this page into one document">⇥ Compile</button>
+          <div class="menu" id="compilemenu">
+            <button data-comp="note"><b>As a new note</b><span>Editable here, links live</span></button>
+            <button data-comp="doc"><b>Download .doc</b><span>Opens in Word or Pages</span></button>
+          </div>
+        </div>
+        <div class="lay" id="layoutseg">
+          <button data-lay="list" title="List">☰</button>
+          <button data-lay="cards" title="Cards">▦</button>
+          <button data-lay="mood" title="Moodboard">⊞</button>
+        </div>
+        <div class="search">
+          <span class="si">⌕</span>
+          <input id="q" placeholder="Search…" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div class="capwrap">
+      <div class="cap">
+        <div class="caprow">
+          <div class="capicon" id="capicon"></div>
+          <textarea id="capin" rows="1" placeholder="Jot a note. Paste a link. Add a date, or ⌘↵, to make it a task…"></textarea>
+        </div>
+        <div class="capmeta hide" id="capmeta">
+          <span class="hint" id="caphint"></span>
+          <button class="capsave" id="capsave">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="board" id="board"></div>
+  </main>
+</div>
+
+<nav class="mobtabs">
+  <button data-view="all" class="on"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></svg></span>All</button>
+  <button data-view="today"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.1 1.9"/></svg></span>Today</button>
+  <button data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links</button>
+  <button data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks</button>
+</nav>
+
+<div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<div class="dropveil" id="dropveil">Drop images to add them</div>
+<div class="dropline" id="dropline"></div>
+<div class="light" id="light"><img id="lightimg" alt=""><div class="nav" id="lightnav"></div></div>
+<input type="file" id="filepick" accept="image/*" multiple style="display:none">
+<input type="file" id="jsonpick" accept=".json,application/json" style="display:none">
+<div class="scrim" id="ask"><div class="askbox" id="askbox"></div></div>
+<div class="selbar" id="selbar">
+  <span class="cnt" id="selcnt"></span>
+  <button data-sel="all">Select all</button>
+  <button data-sel="tag">＋ Tag</button>
+  <button data-sel="untag">－ Tag</button>
+  <button data-sel="arch">▣ Archive</button>
+  <button data-sel="del" class="dan">Delete</button>
+  <button data-sel="clear">Done</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   THE MODEL — facets, not types.
+
+   Every item is TEXT (title + body). On top of that it may carry:
+     · a LINK facet   — it has a url  → gets a cover image, source line
+     · an ACTION facet — it is actionable → gets a checkbox, optional due date
+
+   Nothing is exclusive. An article to read by Friday carries both.
+   The sidebar shows filters, not folders:
+     Notes = text only   Links = has a url   Tasks = actionable
+   Notes and Links don't overlap. Tasks cuts across Links, so an article
+   with a deadline is in both — which is the whole point of the model.
+   ========================================================================= */
+
+var KEY="trove.v3", K2="trove.v2", K1="trove.v1", mem=null;
+
+function hasLink(i){ return !!(i && i.url) }
+function hasAction(i){ return !!(i && i.actionable) }
+function hasPhotos(i){ return !!(i && i.photos && i.photos.length) }
+function hasChecks(i){ return !!(i && i.checks && i.checks.length) }
+function checkDone(i){ return hasChecks(i)?i.checks.filter(function(c){ return c.d }).length:0 }
+function isPlain(i){ return !hasLink(i) && !hasAction(i) }
+
+/* ---- storage + migration ---- */
+function migrate(old){
+  return old.map(function(o){
+    return {
+      id:o.id, title:o.title||"", body:o.body||"",
+      url:o.url||"", image:o.image||"", desc:o.desc||"", logo:o.logo||"",
+      site:o.site||"", metaState:o.metaState||null, titleAuto:!!o.titleAuto,
+      actionable: o.type==="task" || o.due!=null,
+      due: o.due!=null?o.due:null,
+      timed:!!(o.due&&(new Date(o.due).getHours()||new Date(o.due).getMinutes())), done:!!o.done,
+      tint:o.tint||"", tags:o.tags||[], checks:o.checks||[], archived:!!o.archived, pin:!!o.pin,
+      created:o.created||Date.now(), modified:o.created||Date.now()
+    };
+  });
+}
+// v3 turned plain-text bodies into rich text. Run every note through once.
+function enrich(list){
+  list.forEach(function(o){ o.body=toRich(o.body) });
+  return list;
+}
+function load(){
+  try{
+    var r=localStorage.getItem(KEY);
+    if(r) return JSON.parse(r);
+    var two=localStorage.getItem(K2);
+    if(two){ var a=enrich(JSON.parse(two)); localStorage.setItem(KEY,JSON.stringify(a)); return a }
+    var one=localStorage.getItem(K1);
+    if(one){ var b=enrich(migrate(JSON.parse(one))); localStorage.setItem(KEY,JSON.stringify(b)); return b }
+  }catch(e){}
+  return mem;
+}
+function save(){
+  // every write is local first; syncing notices afterwards and never blocks it
+  if(typeof stampChanges==="function") setTimeout(stampChanges,0);
+  try{ localStorage.setItem(KEY, JSON.stringify(S.items)) }catch(e){
+    // Browsers cap localStorage at ~5MB. Images are the only thing big enough to hit it.
+    // A native app writes real files to disk and never has this problem.
+    if(typeof toast==="function") toast("Storage full — this browser caps saved images");
+  }
+  mem=S.items;
+}
+
+var S={items:[], view:"all", q:"", tag:null, layouts:{}, sel:{}};
+
+/* Each lens remembers its own layout, the way Raindrop gives every collection
+   its own view settings. The defaults suit what each lens mostly holds. */
+var DEFAULT_LAYOUT={all:"mood", today:"list", overdue:"list", upcoming:"list", someday:"list",
+  notes:"mood", links:"cards", tasks:"list", done:"list"};
+
+/* A tag is its own page, not a variation of whichever lens you came from —
+   so it gets its own key and remembers its own layout. Same for search. */
+function pageKey(){
+  if(S.q) return "search";
+  if(S.tag) return "tag:"+S.tag;
+  return S.view;
+}
+function defaultLayout(){
+  if(S.q) return "list";
+  if(S.tag) return "mood";
+  return DEFAULT_LAYOUT[S.view]||"mood";
+}
+function layoutFor(){ return S.layouts[pageKey()]||defaultLayout() }
+function setLayout(lay){
+  S.layouts[pageKey()]=lay;
+  try{ localStorage.setItem("trove.layouts",JSON.stringify(S.layouts)) }catch(e){}
+}
+var TINTS=["","amber","sage","sky","rose","lilac"];
+var TINTHEX={"":"transparent",amber:"#FCF3E3",sage:"#EDF3EC",sky:"#EAF1F8",rose:"#FAEDEC",lilac:"#F0EDF8"};
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
+
+/* ---- dates ---- */
+function startOfDay(d){ var x=new Date(d); x.setHours(0,0,0,0); return x }
+function todayKey(){ return startOfDay(new Date()).getTime() }
+function dayOf(ts){ return startOfDay(new Date(ts)).getTime() }
+/* A date can be worn three ways: no date at all (someday), a date on its own,
+   or a date with a time. `timed` says which of the last two; when it isn't
+   given we infer it from the timestamp, so older records still read right. */
+function fmtDue(ts,timed){
+  var d=new Date(ts), diff=Math.round((dayOf(ts)-todayKey())/86400000);
+  if(timed===undefined) timed=!!(d.getHours()||d.getMinutes());
+  var time=timed
+    ? d.toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}).replace(":00","") : "";
+  var label;
+  if(diff===0) label="Today"; else if(diff===1) label="Tomorrow";
+  else if(diff===-1) label="Yesterday";
+  else if(diff<-1) label=Math.abs(diff)+" days ago";
+  else if(diff<7) label=d.toLocaleDateString([],{weekday:"long"});
+  else label=d.toLocaleDateString([],{month:"short",day:"numeric"});
+  return label+(time?" · "+time:"");
+}
+function dueClass(ts){ var d=dayOf(ts), t=todayKey(); return d<t?"past":d===t?"today":"later" }
+
+/* =========================================================================
+   CAPTURE PARSER — returns facets, never a single type.
+   ========================================================================= */
+var DAYS=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+
+function parse(raw){
+  var text=(raw||"").trim();
+  var out={title:"",body:"",url:"",tags:[],due:null,timed:false,actionable:false,titleAuto:false};
+  if(!text) return out;
+
+  text=text.replace(/(^|\s)#([\p{L}\d_-]+)/gu,function(m,p,t){ out.tags.push(t.toLowerCase()); return p });
+
+  var um=text.match(/https?:\/\/[^\s]+|(^|\s)www\.[^\s]+/i);
+  if(um){
+    out.url=um[0].trim();
+    if(!/^https?:/i.test(out.url)) out.url="https://"+out.url;
+    text=text.replace(um[0],"").trim();
+  }
+
+  if(/^(todo|task)[:\s]/i.test(text)){ text=text.replace(/^(todo|task)[:\s]+/i,""); out.actionable=true }
+  if(/^[-*]\s+|^\[\s*\]\s*/.test(text)){ text=text.replace(/^[-*]\s+|^\[\s*\]\s*/,""); out.actionable=true }
+  if(/^(read|watch|call|email|buy|book|send|finish|review|pay|fix)\b/i.test(text)) out.actionable=true;
+
+  var now=new Date(), due=null, hit=null, m, low=text.toLowerCase();
+
+  // A bare day word is only a deadline if it's introduced by a preposition ("by friday")
+  // or sits at the end of the line ("water the plants tomorrow", "… tomorrow 7am").
+  // Otherwise it's just a word: "notes for the friday standup" stays a plain note.
+  function dateAllowed(str,mm){
+    var end=mm.index+mm[0].length, nx=str.charAt(end);
+    if(nx==="'"||nx==="’") return false;          // possessive: "today's meeting"
+    var before=str.slice(0,mm.index).trim(), after=str.slice(end).trim();
+    if(/\b(by|on|due|before|until|this|next)$/i.test(before)) return true;
+    if(after==="") return true;
+    return /^(at\s+)?\d{1,2}(:\d{2})?\s*(am|pm)?[.!]?$/i.test(after);
+  }
+
+  if((m=low.match(/\bin (\d+) (day|days|week|weeks)\b/))){
+    var n=+m[1]*(/week/.test(m[2])?7:1), d=startOfDay(now); d.setDate(d.getDate()+n); due=d; hit=m[0];
+  } else if((m=low.match(/\bnext week\b/))){ var d2=startOfDay(now); d2.setDate(d2.getDate()+7); due=d2; hit=m[0] }
+  else if((m=low.match(/\b(today|tonight)\b/))&&dateAllowed(low,m)){ due=startOfDay(now); hit=m[0] }
+  else if((m=low.match(/\btomorrow\b/))&&dateAllowed(low,m)){ var d3=startOfDay(now); d3.setDate(d3.getDate()+1); due=d3; hit=m[0] }
+  else if((m=low.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)\b/))&&dateAllowed(low,m)){
+    var idx=-1; for(var k=0;k<DAYS.length;k++){ if(DAYS[k].indexOf(m[1])===0){ idx=k; break } }
+    if(idx>=0){ var d4=startOfDay(now), delta=(idx-d4.getDay()+7)%7||7; d4.setDate(d4.getDate()+delta); due=d4; hit=m[0] }
+  }
+  if(hit){
+    // also swallow a preposition that only existed to introduce the date ("… by friday")
+    var esq=hit.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    text=text.replace(new RegExp("\\b(?:by|on|due|before|until|for)\\s+"+esq+"\\b","i"),"")
+             .replace(new RegExp("\\b"+esq+"\\b","i"),"").trim();
+  }
+
+  var tm=text.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i)||text.match(/\bat\s+(\d{1,2}):(\d{2})\b/);
+  if(tm){
+    var h=+tm[1], mi=+(tm[2]||0), ap=(tm[3]||"").toLowerCase();
+    if(ap==="pm"&&h<12) h+=12; if(ap==="am"&&h===12) h=0;
+    if(!due) due=startOfDay(now);
+    due=new Date(due); due.setHours(h,mi,0,0);
+    if(due.getTime()<Date.now()-6e4 && !hit) due.setDate(due.getDate()+1);
+    text=text.replace(tm[0],"").trim();
+  }
+  if(due){ out.due=due.getTime(); out.actionable=true; out.timed=!!tm }
+
+  text=text.replace(/\s{2,}/g," ").replace(/^[-–—\s]+/,"")
+           .replace(/\s+(by|on|at|due|before|until|for|this)$/i,"").trim();
+  var nl=text.indexOf("\n");
+  if(nl>-1){ out.title=text.slice(0,nl).trim(); out.body=text.slice(nl+1).trim() }
+  else out.title=text;
+
+  if(out.url && !out.title){
+    out.titleAuto=true;
+    try{ out.title=new URL(out.url).hostname.replace(/^www\./,"") }catch(e){ out.title=out.url }
+  }
+  return out;
+}
+
+/* =========================================================================
+   LINK METADATA — Open Graph tags via a public helper (CORS workaround).
+   In a native Apple app, LinkPresentation does this on-device instead.
+   ========================================================================= */
+/* Some sites simply refuse anything that isn't a browser with a session —
+   Amazon answers 503, the NYT and others block scrapers outright. So the
+   chain now mixes several kinds of source, and falls back to things that
+   can't fail: an ID-derived thumbnail, and a favicon loaded as an image
+   rather than fetched. */
+
+function ytId(u){
+  try{
+    var url=new URL(u), h=url.hostname.replace(/^www\./,"");
+    if(h==="youtu.be") return url.pathname.slice(1).split("/")[0]||"";
+    if(h==="youtube.com"||h==="m.youtube.com"||h==="music.youtube.com"){
+      var v=url.searchParams.get("v");
+      if(v) return v;
+      var m=url.pathname.match(/\/(embed|shorts|live|v)\/([^\/?#]+)/);
+      if(m) return m[2];
+    }
+  }catch(e){}
+  return "";
+}
+function faviconFor(u){
+  var h=host(u);
+  return h?("https://icons.duckduckgo.com/ip3/"+h+".ico"):"";
+}
+
+var H_YT={ json:true,
+  url:function(u){ return "https://www.youtube.com/oembed?format=json&url="+encodeURIComponent(u) },
+  parse:function(j){
+    if(!j||!j.title) return null;
+    return {title:j.title,desc:"",image:j.thumbnail_url||"",logo:"",site:j.author_name||"YouTube"};
+  }};
+var H_MICROLINK={ json:true,
+  url:function(u){ return "https://api.microlink.io/?url="+encodeURIComponent(u)+"&palette=false" },
+  parse:function(j){
+    if(!j||j.status!=="success"||!j.data) return null;
+    var d=j.data;
+    return {title:d.title||"",desc:d.description||"",
+      image:(d.image&&d.image.url)||(d.screenshot&&d.screenshot.url)||"",
+      logo:(d.logo&&d.logo.url)||"",site:d.publisher||""};
+  }};
+var H_ALLORIGINS={ json:false,
+  url:function(u){ return "https://api.allorigins.win/raw?url="+encodeURIComponent(u) },
+  parse:function(t,u){ return fromHTML(t,u) }};
+var H_CORSPROXY={ json:false,
+  url:function(u){ return "https://corsproxy.io/?url="+encodeURIComponent(u) },
+  parse:function(t,u){ return fromHTML(t,u) }};
+// a reader service: returns the page as text, and often gets through where
+// a raw proxy is refused
+var H_READER={ json:false,
+  url:function(u){ return "https://r.jina.ai/"+u },
+  parse:function(t){
+    if(!t||t.length<20) return null;
+    var title=(t.match(/^Title:\s*(.+)$/m)||[])[1]||"";
+    var img=(t.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/)||[])[1]||"";
+    var body=t.split(/Markdown Content:\s*/).pop().replace(/!\[[^\]]*\]\([^)]*\)/g,"")
+             .replace(/\[[^\]]*\]\([^)]*\)/g,"").replace(/[#*_>`\-]/g," ")
+             .replace(/\s+/g," ").trim();
+    if(!title&&!img) return null;
+    return {title:title.trim(),desc:body.slice(0,300),image:img,logo:"",site:""};
+  }};
+
+function helpersFor(u){
+  var list=[];
+  if(ytId(u)) list.push(H_YT);                 // authoritative for YouTube
+  list.push(H_MICROLINK,H_ALLORIGINS,H_CORSPROXY,H_READER);
+  return list;
+}
+function abs(src,base){ try{ return new URL(src,base).href }catch(e){ return src||"" } }
+function fromHTML(html,base){
+  var doc=new DOMParser().parseFromString(html,"text/html");
+  function m(sel){ var e=doc.querySelector(sel); return e?(e.getAttribute("content")||"").trim():"" }
+  var title=m('meta[property="og:title"]')||m('meta[name="twitter:title"]')
+    ||(doc.querySelector("title")?doc.querySelector("title").textContent.trim():"");
+  var desc=m('meta[property="og:description"]')||m('meta[name="twitter:description"]')||m('meta[name="description"]');
+  var img=m('meta[property="og:image:secure_url"]')||m('meta[property="og:image"]')
+    ||m('meta[name="twitter:image"]')||m('meta[name="twitter:image:src"]');
+  var icon=doc.querySelector('link[rel~="apple-touch-icon"]')||doc.querySelector('link[rel~="icon"]');
+  return {title:title,desc:desc,image:img?abs(img,base):"",
+    logo:icon?abs(icon.getAttribute("href"),base):"",site:m('meta[property="og:site_name"]')};
+}
+function applyMeta(item,meta){
+  if(meta.title&&(item.titleAuto||!item.title)){ item.title=meta.title.slice(0,180); item.titleAuto=false }
+  if(meta.desc&&!item.desc) item.desc=meta.desc.slice(0,320);
+  if(meta.image) item.image=meta.image;
+  if(meta.logo) item.logo=meta.logo;
+  if(meta.site) item.site=meta.site;
+}
+var mqueue=[], mactive=0;
+function fetchMeta(item,force){
+  if(!item||!item.url) return;
+  if(!force&&(item.metaState==="ok"||item.metaState==="loading"||item.metaState==="fail")) return;
+  if(item.metaState==="loading") return;
+  mqueue.push(item); pump();
+}
+function pump(){ while(mactive<2&&mqueue.length){ mactive++; runFetch(mqueue.shift()) } }
+function runFetch(item){
+  item.metaState="loading"; render();
+
+  // Free wins that need no network round-trip and can't be refused.
+  var yt=ytId(item.url);
+  if(yt) item.image=item.image||("https://i.ytimg.com/vi/"+yt+"/hqdefault.jpg");
+  item.logo=item.logo||faviconFor(item.url);
+
+  var chain=helpersFor(item.url), idx=0;
+  function attempt(){
+    if(idx>=chain.length){ finish(); return }
+    var h=chain[idx++], ctl, timer;
+    try{ ctl=new AbortController(); timer=setTimeout(function(){ctl.abort()},11000) }catch(e){}
+    fetch(h.url(item.url), ctl?{signal:ctl.signal,mode:"cors"}:{mode:"cors"})
+      .then(function(r){ if(!r.ok) throw 0; return h.json?r.json():r.text() })
+      .then(function(p){
+        clearTimeout(timer);
+        var meta=h.parse(p,item.url);
+        if(!meta||(!meta.title&&!meta.image&&!meta.desc)) throw 0;
+        applyMeta(item,meta);
+        finish();
+      })
+      .catch(function(){ clearTimeout(timer); attempt() });
+  }
+  function finish(){
+    // partial success still counts: a thumbnail and an icon beat a dead card
+    item.metaState=(item.image||item.desc||!item.titleAuto)?"ok":"fail";
+    mactive--; save(); render(); pump();
+  }
+  attempt();
+}
+
+/* =========================================================================
+   PHOTOS — drag, drop or paste images onto anything.
+   Images are downscaled in the browser before being stored, because
+   localStorage is small. A native app stores the original file on disk.
+   ========================================================================= */
+var MAXDIM=1200, JPEGQ=0.82;
+
+function readImage(file){
+  return new Promise(function(res){
+    if(!file||!/^image\//.test(file.type)) return res(null);
+    var fr=new FileReader();
+    fr.onload=function(){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.naturalWidth, h=img.naturalHeight, scale=Math.min(1,MAXDIM/Math.max(w,h));
+        var cw=Math.round(w*scale), ch=Math.round(h*scale);
+        try{
+          var c=document.createElement("canvas"); c.width=cw; c.height=ch;
+          c.getContext("2d").drawImage(img,0,0,cw,ch);
+          var isPng=/png/i.test(file.type);
+          res({src:c.toDataURL(isPng?"image/png":"image/jpeg",JPEGQ), w:cw, h:ch});
+        }catch(e){ res({src:fr.result,w:w,h:h}) }
+      };
+      img.onerror=function(){ res(null) };
+      img.src=fr.result;
+    };
+    fr.onerror=function(){ res(null) };
+    fr.readAsDataURL(file);
+  });
+}
+function readImages(files){
+  var list=[].slice.call(files||[]).filter(function(f){ return /^image\//.test(f.type) });
+  return Promise.all(list.map(readImage)).then(function(r){ return r.filter(Boolean) });
+}
+function attachTo(item,photos){
+  if(!photos.length) return;
+  item.photos=(item.photos||[]).concat(photos);
+  item.modified=Date.now();
+  save(); render();
+  toast(photos.length+" image"+(photos.length>1?"s":"")+" added");
+}
+function newItemWithPhotos(photos){
+  if(!photos.length) return;
+  var now=Date.now();
+  var fresh={id:uid(),title:"",body:"",url:"",image:"",desc:"",logo:"",site:"",
+    metaState:null,titleAuto:false,actionable:false,due:null,done:false,tint:"",tags:[],
+    photos:photos,checks:[],archived:false,pin:false,created:now,modified:now};
+  S.items.unshift(fresh);
+  followItem(fresh);
+  save(); render();
+  toast(photos.length>1?photos.length+" images saved as a note":"Image saved as a note");
+}
+
+/* =========================================================================
+   SEED — note how several items carry two facets at once
+   ========================================================================= */
+// Small generated SVGs so the demo shows real header images without shipping photo files.
+function demoImg(w,h,c1,c2,shapes){
+  var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'">'
+    +'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+    +'<stop offset="0" stop-color="'+c1+'"/><stop offset="1" stop-color="'+c2+'"/>'
+    +'</linearGradient></defs><rect width="'+w+'" height="'+h+'" fill="url(#g)"/>'+shapes+'</svg>';
+  return {src:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s), w:w, h:h};
+}
+
+function seed(){
+  var t=todayKey(), D=86400000, now=Date.now();
+  function it(o){
+    return Object.assign({id:uid(),title:"",body:"",url:"",image:"",desc:"",logo:"",site:"",
+      metaState:null,titleAuto:false,actionable:false,due:null,timed:false,done:false,tint:"",tags:[],
+      photos:[],checks:[],archived:false,pin:false,created:now,modified:now},o);
+  }
+  return [
+    // TEXT + LINK + ACTION — the combination the old model couldn't express
+    it({title:"Local-first software: you own your data",
+        url:"https://www.inkandswitch.com/local-first/",
+        desc:"Seven ideals for software that keeps your data on your own devices while still syncing seamlessly.",
+        body:"Read before deciding on the sync approach.",
+        actionable:true, due:t+2*D, tags:["reading","tech"], created:now-5e6}),
+    it({title:"Send the studio contract back", actionable:true, due:t+18*36e5,
+        tags:["work"], created:now-1e5}),
+    it({title:"Water the olive tree", actionable:true, due:t-1*D, tags:["home"], created:now-9e6}),
+    it({title:"App idea",
+        body:"One place for everything I save. Capture has to be one gesture — share sheet on iPhone, ⌘⇧Space on the Mac. If it takes more than two seconds I won't use it.",
+        tint:"amber", pin:true, tags:["ideas"], created:now-1e6}),
+    it({title:"Nielsen Norman Group — article archive",
+        url:"https://www.nngroup.com/articles/",
+        desc:"Evidence-based user experience research, training, and consulting.",
+        pin:true, tags:["design","reading"], created:now-3e6}),
+    // TEXT + ACTION, no date — a "someday" task
+    it({title:"Book flights for Naxos", actionable:true, tags:["travel"], created:now-2e6}),
+    it({title:"Yiayia's avgolemono",
+        body:"3 eggs, juice of 1½ lemons, ladle of hot broth whisked in slowly — off the heat, always off the heat.\n\nRice goes in 15 min before.",
+        tint:"sage", tags:["recipes"], created:now-8e6}),
+    it({body:"\"The best interface is the one you don't notice.\"", tint:"lilac", created:now-11e6}),
+    it({title:"Kinfolk", url:"https://www.kinfolk.com/",
+        desc:"Slow living, design, and the quiet corners of everyday life.",
+        tags:["design"], created:now-14e6}),
+    // TEXT + PHOTOS — three images, laid out as a header
+    it({title:"Colour studies", body:"For the kitchen. The terracotta one, probably.",
+        tags:["design","home"], created:now-4e6, photos:[
+          demoImg(800,600,"#E8C4A0","#C2683F",'<circle cx="560" cy="200" r="150" fill="#8C4A2F" opacity=".55"/><circle cx="260" cy="420" r="110" fill="#F5E6D3" opacity=".7"/>'),
+          demoImg(800,600,"#B8CDC0","#4B7B52",'<rect x="80" y="120" width="300" height="360" rx="16" fill="#2E5233" opacity=".45"/><circle cx="580" cy="380" r="130" fill="#EDF3EC" opacity=".6"/>'),
+          demoImg(800,600,"#C6D6E8","#3E6EA8",'<path d="M0 420 Q200 280 400 400 T800 340 L800 600 L0 600Z" fill="#1F3F63" opacity=".5"/><circle cx="640" cy="150" r="80" fill="#EAF1F8" opacity=".75"/>')
+        ]}),
+    // TEXT + ONE PHOTO — single image keeps its natural proportions
+    it({title:"Kitchen tiles, Sifnos", body:"Found in a courtyard near the port. Hand-painted, faded blue.",
+        tint:"sky", tags:["travel","design"], created:now-6e6, photos:[
+          demoImg(900,675,"#EAF1F8","#7FA8D8",'<g fill="#2C5480" opacity=".38"><rect x="90" y="90" width="160" height="160" rx="8"/><rect x="310" y="90" width="160" height="160" rx="8"/><rect x="530" y="90" width="160" height="160" rx="8"/><rect x="90" y="310" width="160" height="160" rx="8"/><rect x="310" y="310" width="160" height="160" rx="8"/><rect x="530" y="310" width="160" height="160" rx="8"/></g><circle cx="450" cy="300" r="190" fill="#FFFFFF" opacity=".18"/>')
+        ]}),
+    // a note whose contents are tickable — separate from the item's own checkbox
+    it({title:"Packing list", tint:"sky", actionable:true, due:t+3*D,
+        tags:["travel"], created:now-16e6, checks:[
+          {t:"linen shirts ×3",d:true},{t:"the good sandals",d:true},
+          {t:"charger + adapter",d:false},{t:"book: Cavafy",d:false},
+          {t:"sunglasses",d:false}
+        ]}),
+    it({title:"Reply to Maria about the exhibition", actionable:true, due:t-7*D,
+        done:true, tags:["work"], created:now-2e7})
+  ];
+}
+
+/* =========================================================================
+   LENSES
+   ========================================================================= */
+var LENS={
+  // named "All", not "Everything" — that's the app's name now, and having both
+  // would read as a bug rather than as a pun
+  all:      { title:"All", note:"", test:function(i){ return !i.done } },
+  // Today means today. Letting overdue items pile in here is what makes
+  // Reminders' Today list useless — it stops meaning "what I planned for now".
+  today:    { title:"Today", note:"Dated today — nothing carried over",
+              test:function(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)===todayKey() } },
+  overdue:  { title:"Overdue", note:"Past their date — reschedule or let them go",
+              test:function(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)<todayKey() } },
+  someday:  { title:"Someday", note:"Actionable, but not yet scheduled",
+              test:function(i){ return hasAction(i)&&!i.done&&i.due==null } },
+  upcoming: { title:"Upcoming", note:"Dated after today",
+              test:function(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)>todayKey() } },
+  notes:    { title:"Notes", note:"Text only — no link, no checkbox",
+              test:function(i){ return !hasLink(i)&&!hasAction(i)&&!i.done } },
+  links:    { title:"Links", note:"Everything with a link — including links that are also tasks",
+              test:function(i){ return hasLink(i)&&!i.done } },
+  tasks:    { title:"Tasks", note:"Everything actionable — cuts across notes and links",
+              test:function(i){ return hasAction(i)&&!i.done } },
+  done:     { title:"Completed", note:"", test:function(i){ return !!i.done } },
+  /* Archive is not completion. Completion says "this is finished"; archive says
+     "not now" — and it applies to anything, including notes and links, which
+     can never be completed. */
+  archived: { title:"Archived", note:"Out of the way, still searchable",
+              test:function(i){ return !!i.archived } },
+  /* A locked tag: applied by the app, browsable like any other, but not
+     something you can add or remove by hand. */
+  compiled: { title:"⇥ compiled", note:"Documents built from a page of links — assigned automatically",
+              test:function(i){ return !!i.compiled && !i.done } }
+};
+
+// Where a newly saved item most naturally lives.
+function homeLens(i){ return hasLink(i)?"links" : hasAction(i)?"tasks" : "notes" }
+
+function visible(){
+  var q=S.q.toLowerCase().trim();
+  var list=S.items.filter(function(i){
+    // archived items stay out of every view except their own — but search
+    // still reaches them, the way Keep's archive does
+    if(!q && S.view!=="archived" && i.archived) return false;
+    if(q){
+      var hay=(i.title+" "+richToText(i.body)+" "+i.url+" "+i.desc+" "+(i.tags||[]).join(" ")).toLowerCase();
+      return hay.indexOf(q)>=0;
+    }
+    if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && !i.done;
+    return (LENS[S.view]||LENS.all).test(i);
+  });
+  // Array order IS the order. Sort is stable, so returning 0 for ties keeps
+  // whatever arrangement you dragged things into. Date-driven lenses override.
+  var byDate=!!{today:1,overdue:1,upcoming:1,someday:1,tasks:1}[S.view];
+  list.sort(function(a,b){
+    var p=(!!b.pin)-(!!a.pin);
+    if(p) return p;
+    if(byDate){
+      if(a.due!=null&&b.due!=null) return a.due-b.due;
+      if(a.due!=null) return -1;
+      if(b.due!=null) return 1;
+    }
+    return 0;
+  });
+  return list;
+}
+
+// Manual arrangement only makes sense where nothing else is claiming the order.
+function canReorder(){
+  return !S.q && (!!S.tag || !!{all:1,notes:1,links:1,done:1}[S.view]);
+}
+
+/* =========================================================================
+   RENDER — one card template, slots appear per facet
+   ========================================================================= */
+var board=document.getElementById("board");
+function esc(s){ return (s||"").replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
+function host(u){ try{ return new URL(u).hostname.replace(/^www\./,"") }catch(e){ return "" } }
+function hue(s){ var h=0; for(var i=0;i<(s||"x").length;i++) h=(h*31+s.charCodeAt(i))%360; return h }
+
+/* ---- typography ------------------------------------------------------
+   macOS applies smart quotes in its own text engine. Safari honours that
+   setting inside web pages; Chromium browsers ignore it entirely — which is
+   why the app produced straight quotes regardless of your system preference.
+   A page also can't read that preference. So we do our own substitution and
+   let you pick the style, including Greek « ».
+   --------------------------------------------------------------------- */
+var QUOTES={
+  off:null,
+  en:{open:"“",close:"”"},   // “ ”
+  gr:{open:"«",close:"»"}    // « »
+};
+var QORDER=["gr","en","off"];
+var QLABEL={gr:"« » Greek", en:"“ ” English", off:'" Straight'};
+var quoteStyle="gr";
+
+// A quote opens if there's nothing but space or an opening bracket before it.
+function opensHere(prev){ return !prev || /[\s(\[{«“‘—–-]/.test(prev) }
+function quoteFor(prev,ch){
+  var q=QUOTES[quoteStyle];
+  if(!q) return null;
+  if(ch==='"') return opensHere(prev)?q.open:q.close;
+  // the single mark is nearly always an apostrophe, and never a guillemet
+  if(ch==="'") return opensHere(prev)?"‘":"’";
+  return null;
+}
+function attachSmartQuotes(el,rich){
+  if(!el||el.__sq) return;
+  el.__sq=true;
+  el.addEventListener("beforeinput",function(e){
+    if(quoteStyle==="off") return;
+    if(e.inputType!=="insertText"||(e.data!=='"'&&e.data!=="'")) return;
+    var prev="";
+    if(rich){
+      var sel=window.getSelection();
+      if(!sel||!sel.rangeCount) return;
+      var r=sel.getRangeAt(0);
+      if(r.startContainer.nodeType===3&&r.startOffset>0)
+        prev=r.startContainer.data.charAt(r.startOffset-1);
+    } else {
+      var s=el.selectionStart;
+      prev=s>0?el.value.charAt(s-1):"";
+    }
+    var rep=quoteFor(prev,e.data);
+    if(!rep) return;
+    e.preventDefault();
+    if(rich){
+      try{ document.execCommand("insertText",false,rep) }catch(err){}
+    } else {
+      var a=el.value.slice(0,el.selectionStart), b=el.value.slice(el.selectionEnd);
+      el.value=a+rep+b;
+      el.selectionStart=el.selectionEnd=a.length+rep.length;
+      el.dispatchEvent(new Event("input",{bubbles:true}));
+    }
+  });
+}
+
+/* App-wide text scale. Content scales — titles, note bodies, excerpts, the
+   capture box — while the chrome around it stays put, so the interface
+   doesn't grow along with what you're reading. Bounded at both ends. */
+// Shown as a plain type size. 16 is the app's real body size, so it reads as
+// "what size is my text" rather than as an abstract percentage.
+var SIZES=[12,14,16,18,20,22], BASE=16, sizeIx=2;
+function setNoteSize(ix){
+  sizeIx=Math.max(0,Math.min(SIZES.length-1,ix));
+  document.documentElement.style.setProperty("--tscale",String(SIZES[sizeIx]/BASE));
+  var v=document.getElementById("szval");
+  if(v) v.textContent=SIZES[sizeIx];
+  var lo=document.getElementById("szdown"), hi=document.getElementById("szup");
+  if(lo) lo.disabled=(sizeIx===0);
+  if(hi) hi.disabled=(sizeIx===SIZES.length-1);
+  try{ localStorage.setItem("trove.notesize",String(sizeIx)) }catch(e){}
+}
+
+/* ---- rich text -------------------------------------------------------
+   Note bodies are real formatted text, not markdown source. They're stored
+   as a tiny, strictly whitelisted slice of HTML: bold, italic, underline,
+   line breaks. Nothing else survives, including anything pasted in.
+   md() below is kept only to upgrade older plain-text notes on first load,
+   and would be reused by a Markdown export.
+   --------------------------------------------------------------------- */
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1};
+var SAFE_HREF=/^(https?:|mailto:)/i;
+// these are removed along with everything inside them, rather than unwrapped
+var RICH_DROP={SCRIPT:1,STYLE:1,NOSCRIPT:1,IFRAME:1,OBJECT:1,EMBED:1,TEMPLATE:1,
+  LINK:1,META:1,HEAD:1,TITLE:1,SVG:1};
+
+function sanitizeRich(html){
+  var box=document.createElement("div");
+  box.innerHTML=html||"";
+  (function walk(parent){
+    [].slice.call(parent.childNodes).forEach(function(n){
+      if(n.nodeType===3) return;                       // text stays
+      if(n.nodeType!==1){ parent.removeChild(n); return }
+      var tag=(n.tagName||"").toUpperCase();
+      if(RICH_DROP[tag]){ parent.removeChild(n); return }   // drop contents too
+      walk(n);
+      if(tag==="DIV"||tag==="P"){                      // block → break + its contents
+        parent.insertBefore(document.createElement("br"),n);
+        while(n.firstChild) parent.insertBefore(n.firstChild,n);
+        parent.removeChild(n);
+        return;
+      }
+      if(!RICH_OK[tag]){                               // unwrap anything unknown
+        while(n.firstChild) parent.insertBefore(n.firstChild,n);
+        parent.removeChild(n);
+        return;
+      }
+      if(tag==="A"){
+        // keep the address if it's a real web or mail link; otherwise the
+        // anchor is dropped and only its text survives
+        var href=(n.getAttribute("href")||"").trim();
+        [].slice.call(n.attributes).forEach(function(a){ n.removeAttribute(a.name) });
+        if(SAFE_HREF.test(href)){
+          n.setAttribute("href",href);
+          n.setAttribute("target","_blank");
+          n.setAttribute("rel","noopener noreferrer");
+        } else {
+          while(n.firstChild) parent.insertBefore(n.firstChild,n);
+          parent.removeChild(n);
+        }
+        return;
+      }
+      [].slice.call(n.attributes).forEach(function(a){ n.removeAttribute(a.name) });
+    });
+  })(box);
+  return box.innerHTML
+    .replace(/^(\s*<br\s*\/?>)+/i,"")
+    .replace(/(<br\s*\/?>\s*){3,}/gi,"<br><br>")
+    .trim();
+}
+function richToText(html){
+  var box=document.createElement("div");
+  box.innerHTML=(html||"").replace(/<br\s*\/?>/gi,"\n");
+  return box.textContent||"";
+}
+// plain text (possibly with markdown in it) → rich HTML. Used once per note.
+function toRich(s){
+  if(!s) return "";
+  if(/<(strong|b|em|i|u|br)\b/i.test(s)) return s;
+  return md(s).replace(/\r?\n/g,"<br>");
+}
+
+function md(s){
+  s=esc(s);
+  s=s.replace(/\*\*([^*\n]+)\*\*/g,"<strong>$1</strong>");
+  // the marked span must start and end on a non-space, so "2 * 3 * 4" stays arithmetic
+  s=s.replace(/(^|[\s(>])\*(\S(?:[^*\n]*\S)?)\*(?=[\s.,;:!?)]|$)/g,"$1<em>$2</em>");
+  s=s.replace(/(^|[\s(>])_(\S(?:[^_\n]*\S)?)_(?=[\s.,;:!?)]|$)/g,"$1<em>$2</em>");
+  return s;
+}
+function words(s){ return (s||"").trim().split(/\s+/).filter(Boolean).length }
+
+/* One photo-grid renderer, used by both cards and the editor. */
+function photoGrid(item,editable){
+  var ps=item.photos||[], n=ps.length;
+  if(!n) return "";
+  var shown=ps.slice(0,editable?ps.length:4);
+  var klass=n===1?"n1":n===2?"n2":n===3?"n3":"nx";
+  if(editable) klass=n===1?"n1":n===2?"n2":n===3?"n3":"nx";
+  return '<div class="photos '+klass+'">'+shown.map(function(p,ix){
+    var isMore=(!editable&&ix===3&&n>4);
+    var cell='<div class="ph'+(isMore?" more":"")+'"';
+    if(isMore) cell+=' data-more="'+(n-3)+'"';
+    // let portraits be tall — masonry columns handle it, and cropping a photo
+    // to fit a card is worse than a tall card
+    if(n===1&&p.w&&p.h) cell+=' style="aspect-ratio:'+Math.min(2.4,Math.max(.5,p.w/p.h)).toFixed(3)+'"';
+    cell+=' data-photo="'+item.id+'" data-idx="'+ix+'">';
+    return cell+'<img draggable="false" src="'+esc(p.src)+'" alt="" loading="lazy">'
+      +(editable?'<button class="rm" data-rmimg="'+ix+'" title="Remove">✕</button>':"")+'</div>';
+  }).join("")+'</div>';
+}
+
+function cardHTML(i){
+  var L=hasLink(i), A=hasAction(i), P=hasPhotos(i);
+  var cls="card"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(L?" haslink":"");
+
+  // A short, text-only note is set large. Nothing but words, and few of them,
+  // means it's a thought — it should look like one rather than a clipped paragraph.
+  if(isPlain(i)&&!P&&!i.done){
+    var wc=words(i.title)+words(richToText(i.body));
+    if(wc>0&&wc<=30) cls+=" display"+(wc<=12?" xl":"")+(i.body?"":" titleonly");
+  }
+
+  var h=host(i.url), hu=hue(h);
+
+  // Attached images become the card header. They outrank an auto-fetched link
+  // cover — something you chose beats something we guessed.
+  var gallery=photoGrid(i,false);
+
+  var cover="";
+  if(L&&!hasPhotos(i)){
+    var g="linear-gradient(135deg,hsl("+hu+" 46% 80%),hsl("+((hu+45)%360)+" 42% 90%))";
+    cover='<div class="thumb'+(i.image?" tall":"")+'" style="background:'+g+'">'
+      +(i.image?'<img draggable="false" src="'+esc(i.image)+'" loading="lazy" alt="" onload="this.classList.add(\'in\')" onerror="this.remove()">':"")
+      +(i.metaState==="loading"?'<div class="skel"></div>':"")+'</div>';
+  }
+
+  var checkbox=A?'<div class="box" data-check="'+i.id+'">✓</div>':"";
+  var title=i.title?'<div class="ctitle">'+esc(i.title)+'</div>':"";
+
+  var srcline="";
+  if(L){
+    var favimg=i.logo?'<img draggable="false" src="'+esc(i.logo)+'" alt="" onerror="this.remove()">':"";
+    var status=i.metaState==="loading"?'<span class="pulse"></span>'
+      :(i.metaState==="fail"?'<button class="refetch" data-refetch="'+i.id+'">retry</button>':"");
+    srcline='<div class="srcline"><span class="fav" style="background:hsl('+hu+' 42% 46%)">'
+      +esc((h[0]||"?").toUpperCase())+favimg+'</span>'+esc(i.site||h)+status+'</div>';
+  }
+
+  // checklist: show the first few, tickable straight from the card
+  var checks="";
+  if(hasChecks(i)){
+    var cs=i.checks, showN=Math.min(cs.length,6);
+    checks='<div class="checks">'+cs.slice(0,showN).map(function(c,ix){
+      return '<div class="chk'+(c.d?" on":"")+'">'
+        +'<span class="cbox" data-ck="'+i.id+'|'+ix+'">✓</span>'
+        +'<span>'+esc(c.t)+'</span></div>';
+    }).join("")
+      +(cs.length>showN?'<div class="chkmore">+'+(cs.length-showN)+' more</div>':"")
+      +'</div>';
+  }
+
+  var foot=[];
+  if(hasChecks(i)){
+    var dn=checkDone(i), tot=i.checks.length;
+    foot.push('<span class="ckprog'+(dn===tot?" all":"")+'">'+dn+'/'+tot+'</span>');
+  }
+  if(i.compiled) foot.push('<button class="tag docmark" data-auto="compiled" '
+      +'title="See every compiled document">⇥ compiled</button>');
+  if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+'">◔ '+fmtDue(i.due,i.timed)+'</span>');
+  if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
+  (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
+
+  if(S.sel[i.id]) cls+=" picked";
+  return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
+    +(i.pin?'<div class="pinned"></div>':"")
+    +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
+    +'<div class="quick">'
+      +(L?'<button data-open="'+i.id+'" class="go" title="Open link in a new tab">↗</button>':"")
+      +(L?'<button data-refetch="'+i.id+'" title="Fetch the preview again">↻</button>':"")
+      +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
+      +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
+      +'<button data-addimg="'+i.id+'" title="Add images">⊞</button>'
+    +'</div>'
+    +gallery+cover
+    +'<div class="head">'+checkbox+'<div style="min-width:0;flex:1">'+title+srcline+'</div></div>'
+    // your own words win. The fetched excerpt is only a stand-in for them.
+    +(i.body?'<div class="cbody">'+i.body+'</div>'
+      : (L&&i.desc?'<div class="desc">'+esc(i.desc)+'</div>':""))
+    +checks
+    +(foot.length?'<div class="foot">'+foot.join("")+'</div>':"")
+    +'</article>';
+}
+
+/* One row for list layout. Same data, much less of it. */
+function rowHTML(i){
+  var L=hasLink(i), A=hasAction(i), P=hasPhotos(i);
+  var cls="row-item"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"");
+  var h=host(i.url), hu=hue(h);
+
+  var thumb="";
+  if(P) thumb='<div class="rthumb"><img draggable="false" src="'+esc(i.photos[0].src)+'" alt="" loading="lazy"></div>';
+  else if(L) thumb='<div class="rthumb" style="background:linear-gradient(135deg,hsl('+hu+' 46% 78%),hsl('+((hu+45)%360)+' 42% 88%))">'
+    +(i.image?'<img draggable="false" src="'+esc(i.image)+'" alt="" loading="lazy" onerror="this.remove()">':"")+'</div>';
+
+  var exc=[];
+  if(L) exc.push('<span class="rsrc">'+esc(i.site||h)+'</span>');
+  var text=richToText(i.body).replace(/\s+/g," ").trim() || (L?i.desc:"");
+  if(text) exc.push(esc(text));
+
+  var due="";
+  if(A&&i.due!=null) due='<span class="due '+dueClass(i.due)+'">'+fmtDue(i.due,i.timed)+'</span>';
+  else if(A&&!i.done) due='<span class="due later">Someday</span>';
+
+  var tags=(i.tags||[]).slice(0,3).map(function(t){ return '<span class="tag">#'+esc(t)+'</span>' }).join("");
+
+  if(S.sel[i.id]) cls+=" picked";
+  return '<div class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
+    +(i.pin?'<div class="pinned"></div>':"")
+    +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
+    +(A?'<div class="box" data-check="'+i.id+'">✓</div>':"")
+    +thumb
+    +'<div class="rtitle">'+(esc(i.title)||'<span style="color:var(--faint)">Untitled</span>')+'</div>'
+    +'<div class="rexc">'+exc.join(" · ")+'</div>'
+    +'<div class="rtags">'+tags+'</div>'
+    +'<div class="rdue">'+due+'</div>'
+    +'<div class="quick">'
+      +(L?'<button data-open="'+i.id+'" class="go" title="Open link in a new tab">↗</button>':"")
+      +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
+      +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
+    +'</div></div>';
+}
+
+/* Render a set of items in whichever layout the current lens is using. */
+function block(list){
+  var lay=layoutFor();
+  if(lay==="list") return '<div class="list">'+list.map(rowHTML).join("")+'</div>';
+  return '<div class="grid '+(lay==="cards"?"cards":"mood")+'">'+list.map(cardHTML).join("")+'</div>';
+}
+
+function bucket(i){
+  if(i.due==null) return "Someday";
+  var d=dayOf(i.due)-todayKey();
+  if(d<0) return "Overdue";
+  if(d===0) return "Today";
+  if(d===1) return "Tomorrow";
+  if(d<7) return "This week";
+  return "Later";
+}
+
+function render(){
+  var list=visible(), lens=LENS[S.view]||LENS.all;
+  document.getElementById("viewtitle").textContent =
+    S.q?'"'+S.q+'"' : S.tag?"#"+S.tag : lens.title;
+  document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
+
+  if(!list.length){
+    board.innerHTML='<div class="empty"><div class="big">◌</div>'
+      +(S.q?"Nothing matches that.":"Nothing here yet — capture something above.")+'</div>';
+  } else if((S.view==="tasks"||S.view==="upcoming")&&!S.q&&!S.tag){
+    var order=["Overdue","Today","Tomorrow","This week","Later","Someday"], groups={};
+    list.forEach(function(i){ (groups[bucket(i)]=groups[bucket(i)]||[]).push(i) });
+    board.innerHTML=order.filter(function(k){return groups[k]}).map(function(k){
+      var g=groups[k], links=g.filter(hasLink).length;
+      return '<div class="grouphead">'+k+'<span class="gn">'+g.length
+        +(links?' · '+links+' also '+(links===1?'a link':'links'):"")+'</span></div>'
+        +block(g);
+    }).join("");
+  } else if(S.view==="all"&&!S.q&&!S.tag){
+    var pinned=list.filter(function(i){return i.pin}), rest=list.filter(function(i){return !i.pin});
+    board.innerHTML=(pinned.length?'<div class="grouphead">Pinned</div>'+block(pinned):"")
+      +(rest.length?(pinned.length?'<div class="grouphead">Recent</div>':"")+block(rest):"");
+  } else {
+    board.innerHTML=block(list);
+  }
+
+  var lay=layoutFor();
+  document.querySelectorAll("#layoutseg button").forEach(function(b){
+    b.classList.toggle("on", b.dataset.lay===lay);
+  });
+  // compiling only means something where there are links to compile
+  var nlinks=list.filter(hasLink).length;
+  document.getElementById("compilebtn").style.display=nlinks?"":"none";
+  paintSel();
+  paintBackupHint();
+
+  var all=S.items;
+  function count(v){ return all.filter(LENS[v].test).length }
+  ["all","today","overdue","upcoming","someday","notes","links","tasks","done","archived","compiled"].forEach(function(v){
+    var e=document.getElementById("c-"+v); if(e) e.textContent=count(v)||"";
+  });
+  var narch=count("archived");
+  document.getElementById("nav-archived").style.display=(narch||S.view==="archived")?"":"none";
+  // Overdue only exists when something is overdue — an empty warning is noise
+  var od=count("overdue");
+  document.getElementById("nav-overdue").style.display=(od||S.view==="overdue")?"":"none";
+  // a task subcategory is open: make sure the group it lives in is visible
+  if({today:1,overdue:1,upcoming:1,someday:1,done:1}[S.view]){
+    document.getElementById("grp-tasks").classList.remove("closed");
+    document.querySelector('[data-toggle="tasks"]').classList.remove("closed");
+  }
+
+  // the tag page gets a rename control; nothing else does
+  document.getElementById("tagedit").style.display=S.tag?"":"none";
+
+  var counts={};
+  all.forEach(function(i){ if(!i.done)(i.tags||[]).forEach(function(x){ counts[x]=(counts[x]||0)+1 }) });
+  var ncomp=count("compiled");
+  var autoRow=ncomp?('<button class="nav auto'+(S.view==="compiled"?" on":"")+'" data-view="compiled"'
+      +' title="Applied automatically — can\'t be added or removed by hand">'
+      +'<span class="lock">⇥</span>compiled<span class="n">'+ncomp+'</span></button>'):"";
+  document.getElementById("taglist").innerHTML=autoRow+Object.keys(counts)
+    .sort(function(a,b){ return counts[b]-counts[a] })
+    .map(function(k){
+      return '<button class="nav'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'"'
+        +' title="Right-click to rename #'+esc(k)+' everywhere">'
+        +'<span class="dot" style="background:hsl('+hue(k)+' 50% 62%)"></span>'
+        +esc(k)+'<span class="n">'+counts[k]+'</span></button>';
+    }).join("");
+
+  document.querySelectorAll(".sidebar .nav[data-view]").forEach(function(b){
+    b.classList.toggle("on", !S.tag&&!S.q&&b.dataset.view===S.view);
+  });
+  document.querySelectorAll(".mobtabs button").forEach(function(b){
+    b.classList.toggle("on", !S.tag&&b.dataset.view===S.view);
+  });
+}
+
+/* =========================================================================
+   SYNC — one library, several devices.
+
+   Talks to Supabase over plain HTTP rather than through their SDK. That keeps
+   the app a single file with no dependencies, keeps it working from file://,
+   and satisfies the extension's content policy, which forbids remote scripts.
+   It's about two hundred lines instead of a hundred kilobytes.
+
+   The shape of it:
+     · every edit is written locally first and drawn immediately
+     · a diff against a shadow copy works out what actually changed
+     · changes queue and go up when there's a connection
+     · on open, on focus, and once a minute, it asks for what changed there
+     · the later edit wins, per item, judged by the app's own modified stamp
+     · deletions are marked rather than dropped, so they travel
+
+   Nothing here is on the critical path: pull the plug and the app behaves
+   exactly as it did before any of this existed.
+   ========================================================================= */
+var SUPA={
+  url:"https://hzbnvkvhcpdodmylgqxb.supabase.co",
+  key:"sb_publishable_acuePtNZl9GO4dq7Tav6FA_tp6-4VyM"
+};
+
+var SYNC={
+  on:!!(SUPA.url&&SUPA.key),
+  session:null,          // {access_token, refresh_token, expires_at, email}
+  shadow:{},             // id -> the JSON we believe the server has
+  queue:{},              // id -> "put" | "del"
+  lastPull:"1970-01-01T00:00:00Z",
+  status:"off",          // off | out | idle | busy | error | offline
+  note:"",
+  timer:null
+};
+
+function supaHeaders(auth){
+  var h={ "apikey":SUPA.key, "Content-Type":"application/json" };
+  if(auth&&SYNC.session) h["Authorization"]="Bearer "+SYNC.session.access_token;
+  return h;
+}
+
+function loadSession(){
+  try{
+    var raw=localStorage.getItem("trove.session");
+    if(raw) SYNC.session=JSON.parse(raw);
+    SYNC.lastPull=localStorage.getItem("trove.lastPull")||SYNC.lastPull;
+    var sh=localStorage.getItem("trove.shadow");
+    if(sh) SYNC.shadow=JSON.parse(sh);
+    var q=localStorage.getItem("trove.queue");
+    if(q) SYNC.queue=JSON.parse(q);
+  }catch(e){}
+}
+function keepSession(){
+  try{
+    if(SYNC.session) localStorage.setItem("trove.session",JSON.stringify(SYNC.session));
+    else localStorage.removeItem("trove.session");
+    localStorage.setItem("trove.lastPull",SYNC.lastPull);
+    localStorage.setItem("trove.shadow",JSON.stringify(SYNC.shadow));
+    localStorage.setItem("trove.queue",JSON.stringify(SYNC.queue));
+  }catch(e){}
+}
+
+/* ---- auth ----
+   Email and password, and no email is ever sent.
+
+   The two obvious alternatives both fail here. A magic link has to redirect
+   you somewhere, and browsers refuse to redirect into chrome-extension:// or
+   file:// addresses. A typed code would need the email template changed to
+   include one — and since June 2026 Supabase locks template editing on new
+   free projects unless you bring your own mail server.
+
+   A password sidesteps all of it: one round trip, no inbox, no rate limit,
+   works identically on every device and offline-tolerant afterwards. */
+
+function keepAuth(j,email){
+  if(!j||!j.access_token) throw { msg:"no session returned" };
+  SYNC.session={
+    access_token:j.access_token, refresh_token:j.refresh_token,
+    expires_at:Date.now()+((j.expires_in||3600)*1000),
+    email:(j.user&&j.user.email)||email
+  };
+  keepSession();
+  return true;
+}
+function authPost(path,body){
+  return fetch(SUPA.url+path,{
+    method:"POST", headers:supaHeaders(false), body:JSON.stringify(body)
+  }).then(function(r){
+    return r.json().then(function(j){
+      if(!r.ok) throw j;
+      return j;
+    });
+  });
+}
+function signInPassword(email,pw){
+  return authPost("/auth/v1/token?grant_type=password",{ email:email, password:pw })
+    .then(function(j){ return keepAuth(j,email) });
+}
+function signUpPassword(email,pw){
+  return authPost("/auth/v1/signup",{ email:email, password:pw })
+    .then(function(j){
+      if(!j.access_token) throw { msg:"account made, but it needs email confirmation — turn that off in Supabase" };
+      return keepAuth(j,email);
+    });
+}
+/* One button for both cases: sign in, and if there's no such account yet,
+   make one. A wrong password on an existing account surfaces as exactly that
+   rather than as a confusing signup error. */
+function signInOrUp(email,pw){
+  return signInPassword(email,pw).catch(function(e){
+    var msg=String((e&&(e.error_description||e.msg||e.message))||"");
+    if(!/invalid login credentials/i.test(msg)) throw e;
+    return signUpPassword(email,pw).catch(function(e2){
+      var m2=String((e2&&(e2.error_description||e2.msg||e2.message))||"");
+      if(/already registered|already exists/i.test(m2)) throw { msg:"wrong password for that address" };
+      throw e2;
+    });
+  });
+}
+
+function refreshSession(){
+  if(!SYNC.session||!SYNC.session.refresh_token) return Promise.reject("no session");
+  return fetch(SUPA.url+"/auth/v1/token?grant_type=refresh_token",{
+    method:"POST", headers:supaHeaders(false),
+    body:JSON.stringify({ refresh_token:SYNC.session.refresh_token })
+  }).then(function(r){ if(!r.ok) throw 0; return r.json() })
+    .then(function(j){
+      SYNC.session={ access_token:j.access_token, refresh_token:j.refresh_token,
+        expires_at:Date.now()+((j.expires_in||3600)*1000),
+        email:(j.user&&j.user.email)||(SYNC.session&&SYNC.session.email) };
+      keepSession();
+    });
+}
+function withFreshSession(){
+  if(!SYNC.session) return Promise.reject("signed out");
+  if(SYNC.session.expires_at-Date.now()>60000) return Promise.resolve();
+  return refreshSession();
+}
+function signOut(){
+  SYNC.session=null; SYNC.shadow={}; SYNC.queue={};
+  SYNC.lastPull="1970-01-01T00:00:00Z";
+  keepSession(); paintSync(); render();
+}
+
+/* ---- change detection ----
+   The app mutates S.items freely and calls save(). Rather than ask every
+   mutation site to declare what it touched, compare against a shadow copy of
+   what the server last saw. Cheap at this scale, and impossible to forget. */
+function stampChanges(){
+  if(!SYNC.on) return;
+  var seen={};
+  S.items.forEach(function(i){
+    seen[i.id]=1;
+    var now=JSON.stringify(i);
+    if(SYNC.shadow[i.id]!==now) SYNC.queue[i.id]="put";
+  });
+  Object.keys(SYNC.shadow).forEach(function(id){
+    if(!seen[id]) SYNC.queue[id]="del";
+  });
+  keepSession();
+  schedulePush();
+}
+function schedulePush(){
+  if(!SYNC.on||!SYNC.session) { paintSync(); return }
+  clearTimeout(SYNC.timer);
+  SYNC.timer=setTimeout(pushChanges,1200);   // let a burst of edits settle
+  paintSync();
+}
+
+/* ---- push ---- */
+function pushChanges(){
+  if(!SYNC.on||!SYNC.session) return Promise.resolve();
+  var ids=Object.keys(SYNC.queue);
+  if(!ids.length){ SYNC.status="idle"; paintSync(); return Promise.resolve() }
+
+  var byId={};
+  S.items.forEach(function(i){ byId[i.id]=i });
+  var rows=ids.map(function(id){
+    if(SYNC.queue[id]==="del"||!byId[id]) return { id:id, data:{}, deleted:true };
+    return { id:id, data:byId[id], deleted:false };
+  });
+
+  SYNC.status="busy"; paintSync();
+  return withFreshSession().then(function(){
+    return fetch(SUPA.url+"/rest/v1/items?on_conflict=id",{
+      method:"POST",
+      headers:Object.assign(supaHeaders(true),{ "Prefer":"resolution=merge-duplicates,return=minimal" }),
+      body:JSON.stringify(rows)
+    });
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    rows.forEach(function(row){
+      if(row.deleted) delete SYNC.shadow[row.id];
+      else SYNC.shadow[row.id]=JSON.stringify(row.data);
+      delete SYNC.queue[row.id];
+    });
+    SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
+  }).catch(function(e){
+    // keep the queue; it'll go up on the next attempt
+    SYNC.status=navigator.onLine?"error":"offline";
+    SYNC.note=String(e&&e.message||e);
+    paintSync();
+  });
+}
+
+/* ---- pull ---- */
+function pullChanges(){
+  if(!SYNC.on||!SYNC.session) return Promise.resolve();
+  SYNC.status="busy"; paintSync();
+  return withFreshSession().then(function(){
+    var q="/rest/v1/items?select=id,data,modified,deleted"
+      +"&modified=gt."+encodeURIComponent(SYNC.lastPull)
+      +"&order=modified.asc";
+    return fetch(SUPA.url+q,{ headers:supaHeaders(true) });
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return r.json();
+  }).then(function(rows){
+    if(rows.length) applyIncoming(rows);
+    if(rows.length) SYNC.lastPull=rows[rows.length-1].modified;
+    SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
+    return rows.length;
+  }).catch(function(e){
+    SYNC.status=navigator.onLine?"error":"offline";
+    SYNC.note=String(e&&e.message||e);
+    paintSync();
+  });
+}
+
+/* Merge rule: the later edit wins, per item, judged by the app's own
+   `modified` stamp rather than the server's. The server clock says when a row
+   arrived; the item's own stamp says when a person actually changed it. */
+function applyIncoming(rows){
+  var byId={}, changed=0;
+  S.items.forEach(function(i,ix){ byId[i.id]=ix });
+
+  rows.forEach(function(row){
+    var here=byId[row.id]!==undefined?S.items[byId[row.id]]:null;
+
+    if(row.deleted){
+      if(here){ S.items.splice(byId[row.id],1); rebuildIndex(); changed++ }
+      delete SYNC.shadow[row.id];
+      return;
+    }
+    var incoming=normalizeItem(row.data);
+    if(!incoming) return;
+    if(!here){
+      S.items.push(incoming); rebuildIndex(); changed++;
+    } else if((incoming.modified||0)>(here.modified||0)){
+      // don't clobber something being edited right now
+      if(S.editing===incoming.id) return;
+      S.items[byId[row.id]]=incoming; changed++;
+    }
+    SYNC.shadow[row.id]=JSON.stringify(incoming);
+  });
+
+  function rebuildIndex(){ byId={}; S.items.forEach(function(i,ix){ byId[i.id]=ix }) }
+
+  if(changed){
+    try{ localStorage.setItem(KEY,JSON.stringify(S.items)) }catch(e){}
+    render();
+    toast(changed+" change"+(changed===1?"":"s")+" from another device");
+  }
+}
+
+function syncNow(){
+  return pullChanges().then(pushChanges);
+}
+
+/* =========================================================================
+   BACKUP — the whole library as a file you own.
+
+   Everything lives in this browser's storage, which is not a safe place for
+   the only copy of anything. Export writes one plain-text .json file: every
+   item, every image, every setting. Import reads it back, either merging it
+   with what's here or replacing it outright.
+
+   The format is deliberately dull and readable — a version number, a
+   timestamp, a settings object and a flat array of items. Anything that can
+   read JSON can read your notes, including you, in a text editor, in ten
+   years, without this app.
+   ========================================================================= */
+var EXPORT_FORMAT="everything.library", EXPORT_VERSION=1;
+var SETTING_KEYS=["trove.theme","trove.font","trove.quotes","trove.notesize",
+  "trove.layouts","trove.brand","trove.grp.tasks"];
+
+function settingsSnapshot(){
+  var out={};
+  SETTING_KEYS.forEach(function(k){
+    try{ var v=localStorage.getItem(k); if(v!=null) out[k]=v }catch(e){}
+  });
+  return out;
+}
+
+// Fill in anything an older or hand-edited file is missing, so a partial
+// record can never poison the app.
+function normalizeItem(o){
+  if(!o||typeof o!=="object") return null;
+  if(o.type&&o.actionable===undefined) o=migrate([o])[0];   // a v1-era record
+  var now=Date.now();
+  return {
+    id:String(o.id||uid()),
+    title:String(o.title||""),
+    body:toRich(o.body||""),
+    url:String(o.url||""), image:String(o.image||""), desc:String(o.desc||""),
+    logo:String(o.logo||""), site:String(o.site||""),
+    metaState:o.metaState||null, titleAuto:!!o.titleAuto,
+    actionable:!!o.actionable, due:(typeof o.due==="number")?o.due:null,
+    timed:(o.timed!==undefined)?!!o.timed
+      :!!(o.due&&(new Date(o.due).getHours()||new Date(o.due).getMinutes())),
+    done:!!o.done, tint:String(o.tint||""), compiled:!!o.compiled,
+    tags:Array.isArray(o.tags)?o.tags.map(String):[],
+    photos:Array.isArray(o.photos)?o.photos.filter(function(p){ return p&&p.src }):[],
+    checks:Array.isArray(o.checks)?o.checks.filter(function(c){ return c&&c.t })
+      .map(function(c){ return {t:String(c.t),d:!!c.d} }):[],
+    archived:!!o.archived,
+    pin:!!o.pin,
+    created:(typeof o.created==="number")?o.created:now,
+    modified:(typeof o.modified==="number")?o.modified:(o.created||now)
+  };
+}
+
+function exportLibrary(){
+  var payload={
+    format:EXPORT_FORMAT,
+    version:EXPORT_VERSION,
+    app:document.title,
+    exportedAt:new Date().toISOString(),
+    itemCount:S.items.length,
+    settings:settingsSnapshot(),
+    items:S.items
+  };
+  try{
+    var text=JSON.stringify(payload,null,2);
+    var blob=new Blob([text],{type:"application/json"});
+    var d=new Date(), pad=function(n){ return (n<10?"0":"")+n };
+    var name="everything-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+".json";
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href) },2000);
+    try{ localStorage.setItem("trove.lastExport",String(Date.now())) }catch(e){}
+    paintBackupHint();
+    var kb=Math.round(text.length/1024);
+    toast(S.items.length+" items exported · "+(kb>1024?(kb/1024).toFixed(1)+" MB":kb+" KB"));
+  }catch(e){ toast("Couldn't build the file") }
+}
+
+function applyImport(data,mode){
+  var incoming=(data.items||[]).map(normalizeItem).filter(Boolean);
+  if(!incoming.length) return toast("Nothing to import");
+
+  if(mode==="replace"){
+    S.items=incoming;
+    // settings travel with a full replace, not with a merge
+    if(data.settings){
+      Object.keys(data.settings).forEach(function(k){
+        if(SETTING_KEYS.indexOf(k)>=0){ try{ localStorage.setItem(k,data.settings[k]) }catch(e){} }
+      });
+    }
+    S.sel={}; save(); render();
+    toast("Replaced with "+incoming.length+" items — reload to apply settings");
+    return;
+  }
+
+  // merge: unknown ids are added, known ids win on whichever was edited last
+  var byId={}, added=0, updated=0;
+  S.items.forEach(function(x,ix){ byId[x.id]=ix });
+  incoming.forEach(function(n){
+    if(byId[n.id]===undefined){ S.items.push(n); added++ }
+    else{
+      var cur=S.items[byId[n.id]];
+      if((n.modified||0)>(cur.modified||0)){ S.items[byId[n.id]]=n; updated++ }
+    }
+  });
+  S.sel={}; save(); render();
+  toast(added+" added, "+updated+" updated"+(added+updated?"":" — nothing new"));
+}
+
+function readImportFile(file){
+  var fr=new FileReader();
+  fr.onload=function(){
+    var data;
+    try{ data=JSON.parse(fr.result) }catch(e){ return toast("That isn't a readable .json file") }
+    if(!data||!Array.isArray(data.items)) return toast("No library found in that file");
+    var n=data.items.length;
+    var when=data.exportedAt?new Date(data.exportedAt).toLocaleString():"an unknown date";
+    askChoice("Import "+n+" item"+(n===1?"":"s"),
+      "From a backup made <b>"+esc(when)+"</b>.<br><br>"
+      +"<b>Merge</b> keeps everything you have now and adds what's missing. "
+      +"Where both copies exist, the one edited more recently wins.<br><br>"
+      +"<b>Replace</b> discards your current "+S.items.length+" items entirely.",
+      [{label:"Cancel",value:null,kind:"sec"},
+       {label:"Replace",value:"replace",kind:"dan"},
+       {label:"Merge",value:"merge"}],
+      function(mode){
+        if(!mode) return;
+        if(mode!=="replace") return applyImport(data,mode);
+        askChoice("Discard the "+S.items.length+" items here?",
+          "Replacing throws away everything currently in the app and puts the "
+          +"backup in its place. There is no undo.",
+          [{label:"Cancel",value:false,kind:"sec"},{label:"Replace",value:true,kind:"dan"}],
+          function(go){ if(go) applyImport(data,"replace") });
+      });
+  };
+  fr.onerror=function(){ toast("Couldn't read that file") };
+  fr.readAsText(file);
+}
+
+function paintBackupHint(){
+  var el=document.getElementById("bkhint");
+  if(!el) return;
+  var last=0;
+  try{ last=parseInt(localStorage.getItem("trove.lastExport")||"0",10) }catch(e){}
+  if(!S.items.length){ el.textContent=""; el.className="bkhint"; return }
+  if(!last){ el.textContent="Never backed up"; el.className="bkhint warn"; return }
+  var days=Math.floor((Date.now()-last)/864e5);
+  el.textContent = days<1 ? "Backed up today"
+    : "Backed up "+days+" day"+(days===1?"":"s")+" ago";
+  el.className="bkhint"+(days>=7?" warn":"");
+}
+
+/* =========================================================================
+   COMPILE — turn the page you're looking at into one document.
+
+   Each link becomes a paragraph of your own writing about it, with its key
+   phrase hyperlinked back to the source. The phrase is the item's title: if
+   it appears in what you wrote, the link is applied in place; otherwise the
+   title leads the paragraph. Output as a note here, or a .doc you can open
+   in Word or Pages with the links intact.
+   ========================================================================= */
+
+// Wrap the first plain-text occurrence of `phrase` in an anchor. Works on the
+// DOM so it can't break tags, and won't touch text already inside a link.
+function linkPhrase(html,phrase,url){
+  if(!phrase) return null;
+  var box=document.createElement("div");
+  box.innerHTML=html;
+  var found=null;
+  (function walk(node){
+    if(found) return;
+    for(var k=0;k<node.childNodes.length;k++){
+      var n=node.childNodes[k];
+      if(found) return;
+      if(n.nodeType===3){
+        var at=n.data.indexOf(phrase);
+        if(at>=0){ found={node:n,at:at}; return }
+      } else if(n.nodeType===1 && n.tagName!=="A"){
+        walk(n);
+      }
+    }
+  })(box);
+  if(!found) return null;
+  var t=found.node, tail=t.splitText(found.at);
+  tail.splitText(phrase.length);
+  var a=document.createElement("a");
+  a.setAttribute("href",url);
+  a.setAttribute("target","_blank");
+  a.setAttribute("rel","noopener noreferrer");
+  tail.parentNode.insertBefore(a,tail);
+  a.appendChild(tail);
+  return box.innerHTML;
+}
+
+function compileEntry(i){
+  var label=(i.title||host(i.url)||i.url).trim();
+  var anchor='<a href="'+esc(i.url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+'</a>';
+  var body=sanitizeRich(i.body||"");
+  if(body){
+    var inPlace=linkPhrase(body,label,i.url);
+    if(inPlace) return inPlace;             // your sentence, with the link inside it
+    return anchor+" — "+body;               // otherwise the title leads
+  }
+  return anchor+(i.desc?"<br>"+esc(i.desc):"");
+}
+
+function compileList(){
+  return visible().filter(hasLink);
+}
+function compileBody(list){
+  return list.map(function(i){ return compileEntry(i) }).join("<br><br>");
+}
+function compileTitle(){
+  var lens=(LENS[S.view]||LENS.all).title;
+  var scope=S.q?'"'+S.q+'"':(S.tag?"#"+S.tag:lens);
+  return scope+" — "+new Date().toLocaleDateString([], {day:"numeric",month:"long",year:"numeric"});
+}
+
+function compileToNote(){
+  var list=compileList();
+  if(!list.length) return toast("No links on this page");
+  var now=Date.now();
+  var item={id:uid(),title:compileTitle(),body:sanitizeRich(compileBody(list)),
+    url:"",image:"",desc:"",logo:"",site:"",metaState:null,titleAuto:false,
+    actionable:false,due:null,done:false,tint:"doc",compiled:true,tags:[],photos:[],
+    checks:[],archived:false,pin:false,created:now,modified:now};
+  S.items.unshift(item);
+  S.view="notes"; S.tag=null; S.q=""; document.getElementById("q").value="";
+  save(); render();
+  toast(list.length+" links compiled into a note");
+  setTimeout(function(){ openEditor(item.id) },120);
+}
+
+function compileToDoc(){
+  var list=compileList();
+  if(!list.length) return toast("No links on this page");
+  var title=compileTitle();
+  var doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+    +'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    +'<head><meta charset="utf-8"><title>'+esc(title)+'</title></head><body>'
+    +'<h1 style="font-family:Georgia,serif">'+esc(title)+'</h1>'
+    +list.map(function(i){
+      return '<p style="font-family:Georgia,serif;font-size:12pt;line-height:1.5">'
+        +compileEntry(i)+'</p>';
+    }).join("")
+    +'</body></html>';
+  try{
+    var blob=new Blob(["﻿"+doc],{type:"application/msword"});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=title.replace(/[\/\\:*?"<>|]/g,"-")+".doc";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href) },2000);
+    toast(list.length+" links exported");
+  }catch(e){ toast("Couldn't build the file") }
+}
+
+/* =========================================================================
+   CAPTURE
+   ========================================================================= */
+var capin=document.getElementById("capin"), capmeta=document.getElementById("capmeta"),
+    caphint=document.getElementById("caphint"), capicon=document.getElementById("capicon");
+
+// the capture icon is drawn from the same set as the sidebar, so what you're
+// about to make is announced in the app's own hand
+var CAPI={
+  note:'<svg viewBox="0 0 24 24"><path d="M4.5 19.5h15"/>'
+    +'<path d="M15.6 4.9a2.1 2.1 0 0 1 3 3L9.4 17.1l-4 1 1-4z"/></svg>',
+  link:'<svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/>'
+    +'<path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg>',
+  task:'<svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/>'
+    +'<path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg>'
+};
+
+/* null = let the text decide; true/false = you've overridden it by clicking
+   the task chip or pressing ⌘↵. Cleared after every save. */
+var capForce=null;
+function capActionable(p){ return capForce===null ? p.actionable : capForce }
+
+/* A note is content; a link or a task is a labelled object. So text typed
+   for a note becomes the note itself rather than a heading with nothing
+   underneath it. Links and tasks keep the text as their label. */
+function shapeCapture(p,actionable){
+  if(p.url||actionable) return {title:p.title, body:toRich(p.body), checks:[]};
+
+  var whole=p.title+(p.body?"\n"+p.body:"");
+  // Paste a list and get a list: if two or more lines after the first are
+  // bulleted, they become checklist items and the first line is the title.
+  var lines=whole.split(/\r?\n/);
+  if(lines.length>2){
+    var rest=lines.slice(1).filter(function(l){ return l.trim() });
+    var bullets=rest.filter(function(l){ return /^\s*[-*·•]\s+/.test(l) });
+    if(bullets.length>=2 && bullets.length===rest.length){
+      return {
+        title:lines[0].trim(),
+        body:"",
+        checks:rest.map(function(l){ return {t:l.replace(/^\s*[-*·•]\s+/,"").trim(),d:false} })
+      };
+    }
+  }
+  return {title:"", body:toRich(whole), checks:[]};
+}
+
+function refreshCap(){
+  capin.style.height="auto";
+  capin.style.height=Math.min(capin.scrollHeight,180)+"px";
+  if(!capin.value.trim()){ capmeta.classList.add("hide"); capicon.innerHTML=CAPI.note; return }
+  capmeta.classList.remove("hide");
+  var p=parse(capin.value), act=capActionable(p);
+  capicon.innerHTML = act?CAPI.task : p.url?CAPI.link : CAPI.note;
+  var bits=['<span class="chip">✎ note</span>'];
+  if(p.url) bits.push('<span class="chip blue">⚭ link</span>');
+  // this chip is a switch, not a readout — click it to force a checkbox on or off
+  bits.push('<button class="chip tog'+(act?" acc":"")+'" id="cap-act" '
+    +'title="'+(act?"Remove the checkbox":"Give this a checkbox")+'">☑ task</button>');
+  if(p.due!=null) bits.push('<span class="chip '+(dueClass(p.due)==="past"?"red":"green")+'">◔ '+fmtDue(p.due,p.timed)+'</span>');
+  else if(act) bits.push('<span class="chip">◇ Someday</span>');
+  p.tags.forEach(function(t){ bits.push('<span class="chip">#'+esc(t)+'</span>') });
+  bits.push('<span class="hint" style="margin-left:4px"><kbd>↵</kbd> save · '
+    +'<kbd>⇧↵</kbd> new line · <kbd>⌘↵</kbd> as task</span>');
+  caphint.innerHTML=bits.join(" ");
+  var tog=document.getElementById("cap-act");
+  if(tog) tog.addEventListener("click",function(){ capForce=!act; refreshCap(); capin.focus() });
+}
+/* After saving, stay put if the current lens can show the new item; otherwise
+   follow it to a lens that can. Saving a link from Links keeps you in Links;
+   jotting a note there moves you to Notes rather than filing it out of sight. */
+function followItem(item){
+  if(S.tag && (item.tags||[]).indexOf(S.tag)<0) S.tag=null;
+  if(S.q){ S.q=""; document.getElementById("q").value="" }
+  var lens=LENS[S.view];
+  if(S.tag) return;
+  if(!lens || !lens.test(item)) S.view=homeLens(item);
+}
+
+function commit(asTask){
+  if(!capin.value.trim()) return;
+  var p=parse(capin.value), now=Date.now();
+  var act=(asTask===true)?true:capActionable(p);
+  var shape=shapeCapture(p,act);
+  var item={id:uid(),title:shape.title,body:shape.body,url:p.url,image:"",desc:"",logo:"",site:"",
+    metaState:null,titleAuto:p.titleAuto,actionable:act,due:p.due,timed:!!p.timed,done:false,
+    tint:"",tags:p.tags,photos:[],checks:shape.checks,archived:false,pin:false,created:now,modified:now};
+  S.items.unshift(item);
+  capin.value=""; capForce=null; refreshCap(); save();
+  var names=[]; if(p.url) names.push("Links"); if(act) names.push("Tasks");
+  if(!names.length) names.push("Notes");
+  followItem(item);
+  if(item.url) fetchMeta(item); else render();
+  toast("Saved · "+names.join(" + "));
+}
+capin.addEventListener("input",refreshCap);
+capin.addEventListener("keydown",function(e){
+  if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){ e.preventDefault(); commit(true); return }
+  if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); commit() }
+  if(e.key==="Escape"){ capin.value=""; capForce=null; refreshCap(); capin.blur() }
+});
+document.getElementById("capsave").addEventListener("click",commit);
+
+/* =========================================================================
+   EDITOR — facet toggles instead of a type picker
+   ========================================================================= */
+var scrim=document.getElementById("scrim"), sheet=document.getElementById("sheet");
+
+// the open note wears its own colour, so editing feels like the same object
+function applySheetTint(tint){ sheet.className="sheet"+(tint?" tint-"+tint:"") }
+
+function openEditor(id){
+  var i=S.items.filter(function(x){return x.id===id})[0]; if(!i) return;
+  var d={url:i.url||"",actionable:hasAction(i),due:i.due,timed:!!i.timed,tint:i.tint||"",pin:!!i.pin};
+
+  S.editing=id;
+  // Read-only context from the fetched page, so the window works for reading too
+  var ctx="";
+  if(i.url){
+    ctx='<div class="readctx">'+(i.desc?esc(i.desc)+'<br>':"")
+      +'<a href="'+esc(i.url)+'" target="_blank" rel="noopener">'+esc(i.site||host(i.url)||i.url)+' ↗</a></div>';
+  }
+
+  sheet.innerHTML=
+    '<div class="egal" id="e-gal">'+photoGrid(i,true)+'</div>'
+    +'<input class="etitle" id="e-title" placeholder="Title" value="'+esc(i.title)+'">'
+    +ctx
+    +'<div class="ebody" id="e-body" contenteditable="true" spellcheck="true" '
+      +'data-ph="Write something…">'+sanitizeRich(i.body)+'</div>'
+    +'<div class="fmtbar">'
+      +'<button class="facet fmt" id="e-bold" title="Bold — ⌘B"><b>B</b></button>'
+      +'<button class="facet fmt" id="e-ital" title="Italic — ⌘I"><i>I</i></button>'
+      +'<button class="facet fmt" id="e-link" title="Link the selected text — ⌘K">⚭</button>'
+      +'<span class="wc" id="e-wc"></span>'
+    +'</div>'
+    +'<div class="cklist" id="e-cklist"></div>'
+    +'<div class="egalbar">'
+      +'<button class="addimg" id="e-addimg">⊞ Add images</button>'
+      +'<button class="addimg" id="e-addchk">☑ Checklist item</button>'
+    +'</div>'
+    +'<div class="facetbar">'
+      +'<button class="facet'+(d.url?" on":"")+'" id="f-link"><span class="fi">⚭</span>Link</button>'
+      +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
+      +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
+      +'<div class="swatches" id="e-tint" style="margin-left:auto">'
+        +TINTS.map(function(t){ return '<div class="sw'+((i.tint||"")===t?" on":"")+'" data-tint="'+t+'" style="background:'+TINTHEX[t]+'"></div>' }).join("")
+      +'</div>'
+    +'</div>'
+    +'<div class="panel'+(d.url?" on":"")+'" id="p-link"><label>Address</label>'
+      +'<div class="urlrow">'
+        +'<input id="e-url" placeholder="https://…" value="'+esc(i.url)+'">'
+        +'<button class="btn sec" id="e-copy" title="Copy link">⧉ Copy</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px;margin-top:9px;align-items:center">'
+        +'<button class="btn sec" id="e-meta">↻ Refresh preview</button>'
+        +'<span class="hint">Pulls title, description and cover image</span></div></div>'
+    +'<div class="panel'+(d.actionable?" on":"")+'" id="p-act"><label>Due</label>'
+      +'<div class="dpick">'
+        +'<button class="field dbtn" id="e-duebtn"></button>'
+        +'<button class="btn sec" id="e-nodate">Someday</button>'
+        +'<span class="hint">No date means no deadline</span></div>'
+      +'<div class="dpop" id="e-dpop">'
+        +'<div class="dquick">'
+          +'<button data-q="today">Today</button><button data-q="tomorrow">Tomorrow</button>'
+          +'<button data-q="weekend">This weekend</button><button data-q="week">Next week</button>'
+        +'</div>'
+        +'<div class="dhead"><button data-m="-1">‹</button><span id="e-dmon"></span>'
+          +'<button data-m="1">›</button></div>'
+        +'<div class="dgrid" id="e-dgrid"></div>'
+        +'<div class="dtime"><label>Time</label><span id="e-tslot"></span>'
+          +'<button class="btn" id="e-ddone">Done</button></div>'
+      +'</div></div>'
+    +'<div class="row" style="margin-top:12px;padding-top:12px">'
+      +'<div class="tagsug" id="e-tagsug"></div>'
+      +'<input class="field" id="e-tags" style="flex:1;min-width:150px" placeholder="tags, comma separated" value="'+esc((i.tags||[]).join(", "))+'"></div>'
+    +'<div class="row sticky" style="justify-content:flex-end">'
+      +'<button class="btn dan" id="e-del">Delete</button>'
+      +'<button class="btn quiet" id="e-arch">'+(i.archived?"Put back":"Archive")+'</button>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn sec" id="e-cancel">Cancel</button>'
+      +'<button class="btn" id="e-save">Done</button></div>';
+  scrim.classList.add("on");
+  applySheetTint(d.tint);
+
+  function q(s){ return sheet.querySelector(s) }
+
+  // Real formatting. The browser applies bold/italic to the selection directly;
+  // ⌘B and ⌘I are handled natively, the buttons drive the same command.
+  var body=q("#e-body");
+  try{ document.execCommand("styleWithCSS",false,false) }catch(e){}   // emit <b>/<i>, not styled spans
+  function countWords(){
+    var n=words(richToText(body.innerHTML));
+    q("#e-wc").textContent = n ? n.toLocaleString()+" word"+(n===1?"":"s") : "";
+  }
+  /* Browsers don't reliably scroll a contenteditable caret into view, and the
+     sticky action bar covers the bottom of the sheet — so a long note left the
+     cursor underneath it. Nudge the sheet whenever the caret leaves the frame. */
+  /* Finding the caret's position on screen. A collapsed range on a freshly
+     created empty line reports no rectangle at all — the old code then fell
+     back to the containing element, which on an empty line is the whole note
+     body. Its top is near the start of the note, so pressing Enter mid-way
+     through a long note flung the view to the top. The fallback is now only
+     trusted if it's the size of a line rather than the size of the note. */
+  function caretRect(){
+    var sel=window.getSelection();
+    if(!sel||!sel.rangeCount) return null;
+    var r=sel.getRangeAt(0).cloneRange();
+    r.collapse(true);
+    var rect=r.getClientRects()[0];
+    if(rect&&rect.height) return rect;
+    var node=r.startContainer;
+    var el=(node&&node.nodeType===1)?node:(node&&node.parentNode);
+    if(el&&el.getBoundingClientRect){
+      var er=el.getBoundingClientRect();
+      if(er.height&&er.height<=120) return er;      // a line, not the whole body
+    }
+    return null;
+  }
+  function keepCaretVisible(allowUp){
+    var rect=caretRect();
+    if(!rect) return;
+    var box=sheet.getBoundingClientRect(), pad=118;   // room for the pinned bars
+    if(rect.bottom>box.bottom-pad) sheet.scrollTop+=rect.bottom-(box.bottom-pad)+28;
+    else if(allowUp&&rect.top<box.top+16) sheet.scrollTop-=box.top+16-rect.top+28;
+  }
+  countWords();
+  // typing only ever pushes the view down; never yank it upwards mid-sentence
+  body.addEventListener("input",function(){ countWords(); keepCaretVisible(false) });
+  body.addEventListener("keyup",function(e){
+    if(e.key&&e.key.indexOf("Arrow")===0) keepCaretVisible(true);
+  });
+  function fmt(cmd){
+    body.focus();
+    try{ document.execCommand(cmd,false,null) }catch(e){}
+    countWords(); syncFmtButtons();
+  }
+  function syncFmtButtons(){
+    try{
+      q("#e-bold").classList.toggle("on",document.queryCommandState("bold"));
+      q("#e-ital").classList.toggle("on",document.queryCommandState("italic"));
+    }catch(e){}
+  }
+  function linkSelection(){
+    var sel=window.getSelection();
+    if(!sel||sel.isCollapsed) return toast("Select some text first");
+    // hold the selection — opening the dialog moves focus away from it
+    var saved=sel.getRangeAt(0).cloneRange();
+    var shown=saved.toString().slice(0,60);
+    askText("Link “"+shown+"”","Where should this text point?","https://","Link",
+      function(v){
+        var url=String(v).trim();
+        if(!url) return;
+        if(!/^[a-z]+:/i.test(url)) url="https://"+url;
+        if(!SAFE_HREF.test(url)) return toast("Only web and mail links");
+        body.focus();
+        var s2=window.getSelection();
+        s2.removeAllRanges(); s2.addRange(saved);      // put it back, then link it
+        try{ document.execCommand("createLink",false,url) }catch(err){}
+        countWords();
+      });
+  }
+  q("#e-bold").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("bold") });
+  q("#e-ital").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("italic") });
+  q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
+  body.addEventListener("keydown",function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault(); e.stopPropagation();   // don't fall through to capture
+      linkSelection();
+    }
+  });
+  body.addEventListener("keyup",syncFmtButtons);
+  body.addEventListener("mouseup",syncFmtButtons);
+  // paste as plain text — keeps other apps' styling out of the note
+  body.addEventListener("paste",function(e){
+    if(!e.clipboardData) return;
+    var txt=e.clipboardData.getData("text/plain");
+    if(txt==null) return;
+    e.preventDefault();
+    try{ document.execCommand("insertText",false,txt) }catch(err){}
+    countWords();
+  });
+  q("#e-addimg").addEventListener("click",function(){
+    pickFiles(function(photos){ addPhotosToEditing(photos) });
+  });
+
+  /* ---- checklist ----
+     Held in a local draft so nothing is written until you press Done, the
+     same as the title and body. */
+  var draftChecks=(i.checks||[]).map(function(c){ return {t:c.t,d:!!c.d} });
+  function paintChecks(focusIx){
+    q("#e-cklist").innerHTML=draftChecks.map(function(c,ix){
+      return '<div class="ckrow'+(c.d?" done":"")+'">'
+        +'<span class="cbox'+(c.d?"":"")+'" data-tick="'+ix+'" '
+          +'style="'+(c.d?"background:var(--accent);border-color:var(--accent);color:#fff":"")+'">✓</span>'
+        +'<input class="ckin" data-ckin="'+ix+'" value="'+esc(c.t)+'" placeholder="List item">'
+        +'<button class="ckdel" data-ckdel="'+ix+'" title="Remove">✕</button></div>';
+    }).join("");
+    if(focusIx!=null){
+      var el=q('[data-ckin="'+focusIx+'"]');
+      if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length) }
+    }
+  }
+  function readChecks(){
+    sheet.querySelectorAll("[data-ckin]").forEach(function(el){
+      var ix=+el.dataset.ckin;
+      if(draftChecks[ix]) draftChecks[ix].t=el.value;
+    });
+  }
+  paintChecks();
+  q("#e-addchk").addEventListener("click",function(){
+    readChecks(); draftChecks.push({t:"",d:false}); paintChecks(draftChecks.length-1);
+  });
+  q("#e-cklist").addEventListener("click",function(e){
+    var t=e.target.closest("[data-tick]");
+    if(t){ readChecks(); draftChecks[+t.dataset.tick].d=!draftChecks[+t.dataset.tick].d; paintChecks(); return }
+    var del=e.target.closest("[data-ckdel]");
+    if(del){ readChecks(); draftChecks.splice(+del.dataset.ckdel,1); paintChecks(); }
+  });
+  q("#e-cklist").addEventListener("keydown",function(e){
+    var el=e.target.closest("[data-ckin]"); if(!el) return;
+    var ix=+el.dataset.ckin;
+    if(e.key==="Enter"){                       // Enter opens the next line
+      e.preventDefault(); readChecks();
+      draftChecks.splice(ix+1,0,{t:"",d:false});
+      paintChecks(ix+1);
+    }
+    if(e.key==="Backspace"&&el.value===""&&draftChecks.length>1){
+      e.preventDefault(); readChecks();
+      draftChecks.splice(ix,1);
+      paintChecks(Math.max(0,ix-1));
+    }
+  });
+  /* Your three most-used tags, one click away. Only ones not already on this
+     item, so the shortcuts never suggest something that's a no-op. */
+  function currentTags(){
+    return q("#e-tags").value.split(",").map(function(x){ return x.trim().toLowerCase() }).filter(Boolean);
+  }
+  function paintTagSug(){
+    var have=currentTags(), counts={};
+    S.items.forEach(function(x){
+      (x.tags||[]).forEach(function(t){ counts[t]=(counts[t]||0)+1 });
+    });
+    var top=Object.keys(counts)
+      .filter(function(t){ return have.indexOf(t)<0 })
+      .sort(function(a,b){ return counts[b]-counts[a] })
+      .slice(0,3);
+    q("#e-tagsug").innerHTML=top.map(function(t){
+      return '<button class="sug" data-sug="'+esc(t)+'">#'+esc(t)+'</button>';
+    }).join("");
+  }
+  paintTagSug();
+  q("#e-tags").addEventListener("input",paintTagSug);
+  q("#e-tagsug").addEventListener("click",function(e){
+    var b=e.target.closest("[data-sug]"); if(!b) return;
+    var have=currentTags();
+    have.push(b.dataset.sug);
+    q("#e-tags").value=have.join(", ");
+    paintTagSug();
+  });
+
+  attachSmartQuotes(q("#e-title"),false);
+  attachSmartQuotes(body,true);
+
+  q("#f-link").addEventListener("click",function(){
+    var on=!q("#p-link").classList.contains("on");
+    q("#p-link").classList.toggle("on",on); q("#f-link").classList.toggle("on",on);
+    if(on) setTimeout(function(){ q("#e-url").focus() },30); else q("#e-url").value="";
+  });
+  q("#f-act").addEventListener("click",function(){
+    d.actionable=!d.actionable;
+    q("#p-act").classList.toggle("on",d.actionable); q("#f-act").classList.toggle("on",d.actionable);
+  });
+  /* ---- date picker ---- */
+  var MON=["January","February","March","April","May","June","July",
+    "August","September","October","November","December"];
+  var viewM=new Date(d.due!=null?d.due:Date.now());
+  viewM=new Date(viewM.getFullYear(),viewM.getMonth(),1);
+
+  /* A time is opt-in. Adding a date no longer invents 9am — a task can sit on
+     a day without claiming an hour, and a time can be taken off again. */
+  function paintTime(){
+    var slot=q("#e-tslot");
+    if(d.due==null){ slot.innerHTML='<span class="hint">Pick a date first</span>'; return }
+    if(!d.timed){
+      slot.innerHTML='<button class="dquickadd" id="e-addtime">＋ Add a time</button>';
+      return;
+    }
+    var dt=new Date(d.due), hh="", mm="";
+    for(var a=0;a<24;a++) hh+='<option value="'+a+'"'+(a===dt.getHours()?" selected":"")+'>'+(a<10?"0":"")+a+'</option>';
+    var cur=Math.round(dt.getMinutes()/5)*5%60;
+    for(var b=0;b<60;b+=5) mm+='<option value="'+b+'"'+(b===cur?" selected":"")+'>'+(b<10?"0":"")+b+'</option>';
+    slot.innerHTML='<select id="e-dh">'+hh+'</select><b>:</b><select id="e-dm">'+mm+'</select>'
+      +'<button class="dquickadd" id="e-rmtime" title="Remove the time">✕ time</button>';
+  }
+
+  function paintDue(){
+    var btn=q("#e-duebtn");
+    btn.textContent = d.due!=null ? fmtDue(d.due,d.timed) : "No date — someday";
+    btn.classList.toggle("none", d.due==null);
+    paintTime();
+  }
+  function paintGrid(){
+    q("#e-dmon").textContent=MON[viewM.getMonth()]+" "+viewM.getFullYear();
+    var first=new Date(viewM.getFullYear(),viewM.getMonth(),1);
+    var lead=(first.getDay()+6)%7;                       // weeks start Monday
+    var days=new Date(viewM.getFullYear(),viewM.getMonth()+1,0).getDate();
+    var html=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
+      .map(function(x){ return '<div class="dow">'+x.charAt(0)+'</div>' }).join("");
+    var k;
+    for(k=0;k<lead;k++) html+='<button class="dim" data-prev="1"></button>';
+    for(k=1;k<=days;k++){
+      var ts=new Date(viewM.getFullYear(),viewM.getMonth(),k).getTime();
+      var cls=[];
+      if(dayOf(ts)===todayKey()) cls.push("today");
+      if(d.due!=null&&dayOf(d.due)===dayOf(ts)) cls.push("sel");
+      html+='<button class="'+cls.join(" ")+'" data-day="'+k+'">'+k+'</button>';
+    }
+    q("#e-dgrid").innerHTML=html;
+  }
+  function setDay(dt){
+    if(d.timed){
+      var hs=q("#e-dh"), ms=q("#e-dm");
+      dt.setHours(hs?+hs.value:9, ms?+ms.value:0, 0, 0);
+    } else dt.setHours(0,0,0,0);
+    d.due=dt.getTime();
+    viewM=new Date(dt.getFullYear(),dt.getMonth(),1);
+    paintDue(); paintGrid();
+  }
+  paintDue(); paintGrid();
+
+  q("#e-duebtn").addEventListener("click",function(){ q("#e-dpop").classList.toggle("on") });
+  q("#e-ddone").addEventListener("click",function(){ q("#e-dpop").classList.remove("on") });
+  q("#e-nodate").addEventListener("click",function(){
+    d.due=null; d.timed=false;
+    q("#e-dpop").classList.remove("on"); paintDue(); paintGrid();
+  });
+  q("#e-dpop").addEventListener("click",function(e){
+    var nav=e.target.closest("[data-m]");
+    if(nav){ viewM=new Date(viewM.getFullYear(),viewM.getMonth()+(+nav.dataset.m),1); paintGrid(); return }
+    var day=e.target.closest("[data-day]");
+    if(day){ setDay(new Date(viewM.getFullYear(),viewM.getMonth(),+day.dataset.day)); return }
+    if(e.target.closest("#e-addtime")){
+      d.timed=true;
+      var base=new Date(d.due); base.setHours(9,0,0,0);   // a sensible starting hour
+      d.due=base.getTime(); paintDue(); return;
+    }
+    if(e.target.closest("#e-rmtime")){
+      d.timed=false; setDay(new Date(d.due)); return;
+    }
+    var qk=e.target.closest("[data-q]");
+    if(qk){
+      var t=startOfDay(new Date());
+      if(qk.dataset.q==="tomorrow") t.setDate(t.getDate()+1);
+      if(qk.dataset.q==="week") t.setDate(t.getDate()+7);
+      if(qk.dataset.q==="weekend"){ var diff=(6-t.getDay()+7)%7; t.setDate(t.getDate()+(diff||7)) }
+      setDay(t);                                          // date only, no invented hour
+    }
+  });
+  q("#e-dpop").addEventListener("change",function(e){
+    if(e.target.id==="e-dh"||e.target.id==="e-dm"){ if(d.due!=null) setDay(new Date(d.due)) }
+  });
+  q("#e-copy").addEventListener("click",function(){
+    var u=q("#e-url").value.trim();
+    if(!u) return toast("No link to copy");
+    function ok(){ toast("Link copied") }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(u).then(ok,fallback);
+    } else fallback();
+    function fallback(){                      // file:// and older browsers
+      var el=q("#e-url");
+      el.focus(); el.select();
+      try{ document.execCommand("copy"); ok() }
+      catch(err){ toast("Press ⌘C to copy") }
+    }
+  });
+  q("#e-meta").addEventListener("click",function(){
+    // save first — refetching used to close the sheet and lose the note with it
+    applyEdits();
+    var it=byId(id);
+    if(it&&it.url){
+      it.image=""; it.desc=""; it.logo=""; it.site=""; it.metaState=null;
+      fetchMeta(it,true);
+      toast("Saved · fetching preview…");
+    } else toast("Saved");
+  });
+  q("#e-tint").addEventListener("click",function(e){
+    var b=e.target.closest("[data-tint]"); if(!b) return;
+    d.tint=b.dataset.tint;
+    sheet.querySelectorAll("#e-tint .sw").forEach(function(x){ x.classList.toggle("on",x===b) });
+    applySheetTint(d.tint);   // see the colour while you're choosing it
+  });
+  q("#e-pin").addEventListener("click",function(){ d.pin=!d.pin; q("#e-pin").classList.toggle("on",d.pin) });
+  q("#e-cancel").addEventListener("click",close);
+  q("#e-del").addEventListener("click",function(){
+    S.items=S.items.filter(function(x){ return x.id!==id }); save(); close(); render(); toast("Deleted");
+  });
+  /* Archiving from here writes your edits first, so you never lose a change
+     by reaching for Archive instead of Done. */
+  function applyEdits(){
+    var hadUrl=!!i.url;
+    i.title=q("#e-title").value.trim();
+    i.body=sanitizeRich(q("#e-body").innerHTML);
+    i.url=q("#p-link").classList.contains("on")?q("#e-url").value.trim():"";
+    if(i.url&&!/^https?:/i.test(i.url)) i.url="https://"+i.url;
+    i.actionable=d.actionable;
+    i.due=d.actionable?d.due:null;
+    i.timed=d.actionable?!!d.timed:false;
+    readChecks();
+    i.checks=draftChecks.filter(function(c){ return c.t.trim() })
+      .map(function(c){ return {t:c.t.trim(),d:!!c.d} });
+    i.tags=q("#e-tags").value.split(",").map(function(s){ return s.trim().toLowerCase() }).filter(Boolean);
+    i.tint=d.tint; i.pin=d.pin; i.modified=Date.now();
+    if(!i.url){ i.image=""; i.desc=""; i.logo=""; i.site=""; i.metaState=null }
+    save(); close(); render();
+    if(i.url&&!hadUrl) fetchMeta(i,true);
+  }
+  editorApply=applyEdits;                 // so dismissing the sheet saves too
+  q("#e-save").addEventListener("click",function(){ applyEdits(); toast("Updated") });
+  q("#e-arch").addEventListener("click",function(){
+    var going=!i.archived;
+    i.archived=going;
+    applyEdits();
+    toast(going?"Archived":"Back in view");
+  });
+  setTimeout(function(){ q("#e-title").focus() },40);
+}
+function close(){ scrim.classList.remove("on"); S.editing=null; editorApply=null }
+
+/* Dismissing an open note SAVES it. Losing a page of writing because a
+   selection drag ended outside the sheet, or because Escape felt like
+   "close", is not a trade worth making. Cancel is the explicit discard. */
+var editorApply=null;
+function dismissEditor(){ if(editorApply) editorApply(); else close() }
+
+/* A click fires on the nearest common ancestor of press and release — so
+   selecting text and releasing outside the sheet used to register as a click
+   on the backdrop, and shut the note. Only treat it as a backdrop click if
+   the press started there too. */
+var pressedBackdrop=false;
+scrim.addEventListener("mousedown",function(e){ pressedBackdrop=(e.target===scrim) });
+scrim.addEventListener("click",function(e){
+  if(e.target===scrim&&pressedBackdrop) dismissEditor();
+  pressedBackdrop=false;
+});
+
+/* Photo edits inside the editor. These live outside openEditor so their
+   listeners are registered exactly once — registering them per-open was
+   what caused one dropped image to land in every note opened that session. */
+function editingItem(){ return S.editing?byId(S.editing):null }
+function repaintGallery(){
+  var it=editingItem(), g=document.getElementById("e-gal");
+  if(it&&g) g.innerHTML=photoGrid(it,true);
+}
+function addPhotosToEditing(photos){
+  var it=editingItem();
+  if(!it||!photos.length) return;
+  it.photos=(it.photos||[]).concat(photos);
+  it.modified=Date.now();
+  save(); repaintGallery(); render();
+  toast(photos.length+" image"+(photos.length>1?"s":"")+" added");
+}
+sheet.addEventListener("click",function(e){
+  var rm=e.target.closest("[data-rmimg]");
+  if(rm){
+    e.preventDefault(); e.stopPropagation();
+    var it=editingItem(); if(!it||!it.photos) return;
+    it.photos.splice(+rm.dataset.rmimg,1);
+    save(); repaintGallery(); render();
+    return;
+  }
+  // A link inside the editable body would otherwise just place the caret.
+  // Clicking one should go where it points, as it does everywhere else.
+  var a=e.target.closest(".ebody a[href]");
+  if(a){
+    e.preventDefault(); e.stopPropagation();
+    var href=a.getAttribute("href")||"";
+    if(SAFE_HREF.test(href)) window.open(href,"_blank","noopener,noreferrer");
+    return;
+  }
+  // inside the open note, a photo zooms
+  var ph=e.target.closest("[data-photo]");
+  if(ph){ e.stopPropagation(); openLight(ph.dataset.photo,+ph.dataset.idx) }
+});
+sheet.addEventListener("dragover",function(e){
+  if(e.dataTransfer&&[].indexOf.call(e.dataTransfer.types||[],"Files")>=0) e.preventDefault();
+});
+sheet.addEventListener("drop",function(e){
+  if(internalDrag) return;
+  if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return;
+  e.preventDefault(); e.stopPropagation();
+  takeFiles(e.dataTransfer.files,function(photos){ addPhotosToEditing(photos) });
+});
+
+/* =========================================================================
+   IMAGE INPUT — file picker, drag & drop, paste, lightbox
+   ========================================================================= */
+function byId(id){ return S.items.filter(function(x){ return x.id===id })[0] }
+
+var filepick=document.getElementById("filepick"), pickCB=null;
+function pickFiles(cb){ pickCB=cb; filepick.value=""; filepick.click() }
+filepick.addEventListener("change",function(){
+  if(!filepick.files||!filepick.files.length) return;
+  var cb=pickCB; pickCB=null;
+  takeFiles(filepick.files,function(photos){ if(cb) cb(photos) });
+});
+
+/* ---- drag & drop ------------------------------------------------------
+   Two rules keep this predictable:
+   1. Exactly one handler processes a drop, guarded by a lock, so a single
+      file can never be added twice.
+   2. Drops only count inside the board or the open editor. Everywhere else
+      is inert, and the hint pill says so before you let go.
+   --------------------------------------------------------------------- */
+var veil=document.getElementById("dropveil"), hotCard=null, dropBusy=false;
+
+/* Two completely separate drags share this app: rearranging your own cards,
+   and importing image files from outside. internalDrag keeps them apart —
+   without it, dragging a card's photo looks exactly like dropping a file. */
+var dragId=null, internalDrag=false;
+
+function hasFiles(e){
+  if(internalDrag) return false;
+  return !!(e.dataTransfer&&[].indexOf.call(e.dataTransfer.types||[],"Files")>=0);
+}
+
+var dropline=document.getElementById("dropline");
+
+function clearMarks(){
+  board.querySelectorAll(".dropbefore,.dropafter").forEach(function(el){
+    el.classList.remove("dropbefore","dropafter");
+  });
+}
+function hideLine(){ dropline.classList.remove("on") }
+
+// Draw the insertion line into the gap that just opened, in viewport coords.
+function showLine(el,after,horiz){
+  var r=el.getBoundingClientRect(), s=dropline.style;
+  dropline.className="dropline on "+(horiz?"vert":"horiz");
+  if(horiz){                                  // cards sit side by side → upright bar
+    s.left=((after?r.right+14:r.left-18))+"px";
+    s.top=(r.top+8)+"px";
+    s.width="4px";
+    s.height=Math.max(24,r.height-16)+"px";
+  } else {                                    // stacked → bar lying across
+    s.left=(r.left+2)+"px";
+    s.top=((after?r.bottom+20:r.top-24))+"px";
+    s.width=Math.max(40,r.width-4)+"px";
+    s.height="4px";
+  }
+}
+/* Marking a target opens the gap, which moves the target — so the line is
+   placed once immediately (so it responds at once) and again once the gap
+   has finished opening. Its own CSS transition turns the correction into a
+   glide rather than a jump. */
+var lineTimer;
+function markTarget(el,after,horiz){
+  clearMarks();
+  el.classList.add(after?"dropafter":"dropbefore");
+  showLine(el,after,horiz);
+  clearTimeout(lineTimer);
+  lineTimer=setTimeout(function(){
+    if(internalDrag&&el.parentNode) showLine(el,after,horiz);
+  },210);
+}
+
+function endReorder(){
+  clearTimeout(lineTimer);
+  clearMarks(); hideLine();
+  board.querySelectorAll(".dragging").forEach(function(el){ el.classList.remove("dragging") });
+  internalDrag=false; dragId=null;
+}
+function moveItem(id,targetId,after){
+  if(!id||!targetId||id===targetId) return;
+  var from=-1,to=-1,k;
+  for(k=0;k<S.items.length;k++) if(S.items[k].id===id) from=k;
+  if(from<0) return;
+  var it=S.items.splice(from,1)[0];
+  for(k=0;k<S.items.length;k++) if(S.items[k].id===targetId) to=k;
+  if(to<0) S.items.unshift(it); else S.items.splice(after?to+1:to,0,it);
+  save(); render();
+}
+
+board.addEventListener("dragstart",function(e){
+  var el=e.target.closest(".card,.row-item");
+  if(!el||!canReorder()){ e.preventDefault(); return }
+  internalDrag=true; dragId=el.dataset.id;
+  el.classList.add("dragging");
+  try{
+    e.dataTransfer.effectAllowed="move";
+    e.dataTransfer.setData("application/x-trove-item",dragId);
+    e.dataTransfer.setData("text/plain","");     // Firefox refuses an empty payload
+  }catch(err){}
+});
+board.addEventListener("dragover",function(e){
+  if(!internalDrag) return;
+  e.preventDefault();
+  try{ e.dataTransfer.dropEffect="move" }catch(err){}
+
+  var el=e.target.closest(".card,.row-item");
+  // Drifting over a gap between cards keeps the last target rather than
+  // flickering the indicator off — the aim stays where you last pointed it.
+  if(!el||el.dataset.id===dragId) return;
+
+  var r=el.getBoundingClientRect();
+  var horiz=(layoutFor()==="cards");
+  var after = horiz ? e.clientX>r.left+r.width/2 : e.clientY>r.top+r.height/2;
+  if(el.classList.contains(after?"dropafter":"dropbefore")) return;  // no change
+  markTarget(el,after,horiz);
+});
+board.addEventListener("drop",function(e){
+  if(!internalDrag) return;
+  e.preventDefault(); e.stopPropagation();
+  var mark=board.querySelector(".dropbefore,.dropafter");
+  if(mark) moveItem(dragId,mark.dataset.id,mark.classList.contains("dropafter"));
+  endReorder();
+});
+board.addEventListener("dragend",endReorder);
+function clearHot(){ if(hotCard){ hotCard.classList.remove("dropping"); hotCard=null } }
+function endDrag(){
+  clearHot();
+  veil.classList.remove("on","no");
+  board.classList.remove("armed");
+}
+// One funnel for every image import. The lock closes the door until the
+// current batch has finished decoding.
+function takeFiles(files,cb){
+  if(dropBusy) return;
+  dropBusy=true;
+  readImages(files).then(function(photos){
+    dropBusy=false;
+    if(photos.length) cb(photos);
+  },function(){ dropBusy=false });
+}
+function zoneAt(x,y){
+  var el=document.elementFromPoint(x,y);
+  if(!el||!el.closest) return {zone:"none"};
+  if(el.closest("#sheet")) return {zone:"editor"};
+  if(scrim.classList.contains("on")) return {zone:"none"};
+  var card=el.closest(".card,.row-item");
+  if(card) return {zone:"card",card:card};
+  if(el.closest("#board")||el.closest(".capwrap")) return {zone:"board"};
+  return {zone:"none"};
+}
+
+window.addEventListener("dragover",function(e){
+  if(!hasFiles(e)) return;
+  var z=zoneAt(e.clientX,e.clientY);
+  if(z.zone==="none"){
+    e.dataTransfer.dropEffect="none";
+    clearHot(); board.classList.remove("armed");
+    veil.textContent="Drop over a note or the board";
+    veil.classList.add("on","no");
+    return;
+  }
+  e.preventDefault();
+  e.dataTransfer.dropEffect="copy";
+  veil.classList.remove("no");
+  veil.classList.add("on");
+  if(z.zone==="card"){
+    if(z.card!==hotCard){ clearHot(); hotCard=z.card; hotCard.classList.add("dropping") }
+    board.classList.remove("armed");
+    veil.textContent="Add to this note";
+  } else {
+    clearHot();
+    if(z.zone==="board"){ board.classList.add("armed"); veil.textContent="Drop to create a new note" }
+    else { board.classList.remove("armed"); veil.textContent="Add to this note" }
+  }
+});
+window.addEventListener("dragleave",function(e){
+  // only when the pointer actually leaves the window
+  if(e.clientX<=0&&e.clientY<=0) endDrag();
+});
+window.addEventListener("dragend",endDrag);
+window.addEventListener("drop",function(e){
+  if(internalDrag){ endDrag(); return }        // rearranging, not importing
+  if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length){ endDrag(); return }
+  var z=zoneAt(e.clientX,e.clientY), target=hotCard;
+  endDrag();
+  if(z.zone==="editor") return;          // the sheet's own handler takes it
+  e.preventDefault();
+  if(z.zone==="none") return;            // outside the board: ignore entirely
+  takeFiles(e.dataTransfer.files,function(photos){
+    var item=(z.zone==="card"&&(target||z.card))?byId((target||z.card).dataset.id):null;
+    if(item) attachTo(item,photos); else newItemWithPhotos(photos);
+  });
+});
+
+// paste an image while the capture box has focus
+capin.addEventListener("paste",function(e){
+  var items=(e.clipboardData||{}).items||[], files=[];
+  for(var k=0;k<items.length;k++){
+    if(items[k].kind==="file"&&/^image\//.test(items[k].type)) files.push(items[k].getAsFile());
+  }
+  if(!files.length) return;
+  e.preventDefault();
+  takeFiles(files,function(photos){
+    var text=capin.value.trim();
+    if(text){                              // pasted alongside typed text → one item
+      var p=parse(capin.value), now=Date.now(), act=capActionable(p), sh=shapeCapture(p,act);
+      S.items.unshift({id:uid(),title:sh.title,body:sh.body,url:p.url,image:"",desc:"",logo:"",site:"",
+        metaState:null,titleAuto:p.titleAuto,actionable:act,due:p.due,timed:!!p.timed,done:false,
+        tint:"",tags:p.tags,photos:photos,checks:sh.checks,archived:false,pin:false,created:now,modified:now});
+      capin.value=""; capForce=null; refreshCap(); followItem(S.items[0]); save(); render();
+      toast("Saved with "+photos.length+" image"+(photos.length>1?"s":""));
+    } else newItemWithPhotos(photos);
+  });
+});
+
+var light=document.getElementById("light"), lightimg=document.getElementById("lightimg"),
+    lightnav=document.getElementById("lightnav"), lightSet=[], lightIx=0;
+function openLight(id,ix){
+  var it=byId(id); if(!it||!hasPhotos(it)) return;
+  lightSet=it.photos; lightIx=ix||0; light.classList.add("on"); paintLight();
+}
+function paintLight(){
+  lightimg.src=lightSet[lightIx].src;
+  lightnav.innerHTML = lightSet.length>1
+    ? '<button data-step="-1">‹</button><span>'+(lightIx+1)+' / '+lightSet.length
+      +'</span><button data-step="1">›</button>' : "";
+}
+function stepLight(d){ lightIx=(lightIx+d+lightSet.length)%lightSet.length; paintLight() }
+light.addEventListener("click",function(e){
+  var s=e.target.closest("[data-step]");
+  if(s){ stepLight(+s.dataset.step); return }
+  light.classList.remove("on");
+});
+
+/* =========================================================================
+   EVENTS
+   ========================================================================= */
+
+board.addEventListener("click",function(e){
+  // a link written inside a note goes where it points, not to the editor
+  var inline=e.target.closest(".cbody a[href],.rexc a[href]");
+  if(inline){ e.stopPropagation(); return }
+
+  // Photos on a card are part of the card. Clicking one opens the note,
+  // like clicking anywhere else on it. Zooming happens inside the note.
+  var op=e.target.closest("[data-open]");
+  if(op){
+    e.stopPropagation();
+    var oi=byId(op.dataset.open);
+    if(oi&&oi.url) window.open(oi.url,"_blank","noopener,noreferrer");
+    return;
+  }
+
+  var ai=e.target.closest("[data-addimg]");
+  if(ai){
+    e.stopPropagation();
+    var target=byId(ai.dataset.addimg);
+    pickFiles(function(photos){ if(target) attachTo(target,photos) });
+    return;
+  }
+
+  var rf=e.target.closest("[data-refetch]");
+  if(rf){
+    e.stopPropagation();
+    var r=byId(rf.dataset.refetch);
+    if(r){
+      // wipe what we guessed so every source gets a clean run
+      r.image=""; r.desc=""; r.logo=""; r.site=""; r.metaState=null;
+      fetchMeta(r,true);
+    }
+    return;
+  }
+
+  var pn=e.target.closest("[data-pin]");
+  if(pn){ e.stopPropagation(); var p=byId(pn.dataset.pin); if(p){ p.pin=!p.pin; save(); render() } return }
+
+  var ac=e.target.closest("[data-act]");
+  if(ac){
+    e.stopPropagation();
+    var a=byId(ac.dataset.act);
+    if(a){
+      a.actionable=!a.actionable;
+      if(!a.actionable){ a.due=null; a.done=false }
+      save(); render();
+      toast(a.actionable?"Now a task too":"Checkbox removed");
+    }
+    return;
+  }
+
+  var chk=e.target.closest("[data-check]");
+  if(chk){
+    e.stopPropagation();
+    var c=byId(chk.dataset.check);
+    if(c){ c.done=!c.done; c.completedAt=c.done?Date.now():null; save(); render(); if(c.done) toast("Nice.") }
+    return;
+  }
+
+  // ticking a checklist item straight from the card
+  var ck=e.target.closest("[data-ck]");
+  if(ck){
+    e.stopPropagation();
+    var parts=ck.dataset.ck.split("|"), ci=byId(parts[0]);
+    if(ci&&ci.checks&&ci.checks[+parts[1]]){
+      var c=ci.checks[+parts[1]];
+      c.d=!c.d; ci.modified=Date.now();
+      save(); render();
+    }
+    return;
+  }
+
+  var au=e.target.closest("[data-auto]");
+  if(au){ e.stopPropagation(); S.view=au.dataset.auto; S.tag=null; S.sel={}; render(); return }
+
+  var pk=e.target.closest("[data-pick]");
+  if(pk){ e.stopPropagation(); togglePick(pk.dataset.pick); return }
+
+  var row=e.target.closest(".card,.row-item");
+  if(!row) return;
+  // while a selection is live, clicking adds to it rather than opening
+  if(selCount()) togglePick(row.dataset.id); else openEditor(row.dataset.id);
+});
+
+/* ---- multi-select ----------------------------------------------------
+   The tick appears on hover. Once anything is picked, a plain click on a
+   card adds to the selection instead of opening it — so you can rattle
+   through a page without aiming at small targets. Esc clears.
+   --------------------------------------------------------------------- */
+var selbar=document.getElementById("selbar"), selcnt=document.getElementById("selcnt");
+function selIds(){ return Object.keys(S.sel) }
+function selCount(){ return selIds().length }
+function paintSel(){
+  var n=selCount();
+  selbar.classList.toggle("on",n>0);
+  document.body.classList.toggle("selecting",n>0);
+  selcnt.textContent=n+" selected";
+}
+function togglePick(id){
+  if(S.sel[id]) delete S.sel[id]; else S.sel[id]=1;
+  render();
+}
+function clearSel(){ S.sel={}; render() }
+
+selbar.addEventListener("click",function(e){
+  var b=e.target.closest("[data-sel]"); if(!b) return;
+  var ids=selIds(), n=ids.length;
+  if(!n) return;
+  var act=b.dataset.sel;
+
+  if(act==="all"){
+    visible().forEach(function(x){ S.sel[x.id]=1 });
+    render(); return;
+  }
+  if(act==="clear"){ clearSel(); return }
+
+  if(act==="arch"){
+    // if everything picked is already archived, put it all back instead
+    var allArch=ids.every(function(id){ var x=byId(id); return x&&x.archived });
+    S.items.forEach(function(x){
+      if(S.sel[x.id]){ x.archived=!allArch; x.modified=Date.now() }
+    });
+    S.sel={}; save(); render();
+    toast(allArch?(n+" put back"):(n+" archived"));
+    return;
+  }
+
+  if(act==="del"){
+    askChoice("Delete "+n+" item"+(n===1?"":"s")+"?",
+      "This can't be undone. Export first if you might want them back.",
+      [{label:"Cancel",value:false,kind:"sec"},{label:"Delete",value:true,kind:"dan"}],
+      function(go){
+        if(!go) return;
+        S.items=S.items.filter(function(x){ return !S.sel[x.id] });
+        S.sel={}; save(); render(); toast(n+" deleted");
+      });
+    return;
+  }
+
+  // adding: your most-used tags that aren't already on all of them
+  // removing: only tags actually present on the selection
+  var counts={}, onSel={};
+  S.items.forEach(function(x){
+    (x.tags||[]).forEach(function(t){
+      counts[t]=(counts[t]||0)+1;
+      if(S.sel[x.id]) onSel[t]=(onSel[t]||0)+1;
+    });
+  });
+  var sugs = act==="tag"
+    ? Object.keys(counts).filter(function(t){ return (onSel[t]||0)<n })
+        .sort(function(a,b){ return counts[b]-counts[a] }).slice(0,6)
+    : Object.keys(onSel).sort(function(a,b){ return onSel[b]-onSel[a] });
+
+  askTag(act==="tag"?"Tag "+n+" item"+(n===1?"":"s"):"Remove a tag from "+n+" item"+(n===1?"":"s"),
+    act==="tag" ? "Pick one you already use, or type a new one."
+                : "These are the tags currently on your selection.",
+    sugs, act==="tag"?"Add":"Remove",
+    function(word){
+      var tag=String(word).trim().toLowerCase().replace(/^#/,"").replace(/\s+/g,"-");
+      if(!tag) return;
+      var touched=0;
+      S.items.forEach(function(x){
+        if(!S.sel[x.id]) return;
+        x.tags=x.tags||[];
+        var at=x.tags.indexOf(tag);
+        if(act==="tag"&&at<0){ x.tags.push(tag); x.modified=Date.now(); touched++ }
+        if(act==="untag"&&at>=0){ x.tags.splice(at,1); x.modified=Date.now(); touched++ }
+      });
+      save(); render();
+      toast(touched?("#"+tag+(act==="tag"?" added to ":" removed from ")+touched):"Nothing changed");
+    });
+});
+
+/* ---- a small dialog for choices that need more than yes/no ---- */
+var ask=document.getElementById("ask"), askbox=document.getElementById("askbox"), askCB=null;
+function askChoice(title,html,choices,cb){
+  askCB=cb;
+  askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p><div class="askrow">'
+    +choices.map(function(c,ix){
+      return '<button class="btn'+(c.kind?" "+c.kind:"")+'" data-ch="'+ix+'">'+esc(c.label)+'</button>';
+    }).join("")+'</div>';
+  ask.classList.add("on");
+  askbox.onclick=function(e){
+    var b=e.target.closest("[data-ch]"); if(!b) return;
+    // Take the callback and clear it BEFORE running it. If the callback opens
+    // a second dialog — as Replace does, to confirm — clearing afterwards
+    // wiped the new dialog's callback, and its buttons did nothing.
+    var cb=askCB;
+    askCB=null;
+    closeAsk();
+    if(cb) cb(choices[+b.dataset.ch].value);
+  };
+}
+/* Same dialog, with a field. Used instead of the browser's own prompt, which
+   appears detached from the app and looks nothing like it. */
+function askText(title,html,initial,label,cb){
+  askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p>'
+    +'<input class="askin" id="askinput" spellcheck="false" value="'+esc(initial)+'">'
+    +'<div class="askrow"><button class="btn sec" data-ax="0">Cancel</button>'
+    +'<button class="btn" data-ax="1">'+esc(label)+'</button></div>';
+  ask.classList.add("on");
+  var input=document.getElementById("askinput");
+  setTimeout(function(){ input.focus(); input.select() },40);
+  function finish(ok){ var v=input.value; closeAsk(); askCB=null; if(ok) cb(v) }
+  askCB=function(){};
+  askbox.onclick=function(e){
+    var b=e.target.closest("[data-ax]"); if(!b) return;
+    finish(b.dataset.ax==="1");
+  };
+  input.onkeydown=function(e){
+    if(e.key==="Enter"){ e.preventDefault(); finish(true) }
+    if(e.key==="Escape"){ e.preventDefault(); finish(false) }
+  };
+}
+/* Same dialog again, with the tags you already use offered as chips — the
+   tagging experience should be the same everywhere in the app, not "pick
+   from a list here, type blind there". Clicking a chip applies it at once. */
+function askTag(title,html,suggestions,label,cb){
+  askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p>'
+    +(suggestions.length
+      ? '<div class="askchips">'+suggestions.map(function(t){
+          return '<button class="sug" data-tagpick="'+esc(t)+'">#'+esc(t)+'</button>';
+        }).join("")+'</div>'
+      : '')
+    +'<input class="askin" id="askinput" spellcheck="false" placeholder="'
+      +(suggestions.length?"or type another":"type a tag")+'">'
+    +'<div class="askrow"><button class="btn sec" data-ax="0">Cancel</button>'
+    +'<button class="btn" data-ax="1">'+esc(label)+'</button></div>';
+  ask.classList.add("on");
+  var input=document.getElementById("askinput");
+  setTimeout(function(){ input.focus() },40);
+  function finish(val){ closeAsk(); askCB=null; if(val) cb(val) }
+  askCB=function(){};
+  askbox.onclick=function(e){
+    var chip=e.target.closest("[data-tagpick]");
+    if(chip){ finish(chip.dataset.tagpick); return }
+    var b=e.target.closest("[data-ax]"); if(!b) return;
+    finish(b.dataset.ax==="1"?input.value:null);
+  };
+  input.onkeydown=function(e){
+    if(e.key==="Enter"){ e.preventDefault(); finish(input.value) }
+    if(e.key==="Escape"){ e.preventDefault(); finish(null) }
+  };
+}
+/* Two fields, one button. Used only for signing in. */
+function askLogin(cb){
+  askbox.innerHTML='<h3>Sync across your devices</h3>'
+    +'<p>Pick an email and a password. The same pair on any device — Mac, '
+    +'phone, iPad — opens the same library.<br><br>'
+    +'First time through, this creates the account. After that it signs you '
+    +'in. No email is sent and nothing to confirm.</p>'
+    +'<input class="askin" id="askemail" type="email" spellcheck="false" '
+      +'autocomplete="username" placeholder="you@example.com">'
+    +'<input class="askin" id="askpw" type="password" '
+      +'autocomplete="current-password" placeholder="a password you choose">'
+    +'<div class="askrow"><button class="btn sec" data-ax="0">Cancel</button>'
+    +'<button class="btn" data-ax="1">Continue</button></div>';
+  ask.classList.add("on");
+  var em=document.getElementById("askemail"), pw=document.getElementById("askpw");
+  setTimeout(function(){ em.focus() },40);
+  function finish(ok){
+    var a=em.value.trim(), b=pw.value;
+    closeAsk(); askCB=null;
+    if(ok) cb(a,b);
+  }
+  askCB=function(){};
+  askbox.onclick=function(e){
+    var t=e.target.closest("[data-ax]"); if(!t) return;
+    finish(t.dataset.ax==="1");
+  };
+  [em,pw].forEach(function(el){
+    el.onkeydown=function(e){
+      if(e.key==="Enter"){ e.preventDefault(); finish(true) }
+      if(e.key==="Escape"){ e.preventDefault(); finish(false) }
+    };
+  });
+}
+function closeAsk(){ ask.classList.remove("on") }
+ask.addEventListener("click",function(e){ if(e.target===ask){ closeAsk(); askCB=null } });
+
+/* ---- backup menu ---- */
+var backupBtn=document.getElementById("backupbtn"),
+    backupMenu=document.getElementById("backupmenu"),
+    jsonpick=document.getElementById("jsonpick");
+function closeBackup(){ backupMenu.classList.remove("on") }
+backupBtn.addEventListener("click",function(e){
+  e.stopPropagation(); backupMenu.classList.toggle("on");
+});
+backupMenu.addEventListener("click",function(e){
+  var b=e.target.closest("[data-bk]"); if(!b) return;
+  closeBackup();
+  if(b.dataset.bk==="export") exportLibrary();
+  else { jsonpick.value=""; jsonpick.click() }
+});
+jsonpick.addEventListener("change",function(){
+  if(jsonpick.files&&jsonpick.files[0]) readImportFile(jsonpick.files[0]);
+});
+document.addEventListener("click",function(e){
+  if(!e.target.closest(".menuwrap")) closeBackup();
+});
+
+var compileBtn=document.getElementById("compilebtn"),
+    compileMenu=document.getElementById("compilemenu");
+function closeCompile(){ compileMenu.classList.remove("on"); compileBtn.classList.remove("on") }
+compileBtn.addEventListener("click",function(e){
+  e.stopPropagation();
+  var on=compileMenu.classList.toggle("on");
+  compileBtn.classList.toggle("on",on);
+});
+compileMenu.addEventListener("click",function(e){
+  var b=e.target.closest("[data-comp]"); if(!b) return;
+  closeCompile();
+  if(b.dataset.comp==="note") compileToNote(); else compileToDoc();
+});
+document.addEventListener("click",function(e){
+  if(!e.target.closest(".compilewrap")) closeCompile();
+});
+
+document.getElementById("layoutseg").addEventListener("click",function(e){
+  var b=e.target.closest("[data-lay]"); if(!b) return;
+  setLayout(b.dataset.lay); render();
+});
+
+document.querySelector(".sidebar").addEventListener("click",function(e){
+  // the disclosure arrow folds the group; the row itself still navigates
+  var tog=e.target.closest("[data-toggle]");
+  if(tog){
+    e.stopPropagation();
+    var grp=document.getElementById("grp-"+tog.dataset.toggle);
+    var closed=grp.classList.toggle("closed");
+    tog.classList.toggle("closed",closed);
+    try{ localStorage.setItem("trove.grp."+tog.dataset.toggle,closed?"0":"1") }catch(err){}
+    return;
+  }
+  var v=e.target.closest("[data-view]"), t=e.target.closest("[data-tag]");
+  // leaving a page ends the selection — carrying it somewhere invisible is
+  // how you end up wondering why the toolbar won't go away
+  if(v){ S.view=v.dataset.view; S.tag=null; S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
+  if(t){ S.tag=(S.tag===t.dataset.tag?null:t.dataset.tag); S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
+});
+/* Renaming a tag. The obvious place is the tag's own page, so there's a
+   Rename button in the header whenever you're looking at one. Right-clicking
+   it in the sidebar does the same thing, for when you already know. */
+function renameTag(old){
+  var used=S.items.filter(function(x){ return (x.tags||[]).indexOf(old)>=0 }).length;
+  askText("Rename #"+old,
+    "Renaming changes it on all <b>"+used+"</b> item"+(used===1?"":"s")+" that carry it. "
+    +"If a tag by the new name already exists, the two merge.",
+    old, "Rename",
+    function(v){
+      var next=v.trim().toLowerCase().replace(/^#/,"").replace(/\s+/g,"-");
+      if(!next||next===old) return;
+      var merged=S.items.some(function(x){
+        return (x.tags||[]).indexOf(old)>=0 && (x.tags||[]).indexOf(next)>=0;
+      });
+      var n=0;
+      S.items.forEach(function(x){
+        var at=(x.tags||[]).indexOf(old);
+        if(at<0) return;
+        x.tags.splice(at,1);
+        if(x.tags.indexOf(next)<0) x.tags.push(next);
+        x.modified=Date.now(); n++;
+      });
+      if(S.tag===old) S.tag=next;
+      if(S.layouts["tag:"+old]){                   // the page keeps its layout
+        S.layouts["tag:"+next]=S.layouts["tag:"+old];
+        delete S.layouts["tag:"+old];
+        try{ localStorage.setItem("trove.layouts",JSON.stringify(S.layouts)) }catch(err){}
+      }
+      save(); render();
+      toast("#"+old+" → #"+next+" on "+n+" item"+(n===1?"":"s")+(merged?" · merged":""));
+    });
+}
+document.getElementById("tagedit").addEventListener("click",function(){
+  if(S.tag) renameTag(S.tag);
+});
+document.getElementById("taglist").addEventListener("contextmenu",function(e){
+  var t=e.target.closest("[data-tag]"); if(!t) return;
+  e.preventDefault();
+  renameTag(t.dataset.tag);
+});
+
+document.querySelector(".mobtabs").addEventListener("click",function(e){
+  var v=e.target.closest("[data-view]"); if(v){ S.view=v.dataset.view; S.tag=null; S.sel={}; render() }
+});
+document.getElementById("q").addEventListener("input",function(e){ S.q=e.target.value; S.sel={}; render() });
+/* Keyboard focus is layered, and each layer swallows what belongs to it.
+   Without this, ⌘K or an undo pressed inside an open note also reached the
+   board behind it — which is why text was appearing and vanishing in the
+   capture field while you were typing in the editor. */
+function isTyping(){
+  var el=document.activeElement;
+  if(!el) return false;
+  var t=(el.tagName||"").toLowerCase();
+  return t==="input"||t==="textarea"||el.isContentEditable;
+}
+
+document.addEventListener("keydown",function(e){
+  // 0. a question is on screen and owns the keyboard until answered
+  if(ask.classList.contains("on")){
+    if(e.key==="Escape"){ e.preventDefault(); closeAsk(); askCB=null }
+    return;
+  }
+  // 1. the lightbox is on top of everything
+  if(light.classList.contains("on")){
+    if(e.key==="Escape"){ e.preventDefault(); light.classList.remove("on") }
+    else if(e.key==="ArrowRight"){ e.preventDefault(); stepLight(1) }
+    else if(e.key==="ArrowLeft"){ e.preventDefault(); stepLight(-1) }
+    return;
+  }
+
+  // 2. an open note is modal. Escape leaves; every other key — including
+  //    ⌘X, ⌘Z and the app's own shortcuts — belongs to the editor alone.
+  if(scrim.classList.contains("on")){
+    if(e.key==="Escape") dismissEditor();   // saves, rather than discarding
+    return;
+  }
+
+  // 3. app-level shortcuts, only once nothing above has claimed the keyboard
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+    e.preventDefault(); capin.focus(); return;
+  }
+  if(e.key==="Escape"&&selCount()){ clearSel(); return }
+  if(e.key==="/"&&!isTyping()){ e.preventDefault(); document.getElementById("q").focus() }
+});
+document.getElementById("themebtn").addEventListener("click",function(){
+  var dark=document.documentElement.getAttribute("data-theme")==="dark";
+  document.documentElement.setAttribute("data-theme",dark?"light":"dark");
+  try{ localStorage.setItem("trove.theme",dark?"light":"dark") }catch(e){}
+});
+/* Typeface switch — Geologica is fetched from Google Fonts the first time you
+   ask for it, so the app still works offline on the system face. */
+function setFont(f){
+  if(f==="geologica"&&!document.getElementById("gfont")){
+    var l=document.createElement("link");
+    l.id="gfont"; l.rel="stylesheet";
+    // range form — Geologica is variable, so 350 and friends all resolve
+    l.href="https://fonts.googleapis.com/css2?family=Geologica:wght@200..600&display=swap";
+    document.head.appendChild(l);
+  }
+  document.documentElement.setAttribute("data-font",f);
+  document.getElementById("fontbtn").textContent = f==="geologica"?"Aa Geologica 200":"Aa System";
+  try{ localStorage.setItem("trove.font",f) }catch(e){}
+}
+function setQuotes(style){
+  quoteStyle=QUOTES.hasOwnProperty(style)?style:"gr";
+  document.getElementById("quotebtn").textContent=QLABEL[quoteStyle];
+  try{ localStorage.setItem("trove.quotes",quoteStyle) }catch(e){}
+}
+document.getElementById("quotebtn").addEventListener("click",function(){
+  var next=QORDER[(QORDER.indexOf(quoteStyle)+1)%QORDER.length];
+  setQuotes(next);
+  toast(next==="off"?"Straight quotes":QLABEL[next].slice(4)+" quotes");
+});
+
+document.getElementById("fontbtn").addEventListener("click",function(){
+  var cur=document.documentElement.getAttribute("data-font")==="geologica";
+  setFont(cur?"system":"geologica");
+  if(!cur) toast("Geologica — needs a connection the first time");
+});
+
+/* The name. "Everything" is the one in use; "Trove" is kept as the fallback,
+   one click away on the logo. */
+var BRANDS=["Everything","Trove"];
+/* Set it as large as the sidebar will take, then back off one pixel at a time
+   until it fits. Guessing from character counts is unreliable with a script
+   face — and the font arrives after first paint, so this runs again then. */
+var BRAND_MAX=52, BRAND_MIN=26;
+function fitBrand(){
+  var el=document.getElementById("brandname");
+  if(!el||!el.clientWidth) return;
+  var size=BRAND_MAX;
+  el.style.fontSize=size+"px";
+  while(size>BRAND_MIN && el.scrollWidth>el.clientWidth){
+    size-=1;
+    el.style.fontSize=size+"px";
+  }
+}
+function setBrand(name){
+  var n=BRANDS.indexOf(name)>=0?name:BRANDS[0];
+  document.getElementById("brandname").textContent=n;
+  document.title=n;
+  // the tagline follows whichever name is in use
+  document.getElementById("tagline").textContent="This is "+n;
+  document.getElementById("copyline").textContent="© "+new Date().getFullYear()+" Social Capital";
+  fitBrand();
+  try{ localStorage.setItem("trove.brand",n) }catch(e){}
+}
+/* A missing webfont fails silently, which is a miserable thing to debug. Ask
+   the browser whether it actually has Cookie, and say so if it doesn't. */
+function checkBrandFont(){
+  var el=document.getElementById("fonthint");
+  if(!el) return;
+  var ok=true;
+  try{ ok=document.fonts.check('30px "Cookie"') }catch(e){}
+  el.style.display=ok?"none":"";
+}
+if(document.fonts&&document.fonts.ready){
+  document.fonts.ready.then(function(){ fitBrand(); checkBrandFont() });
+}
+window.addEventListener("resize",fitBrand);
+document.getElementById("brand").addEventListener("click",function(){
+  var cur=document.getElementById("brandname").textContent;
+  setBrand(BRANDS[(BRANDS.indexOf(cur)+1)%BRANDS.length]);
+});
+
+/* ---- sync controls ---- */
+function paintSync(){
+  var b=document.getElementById("syncbtn");
+  if(!b) return;
+  if(!SYNC.on){ b.style.display="none"; return }
+  var waiting=Object.keys(SYNC.queue).length;
+  var label, cls="";
+  if(!SYNC.session){ label="☁ Sign in to sync"; cls="out" }
+  else if(SYNC.status==="busy"){ label="☁ Syncing…"; cls="busy" }
+  else if(SYNC.status==="offline"){ label="☁ Offline"+(waiting?" · "+waiting:""); cls="err" }
+  else if(SYNC.status==="error"){ label="☁ Sync failed"+(waiting?" · "+waiting:""); cls="err" }
+  else if(waiting){ label="☁ "+waiting+" waiting"; cls="busy" }
+  else label="☁ Synced";
+  b.textContent=label;
+  b.className="ghost syncbtn"+(cls?" "+cls:"");
+  b.title=SYNC.session
+    ? (SYNC.session.email?("Signed in as "+SYNC.session.email):"Signed in")
+      +(SYNC.note?" — "+SYNC.note:"")
+    : "Sync this library across your devices";
+}
+
+document.getElementById("syncbtn").addEventListener("click",function(){
+  if(!SYNC.session){
+    askLogin(function(email,pw){
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("That doesn't look like an email");
+      if(!pw||pw.length<6) return toast("Use at least six characters");
+      toast("Signing in…");
+      signInOrUp(email,pw).then(function(){
+        paintSync();
+        return syncNow();
+      }).then(function(){
+        toast("Signed in — library synced");
+      }).catch(function(e){
+        toast(String(e&&(e.msg||e.error_description||e.message)||"Couldn't sign in"));
+      });
+    });
+    return;
+  }
+  askChoice("Sync",
+    (SYNC.session.email?"Signed in as <b>"+esc(SYNC.session.email)+"</b>.":"Signed in.")
+    +" "+(Object.keys(SYNC.queue).length
+      ? Object.keys(SYNC.queue).length+" change(s) waiting to go up."
+      : "Everything here is up to date.")
+    +(SYNC.note?"<br><br>Last problem: "+esc(SYNC.note):""),
+    [{label:"Sign out",value:"out",kind:"dan"},
+     {label:"Close",value:null,kind:"sec"},
+     {label:"Sync now",value:"now"}],
+    function(v){
+      if(v==="now"){ syncNow().then(function(){ toast("Synced") }) }
+      if(v==="out"){
+        askChoice("Sign out?",
+          "Your library stays on this device. It simply stops syncing.",
+          [{label:"Cancel",value:false,kind:"sec"},{label:"Sign out",value:true,kind:"dan"}],
+          function(go){ if(go){ signOut(); toast("Signed out") } });
+      }
+    });
+});
+
+document.getElementById("szdown").addEventListener("click",function(){ setNoteSize(sizeIx-1) });
+document.getElementById("szup").addEventListener("click",function(){ setNoteSize(sizeIx+1) });
+
+document.getElementById("resetbtn").addEventListener("click",function(){
+  // this wipes real work now, not just demo data — make it deliberate
+  askChoice("Reset to the demo library?",
+    "Your <b>"+S.items.length+"</b> current item"+(S.items.length===1?"":"s")
+    +" will be discarded and replaced with the sample content. "
+    +"There is no undo — export first if you want them back.",
+    [{label:"Cancel",value:false,kind:"sec"},{label:"Reset",value:true,kind:"dan"}],
+    function(go){
+      if(!go) return;
+      S.items=enrich(seed()); S.sel={}; save(); render(); toast("Demo data restored");
+      setTimeout(backfill,300);
+    });
+});
+
+var tEl=document.getElementById("toast"), tTimer;
+function toast(msg){
+  tEl.textContent=msg; tEl.classList.add("on");
+  clearTimeout(tTimer); tTimer=setTimeout(function(){ tEl.classList.remove("on") },1700);
+}
+
+/* ============ boot ============ */
+function backfill(){
+  S.items.forEach(function(i){ if(i.url&&!i.image&&i.metaState!=="fail") fetchMeta(i) });
+}
+try{ var th=localStorage.getItem("trove.theme"); if(th) document.documentElement.setAttribute("data-theme",th) }catch(e){}
+try{ var ft=localStorage.getItem("trove.font"); if(ft) setFont(ft) }catch(e){}
+try{ var ly=localStorage.getItem("trove.layouts"); if(ly) S.layouts=JSON.parse(ly)||{} }catch(e){}
+try{ var ns=localStorage.getItem("trove.notesize"); setNoteSize(ns==null?2:parseInt(ns,10)) }
+catch(e){ setNoteSize(2) }
+try{ setQuotes(localStorage.getItem("trove.quotes")||"gr") }catch(e){ setQuotes("gr") }
+try{ setBrand(localStorage.getItem("trove.brand")||"Everything") }catch(e){ setBrand("Everything") }
+
+try{
+  if(localStorage.getItem("trove.grp.tasks")==="0"){
+    document.getElementById("grp-tasks").classList.add("closed");
+    document.querySelector('[data-toggle="tasks"]').classList.add("closed");
+  }
+}catch(e){}
+attachSmartQuotes(capin,false);
+S.items=load()||enrich(seed());
+save(); render(); refreshCap();
+setTimeout(backfill,350);
+
+/* ---- start syncing ---- */
+if(SYNC.on){
+  loadSession();
+  paintSync();
+  if(SYNC.session){
+    syncNow();
+    setInterval(function(){ if(SYNC.session&&SYNC.status!=="busy") pullChanges() },60000);
+    window.addEventListener("focus",function(){ if(SYNC.session) syncNow() });
+    window.addEventListener("online",function(){ if(SYNC.session) syncNow() });
+    // don't leave with edits stranded in the queue
+    window.addEventListener("pagehide",function(){
+      if(Object.keys(SYNC.queue).length) pushChanges();
+    });
+  }
+}
+})();
+
+/* Offline. The worker keeps a copy of the app so it opens on the Underground,
+   on a plane, or when the wifi is lying about being connected. Your library
+   was always local anyway; this just means the app itself is too. */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
