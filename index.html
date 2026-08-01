@@ -726,10 +726,29 @@
   .sheet[class*="tint-"] .field{background:transparent}
   .sheet[class*="tint-"] .facet.on{background:var(--accent-soft)}
 
+  /* The menu button only exists where the sidebar can't be permanent. */
+  .menubtn{display:none;width:34px;height:34px;border-radius:9px;flex:none;
+    align-items:center;justify-content:center;color:var(--ui);
+    border:1px solid var(--line-strong);background:var(--surface);margin-right:2px}
+  .menubtn svg{width:19px;height:19px;fill:none;stroke:currentColor;
+    stroke-width:1.7;stroke-linecap:round}
+  .menubtn:active{background:var(--line)}
+  .drawerscrim{position:fixed;inset:0;background:rgba(10,14,13,.44);z-index:85;
+    display:none;backdrop-filter:blur(2px)}
+
   .mobtabs{display:none}
   @media (max-width:820px){
     .app{grid-template-columns:1fr}
-    .sidebar{display:none}
+    /* On a phone the sidebar becomes a drawer rather than disappearing.
+       Hiding it took the settings, the tags and half the lenses with it. */
+    .sidebar{display:flex;position:fixed;left:0;top:0;bottom:0;width:min(282px,84vw);
+      z-index:90;background:var(--bg);border-right:1px solid var(--line-strong);
+      transform:translateX(-101%);transition:transform .24s cubic-bezier(.2,.8,.3,1);
+      box-shadow:var(--shadow-lg);overflow-y:auto;padding-bottom:26px}
+    body.drawer .sidebar{transform:none}
+    body.drawer .drawerscrim{display:block}
+    .menubtn{display:flex}
+    .topbar{align-items:center}
     .topbar{padding:14px 16px 0}
     .capwrap{padding:12px 16px 8px}
     .board{padding:4px 16px 96px}
@@ -814,6 +833,9 @@
 
   <main class="main">
     <div class="topbar">
+      <button class="menubtn" id="menubtn" title="Menu">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
       <div>
         <div class="titlerow">
           <div class="title" id="viewtitle">All</div>
@@ -871,6 +893,7 @@
 <div class="light" id="light"><img id="lightimg" alt=""><div class="nav" id="lightnav"></div></div>
 <input type="file" id="filepick" accept="image/*" multiple style="display:none">
 <input type="file" id="jsonpick" accept=".json,application/json" style="display:none">
+<div class="drawerscrim" id="drawerscrim"></div>
 <div class="scrim" id="ask"><div class="askbox" id="askbox"></div></div>
 <div class="selbar" id="selbar">
   <span class="cnt" id="selcnt"></span>
@@ -942,6 +965,8 @@ function load(){
   return mem;
 }
 function save(){
+  // the first save after startup is a real edit, so this stops being a demo
+  if(BOOTED) notDemoAnyMore();
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
   try{ localStorage.setItem(KEY, JSON.stringify(S.items)) }catch(e){
@@ -953,6 +978,17 @@ function save(){
 }
 
 var S={items:[], view:"all", q:"", tag:null, layouts:{}, sel:{}};
+
+/* A device opening the app for the first time gets the sample library so it
+   isn't a blank page. That content must never be mistaken for yours — signing
+   in on a fresh device would otherwise push twelve demo notes into your real
+   library. DEMO stays true until you actually change something. */
+var DEMO=false, BOOTED=false;
+function notDemoAnyMore(){
+  if(!DEMO) return;
+  DEMO=false;
+  try{ localStorage.removeItem("trove.demo") }catch(e){}
+}
 
 /* Each lens remembers its own layout, the way Raindrop gives every collection
    its own view settings. The defaults suit what each lens mostly holds. */
@@ -1909,13 +1945,30 @@ function signUpPassword(email,pw){
 /* One button for both cases: sign in, and if there's no such account yet,
    make one. A wrong password on an existing account surfaces as exactly that
    rather than as a confusing signup error. */
+function errText(e){
+  return String((e&&(e.error_description||e.msg||e.message||e.error))||"");
+}
 function signInOrUp(email,pw){
   return signInPassword(email,pw).catch(function(e){
-    var msg=String((e&&(e.error_description||e.msg||e.message))||"");
+    var msg=errText(e);
     if(!/invalid login credentials/i.test(msg)) throw e;
+
+    /* Supabase answers "invalid login credentials" both for an unknown email
+       and for a wrong password — deliberately, so nobody can probe which
+       addresses exist. So try creating the account, and read the failure:
+
+         "already registered"  -> the email is known, the password is wrong
+         "signups not allowed" -> we can't create one, so the pair simply
+                                  doesn't open anything here
+
+       Reporting the signup error verbatim was misleading: it made a mistyped
+       password look like a configuration problem. */
     return signUpPassword(email,pw).catch(function(e2){
-      var m2=String((e2&&(e2.error_description||e2.msg||e2.message))||"");
-      if(/already registered|already exists/i.test(m2)) throw { msg:"wrong password for that address" };
+      var m2=errText(e2);
+      if(/already registered|already exists|user_already/i.test(m2))
+        throw { msg:"Wrong password for "+email };
+      if(/signup|sign.?up/i.test(m2)&&/disabled|not allowed/i.test(m2))
+        throw { msg:"No account here matches that email and password — check both" };
       throw e2;
     });
   });
@@ -3481,7 +3534,18 @@ document.getElementById("layoutseg").addEventListener("click",function(e){
   setLayout(b.dataset.lay); render();
 });
 
+/* ---- the mobile drawer ---- */
+function openDrawer(on){ document.body.classList.toggle("drawer",on) }
+document.getElementById("menubtn").addEventListener("click",function(e){
+  e.stopPropagation();
+  openDrawer(!document.body.classList.contains("drawer"));
+});
+document.getElementById("drawerscrim").addEventListener("click",function(){ openDrawer(false) });
+
 document.querySelector(".sidebar").addEventListener("click",function(e){
+  // picking a destination closes the drawer; fiddling with settings doesn't
+  if(e.target.closest("[data-view],[data-tag]")) openDrawer(false);
+
   // the disclosure arrow folds the group; the row itself still navigates
   var tog=e.target.closest("[data-toggle]");
   if(tog){
@@ -3693,6 +3757,13 @@ document.getElementById("syncbtn").addEventListener("click",function(){
       toast("Signing in…");
       signInOrUp(email,pw).then(function(){
         paintSync();
+        // never let sample content masquerade as yours
+        if(DEMO){
+          S.items=[]; SYNC.shadow={}; SYNC.queue={};
+          SYNC.lastPull="1970-01-01T00:00:00Z";
+          notDemoAnyMore();
+          try{ localStorage.setItem(KEY,"[]") }catch(e){}
+        }
         return syncNow();
       }).then(function(){
         toast("Signed in — library synced");
@@ -3764,8 +3835,17 @@ try{
   }
 }catch(e){}
 attachSmartQuotes(capin,false);
-S.items=load()||enrich(seed());
+var stored=load();
+if(stored){
+  S.items=stored;
+  try{ DEMO=localStorage.getItem("trove.demo")==="1" }catch(e){}
+} else {
+  S.items=enrich(seed());
+  DEMO=true;
+  try{ localStorage.setItem("trove.demo","1") }catch(e){}
+}
 save(); render(); refreshCap();
+BOOTED=true;   // from here on, a save means a person did something
 setTimeout(backfill,350);
 
 /* ---- start syncing ---- */
