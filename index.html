@@ -312,7 +312,12 @@
   .row-item .quick{position:static;transform:none;flex:none;box-shadow:none;
     background:none;border:0;padding:0;width:52px;justify-content:flex-end;z-index:4}
   .row-item:hover .quick{transform:none}
-  .row-item .pinned{top:50%;margin-top:-10px}
+  /* A row is only 46px tall in places — a corner ribbon would swallow it.
+     Mark the whole left edge instead, which is the list idiom anyway. */
+  .row-item .pinned{top:0;bottom:0;left:0;width:4px;height:auto;overflow:visible;
+    background:var(--accent);
+    border-radius:calc(var(--r) - 1px) 0 0 calc(var(--r) - 1px)}
+  .row-item .pinned::before{display:none}
   .row-item.done .rtitle{text-decoration:line-through;color:var(--faint)}
   .row-item.done{opacity:.55}
 
@@ -562,8 +567,30 @@
   .quick button.on{color:var(--accent)}
   .quick button.go{color:var(--blue);font-weight:700}
   .quick button.go:hover{background:rgba(68,87,159,.14);color:var(--blue)}
-  .pinned{position:absolute;top:10px;left:-1px;width:3px;height:20px;border-radius:0 3px 3px 0;
-    background:var(--accent)}
+  /* pinned — a ribbon folded over the top-left corner.
+     The square is a clipping window: the band inside is longer than the
+     corner it crosses, so both ends are cut flush against the card's edges
+     and it reads as a ribbon rather than a triangle.
+
+     The geometry is tighter than it looks. The band's centre line sits
+     11.7px along the diagonal, so the band spans 7 to 16 — past the corner
+     radius, which stops at 5.4, but short of where the title's first glyph
+     begins, at 19. Any larger and a text-only card wears the ribbon through
+     its own first word. On a card with a cover the ribbon lands on the
+     image, which is where it looks best. */
+  .pinned{position:absolute;top:0;left:0;width:30px;height:30px;overflow:hidden;
+    pointer-events:none;z-index:3;transition:opacity .16s;
+    /* the card's radius is on its border box; this box starts inside the
+       1px border, so it needs the inner radius or a sliver of accent shows
+       past the corner in moodboard, where the card does not clip its own
+       children */
+    border-radius:calc(var(--r) - 1px) 0 0 0}
+  .pinned::before{content:"";position:absolute;top:4px;left:-14px;width:44px;height:9px;
+    background:var(--accent);transform:rotate(-45deg);
+    box-shadow:0 1px 3px rgba(0,0,0,.20)}
+  /* The select circle lives in this exact corner, so on hover the ribbon
+     stands aside — the toolbar's ◆ already shows the same state. */
+  .card:hover .pinned,.row-item:hover .pinned{opacity:0}
 
   /* selection */
   .pick{position:absolute;top:8px;left:8px;z-index:4;width:21px;height:21px;border-radius:50%;
@@ -1295,6 +1322,24 @@ function readImages(files){
   var list=[].slice.call(files||[]).filter(function(f){ return /^image\//.test(f.type) });
   return Promise.all(list.map(readImage)).then(function(r){ return r.filter(Boolean) });
 }
+/* Pull image files out of a clipboard or drag payload.
+   Copying a file in Finder fills .files; copying an image out of a web page
+   fills only .items with a synthesised blob. Some sources fill both with the
+   same image, so this prefers .files and only falls back — merging the two
+   would attach every screenshot twice. */
+function imageFilesFrom(dt){
+  if(!dt) return [];
+  var out=[].slice.call(dt.files||[]).filter(function(f){
+    return f && /^image\//.test(f.type||"");
+  });
+  if(out.length) return out;
+  [].slice.call(dt.items||[]).forEach(function(it){
+    if(it && it.kind==="file" && /^image\//.test(it.type||"")){
+      var f=it.getAsFile(); if(f) out.push(f);
+    }
+  });
+  return out;
+}
 function attachTo(item,photos){
   if(!photos.length) return;
   item.photos=(item.photos||[]).concat(photos);
@@ -1765,6 +1810,20 @@ function block(list){
   return '<div class="grid '+(lay==="cards"?"cards":"mood")+'">'+list.map(cardHTML).join("")+'</div>';
 }
 
+/* Pinned items get their own block rather than merely sorting first.
+   In the card grid, sorting first is enough — the grid fills left to right,
+   so they take the top row. Moodboard is CSS columns, which fill top to
+   bottom: sorting first there ran the pinned items down the left-hand edge
+   instead of across the top. Giving them a container of their own makes the
+   masonry balance them across the width in every layout. */
+function pinSplit(list,restLabel){
+  var pins=list.filter(function(i){ return i.pin }),
+      rest=list.filter(function(i){ return !i.pin });
+  if(!pins.length||!rest.length) return block(list);   // no split worth marking
+  return '<div class="grouphead">Pinned</div>'+block(pins)
+        +'<div class="grouphead">'+esc(restLabel)+'</div>'+block(rest);
+}
+
 function bucket(i){
   if(i.due==null) return "Someday";
   var d=dayOf(i.due)-todayKey();
@@ -1794,11 +1853,9 @@ function render(){
         +block(g);
     }).join("");
   } else if(S.view==="all"&&!S.q&&!S.tag){
-    var pinned=list.filter(function(i){return i.pin}), rest=list.filter(function(i){return !i.pin});
-    board.innerHTML=(pinned.length?'<div class="grouphead">Pinned</div>'+block(pinned):"")
-      +(rest.length?(pinned.length?'<div class="grouphead">Recent</div>':"")+block(rest):"");
+    board.innerHTML=pinSplit(list,"Recent");
   } else {
-    board.innerHTML=block(list);
+    board.innerHTML=pinSplit(list, S.q?"Results":S.tag?"#"+S.tag:lens.title);
   }
 
   var lay=layoutFor();
@@ -2996,6 +3053,21 @@ sheet.addEventListener("drop",function(e){
   takeFiles(e.dataTransfer.files,function(photos){ addPhotosToEditing(photos) });
 });
 
+/* ⌘V with an image on the clipboard adds it to the open note.
+   Bound to the document rather than the sheet because a paste fires at
+   whatever holds focus, and with a note open that might be the body, the
+   title, a checklist row, or nothing at all — but it always means the same
+   thing. Registered once, at the top level: attaching this inside openEditor
+   is what made a single dropped image land in every note opened that session.
+   Text pastes fall straight through to the body's own plain-text handler. */
+document.addEventListener("paste",function(e){
+  if(!S.editing) return;
+  var imgs=imageFilesFrom(e.clipboardData);
+  if(!imgs.length) return;
+  e.preventDefault(); e.stopPropagation();
+  takeFiles(imgs,function(photos){ addPhotosToEditing(photos) });
+},true);
+
 /* =========================================================================
    IMAGE INPUT — file picker, drag & drop, paste, lightbox
    ========================================================================= */
@@ -3192,10 +3264,7 @@ window.addEventListener("drop",function(e){
 
 // paste an image while the capture box has focus
 capin.addEventListener("paste",function(e){
-  var items=(e.clipboardData||{}).items||[], files=[];
-  for(var k=0;k<items.length;k++){
-    if(items[k].kind==="file"&&/^image\//.test(items[k].type)) files.push(items[k].getAsFile());
-  }
+  var files=imageFilesFrom(e.clipboardData);
   if(!files.length) return;
   e.preventDefault();
   takeFiles(files,function(photos){
