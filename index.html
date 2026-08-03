@@ -1754,6 +1754,34 @@ function setNoteSize(ix){
    and would be reused by a Markdown export.
    --------------------------------------------------------------------- */
 var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1};
+
+/* The list icons, defined once and used by both the note editor and the post
+   composer.
+
+   The first version was drawn at 15px with 2px dots, 1.4px rules and numerals
+   at five pixels. Every part of it was technically present and none of it was
+   visible — five-pixel digits in a muted grey are a smudge, not a number.
+   Redrawn at 18px with heavier strokes and numerals half again as large.
+
+   Fill and stroke are stated on every group rather than inherited, and the
+   rule group carries fill="none" explicitly: an unset fill defaults to black,
+   which costs nothing on an open path today and would blot the icon the moment
+   anyone closed one. */
+var ICON_UL=
+   '<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">'
+  +'<g fill="currentColor" stroke="none">'
+  +'<circle cx="2.4" cy="3.2" r="1.5"/><circle cx="2.4" cy="8" r="1.5"/>'
+  +'<circle cx="2.4" cy="12.8" r="1.5"/></g>'
+  +'<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
+  +'<path d="M6.4 3.2h8M6.4 8h8M6.4 12.8h8"/></g></svg>';
+var ICON_OL=
+   '<svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">'
+  +'<g fill="currentColor" stroke="none" font-size="6.4" font-weight="700" '
+  +'font-family="-apple-system,system-ui,sans-serif" text-anchor="middle">'
+  +'<text x="2.5" y="5.4">1</text><text x="2.5" y="10.2">2</text>'
+  +'<text x="2.5" y="15">3</text></g>'
+  +'<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">'
+  +'<path d="M6.6 3.2h7.8M6.6 8h7.8M6.6 12.8h7.8"/></g></svg>';
 var SAFE_HREF=/^(https?:|mailto:)/i;
 // these are removed along with everything inside them, rather than unwrapped
 var RICH_DROP={SCRIPT:1,STYLE:1,NOSCRIPT:1,IFRAME:1,OBJECT:1,EMBED:1,TEMPLATE:1,
@@ -2010,7 +2038,8 @@ function render(){
   document.body.classList.toggle("on-posts",onPosts);
   if(onPosts){
     document.getElementById("viewtitle").textContent="Posts";
-    document.getElementById("lensnote").textContent="public — anyone with the address";
+    document.getElementById("lensnote").textContent=
+      "Public — anyone with the address can see this";
     board.innerHTML=renderPosts();
     paintSidebar();
     return;
@@ -2789,19 +2818,9 @@ function openEditor(id){
          are 15px square and inherit currentColor, so they dim and light with
          every other control. */
       +'<button class="facet fmt" id="e-ul" title="Bulleted list" aria-label="Bulleted list">'
-        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
-        +'<g fill="currentColor"><circle cx="2.3" cy="4" r="1.15"/>'
-        +'<circle cx="2.3" cy="8" r="1.15"/><circle cx="2.3" cy="12" r="1.15"/></g>'
-        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
-        +'<path d="M6.2 4h7.5M6.2 8h7.5M6.2 12h7.5"/></g></svg></button>'
+        +ICON_UL+'</button>'
       +'<button class="facet fmt" id="e-ol" title="Numbered list" aria-label="Numbered list">'
-        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
-        +'<g fill="currentColor" font-size="5.4" font-weight="700" '
-        +'font-family="-apple-system,system-ui,sans-serif" text-anchor="middle">'
-        +'<text x="2.4" y="5.9">1</text><text x="2.4" y="9.9">2</text>'
-        +'<text x="2.4" y="13.9">3</text></g>'
-        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
-        +'<path d="M6.4 4h7.3M6.4 8h7.3M6.4 12h7.3"/></g></svg></button>'
+        +ICON_OL+'</button>'
       +'<span class="wc" id="e-wc"></span>'
     +'</div>'
     +'<div class="cklist" id="e-cklist"></div>'
@@ -3933,19 +3952,9 @@ function paintComposer(){
       +'<button class="facet fmt" data-pf="italic" title="Italic — ⌘I"><i>I</i></button>'
       +'<button class="facet fmt" data-pf="link" title="Link the selected text — ⌘K">⚭</button>'
       +'<button class="facet fmt" data-pf="ul" title="Bulleted list" aria-label="Bulleted list">'
-        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
-        +'<g fill="currentColor"><circle cx="2.3" cy="4" r="1.15"/>'
-        +'<circle cx="2.3" cy="8" r="1.15"/><circle cx="2.3" cy="12" r="1.15"/></g>'
-        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
-        +'<path d="M6.2 4h7.5M6.2 8h7.5M6.2 12h7.5"/></g></svg></button>'
+        +ICON_UL+'</button>'
       +'<button class="facet fmt" data-pf="ol" title="Numbered list" aria-label="Numbered list">'
-        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
-        +'<g fill="currentColor" font-size="5.4" font-weight="700" '
-        +'font-family="-apple-system,system-ui,sans-serif" text-anchor="middle">'
-        +'<text x="2.4" y="5.9">1</text><text x="2.4" y="9.9">2</text>'
-        +'<text x="2.4" y="13.9">3</text></g>'
-        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
-        +'<path d="M6.4 4h7.3M6.4 8h7.3M6.4 12h7.3"/></g></svg></button>'
+        +ICON_OL+'</button>'
       +'<button class="facet fmt" data-pf="img" title="Add an image" style="width:auto;padding:0 10px">⊞</button>'
       +(d.link?"":'<button class="facet fmt" data-pf="addlink" title="Attach a link" '
         +'style="width:auto;padding:0 10px">＋⚭</button>')
