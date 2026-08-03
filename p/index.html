@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Everything</title>
+<meta name="description" content="Notes and links, in the open.">
+<link rel="icon" href="../icons/192.png">
+
+<!--
+  The public page.
+
+  It has no editor, no sync, no sign-in, no write path, and no copy of anyone's
+  library. It makes two GET requests and draws what comes back. Keeping it
+  apart from the app is the point: the app is 190 KB of code that assumes you
+  own everything it can see, and there should be no public door into that.
+
+  Everything it can read is already public — every row in `posts` is published
+  by definition, and `profiles` holds nothing but a name and a bio.
+-->
+
+<style>
+  :root{
+    --bg:#F7F6F3; --surface:#FFFFFF; --surface-2:#FDFCFA;
+    --ink:#1A1917; --muted:#6E6A62; --faint:#8B867D; --read:#3B3934;
+    --line:rgba(22,26,25,.13); --line-strong:rgba(22,26,25,.24);
+    --accent:#1F6B63; --blue:#44579F;
+    --r:16px;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#131211; --surface:#1C1B19; --surface-2:#211F1D;
+      --ink:#EDEBE6; --muted:#ABA69C; --faint:#837E75; --read:#C6C2BA;
+      --line:rgba(255,255,255,.13); --line-strong:rgba(255,255,255,.24);
+      --accent:#5FB3A6; --blue:#8FA8DE;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);
+    padding:0 18px calc(80px + env(safe-area-inset-bottom));
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:600px;margin:0 auto}
+
+  header{padding:52px 0 24px;border-bottom:1px solid var(--line);margin-bottom:8px}
+  .who{display:flex;align-items:center;gap:14px}
+  .av{width:52px;height:52px;border-radius:50%;flex:none;object-fit:cover;
+    background:var(--line);display:grid;place-items:center;
+    font-size:20px;font-weight:600;color:var(--muted)}
+  h1{margin:0;font-size:22px;font-weight:650;letter-spacing:-.02em;line-height:1.2}
+  .at{margin:2px 0 0;font-size:14px;color:var(--faint)}
+  .bio{margin:14px 0 0;font-size:15px;color:var(--read);line-height:1.6}
+
+  article{padding:26px 0;border-bottom:1px solid var(--line)}
+  article:last-child{border-bottom:0}
+  time{display:block;font-size:12.5px;color:var(--faint);margin-bottom:10px}
+  time a{color:inherit;text-decoration:none}
+  time a:hover{color:var(--muted);text-decoration:underline}
+  .text{font-size:16.5px;line-height:1.65;color:var(--ink);word-break:break-word}
+  .text:empty{display:none}
+  .text p{margin:0 0 .7em}
+  .text strong,.text b{font-weight:700}
+  .text em,.text i{font-style:italic}
+  .text ul,.text ol{margin:.5em 0;padding-left:1.4em}
+  .text a{color:var(--blue)}
+  .text + .shots,.text + .card{margin-top:14px}
+
+  .shots{display:grid;gap:4px;border-radius:var(--r);overflow:hidden}
+  .shots.n1{grid-template-columns:1fr}
+  .shots.n2{grid-template-columns:1fr 1fr}
+  .shots.n3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}
+  .shots.n3 figure:first-child{grid-row:span 2}
+  .shots.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  .shots figure{margin:0;min-width:0;background:var(--line)}
+  .shots img{display:block;width:100%;height:100%;object-fit:cover}
+  .shots.n1 img{height:auto;max-height:560px}
+  .shots.n2 img,.shots.n3 img,.shots.n4 img{height:190px}
+  .shots + .card{margin-top:10px}
+
+  .card{display:flex;border:1px solid var(--line);border-radius:var(--r);
+    overflow:hidden;background:var(--surface);text-decoration:none;color:inherit}
+  .card:hover{border-color:var(--line-strong)}
+  .card img{width:132px;flex:none;object-fit:cover;align-self:stretch;background:var(--line)}
+  .card .t{padding:13px 15px;min-width:0}
+  .card .h{font-weight:600;font-size:14.5px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .d{font-size:13px;color:var(--muted);margin-top:5px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .s{font-size:12px;color:var(--faint);margin-top:7px}
+
+  .msg{padding:70px 0;text-align:center;color:var(--faint)}
+  .msg .big{font-size:30px;margin-bottom:10px;opacity:.5}
+  footer{padding:34px 0 0;text-align:center;font-size:12.5px;color:var(--faint)}
+  footer a{color:var(--faint)}
+  .back{display:inline-block;margin-top:18px;font-size:13px;color:var(--blue);
+    text-decoration:none}
+
+  @media (max-width:520px){
+    header{padding-top:34px}
+    .card img{width:100px}
+    .shots.n2 img,.shots.n3 img,.shots.n4 img{height:140px}
+  }
+</style>
+
+<div class="wrap">
+  <header id="head"></header>
+  <main id="stream"><div class="msg"><div class="big">◌</div>Loading…</div></main>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+var SUPA={
+  url:"https://hzbnvkvhcpdodmylgqxb.supabase.co",
+  key:"sb_publishable_acuePtNZl9GO4dq7Tav6FA_tp6-4VyM"
+};
+
+var qs=new URLSearchParams(location.search);
+var handle=(qs.get("u")||"").trim().toLowerCase();
+var only=(qs.get("p")||"").trim();
+
+var head=document.getElementById("head"),
+    stream=document.getElementById("stream"),
+    foot=document.getElementById("foot");
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c] }) }
+
+function get(path){
+  return fetch(SUPA.url+"/rest/v1"+path,{
+    headers:{ apikey:SUPA.key, Authorization:"Bearer "+SUPA.key }
+  }).then(function(r){
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    return r.json();
+  });
+}
+
+/* The same whitelist the app writes with, applied again on the way out.
+
+   The app sanitises before it publishes, so in principle this is redundant.
+   In practice a row in a database is just a row: it could have been written
+   by an older build, or edited by hand in the dashboard, or by some future
+   version of the app with a looser idea of what markup is. This page trusts
+   none of that, because it is the one place the content becomes a live DOM
+   in someone else's browser. */
+var OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,P:1};
+// removed outright, contents and all — keeping the text of a <script> would
+// be pointless and keeping a <form>'s labels would be misleading
+var DROP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,SVG:1,MATH:1,LINK:1,
+  META:1,BASE:1,FORM:1,INPUT:1,TEXTAREA:1,SELECT:1,BUTTON:1,NOSCRIPT:1,TEMPLATE:1};
+var SAFE=/^(https?:|mailto:)/i;
+
+/* One pass, depth first. Anything not on the list is unwrapped — its markup
+   goes, its words stay — and every surviving element is stripped of every
+   attribute. An href is then put back by hand on links that point somewhere
+   ordinary, which is the only attribute this page will emit.
+
+   Stripping first and rebuilding is deliberate: an allow-list of attributes
+   has to anticipate onclick, onerror, onanimationend, style, srcdoc and
+   whatever ships next year. Removing all of them anticipates nothing. */
+function body(html){
+  var box=document.createElement("div");
+  box.innerHTML=String(html||"");
+  (function walk(node){
+    [].slice.call(node.childNodes).forEach(function(n){
+      if(n.nodeType===3) return;                 // text is always fine
+      if(n.nodeType!==1){ n.remove(); return }    // comments, CDATA, the rest
+      var tag=(n.tagName||"").toUpperCase();
+      if(DROP[tag]){ n.remove(); return }
+      walk(n);                                    // children first
+      var href=(tag==="A"&&n.getAttribute("href"))||"";
+      if(!OK[tag]||(tag==="A"&&!SAFE.test(href))){
+        while(n.firstChild) n.parentNode.insertBefore(n.firstChild,n);
+        n.remove();
+        return;
+      }
+      [].slice.call(n.attributes).forEach(function(a){ n.removeAttribute(a.name) });
+      if(tag==="A"){
+        n.setAttribute("href",href);
+        n.setAttribute("rel","noopener noreferrer nofollow ugc");
+        n.setAttribute("target","_blank");
+      }
+    });
+  })(box);
+  return box.innerHTML;
+}
+
+function host(u){ try{ return new URL(u).hostname.replace(/^www\./,"") }catch(e){ return "" } }
+function when(iso){
+  var d=new Date(iso), now=new Date(), ms=now-d, day=864e5;
+  if(ms<6e4) return "just now";
+  if(ms<36e5) return Math.round(ms/6e4)+" min ago";
+  if(ms<day)  return Math.round(ms/36e5)+" h ago";
+  if(ms<7*day) return Math.round(ms/day)+" days ago";
+  return d.toLocaleDateString(undefined,{day:"numeric",month:"long",
+    year:d.getFullYear()===now.getFullYear()?undefined:"numeric"});
+}
+
+function shotsHTML(list){
+  var n=(list||[]).length; if(!n) return "";
+  return '<div class="shots n'+Math.min(n,4)+'">'+list.slice(0,4).map(function(p){
+    if(!p||!/^https?:/i.test(p.url||"")) return "";
+    var dim=(p.w&&p.h)?' width="'+(+p.w)+'" height="'+(+p.h)+'"':"";
+    return '<figure><img src="'+esc(p.url)+'" alt=""'+dim+' loading="lazy" decoding="async"></figure>';
+  }).join("")+'</div>';
+}
+function cardHTML(l){
+  if(!l||!l.url||!SAFE.test(l.url)) return "";
+  return '<a class="card" href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer nofollow ugc">'
+    +(l.image&&/^https?:/i.test(l.image)?'<img src="'+esc(l.image)+'" alt="" loading="lazy">':"")
+    +'<div class="t"><div class="h">'+esc(l.title||l.url)+'</div>'
+    +(l.desc?'<div class="d">'+esc(l.desc)+'</div>':"")
+    +'<div class="s">'+esc(l.site||host(l.url))+'</div></div></a>';
+}
+function postHTML(p){
+  var link=only?"":('<a href="?u='+encodeURIComponent(handle)+'&p='+encodeURIComponent(p.id)+'">'
+                    +esc(when(p.created_at))+'</a>');
+  return '<article>'
+    +'<time>'+(link||esc(when(p.created_at)))+(p.edited_at?" · edited":"")+'</time>'
+    +'<div class="text">'+body(p.body)+'</div>'
+    + shotsHTML(p.photos)
+    + cardHTML(p.link)
+    +'</article>';
+}
+function message(t,sub){
+  return '<div class="msg"><div class="big">◌</div>'+esc(t)
+    +(sub?'<div style="margin-top:8px;font-size:13.5px">'+esc(sub)+'</div>':"")+'</div>';
+}
+
+if(!handle){
+  head.innerHTML="";
+  stream.innerHTML=message("No page asked for.","Add ?u=someone to the address.");
+} else {
+  get("/profiles?select=handle,display_name,bio,avatar,user_id&handle=eq."+encodeURIComponent(handle))
+    .then(function(rows){
+      var me=rows[0];
+      if(!me){
+        stream.innerHTML=message("No page here.","Nobody has taken @"+handle+".");
+        throw "stop";
+      }
+      var name=me.display_name||me.handle;
+      document.title=name+" — Everything";
+      head.innerHTML='<div class="who">'
+        +(me.avatar&&/^https?:/i.test(me.avatar)
+           ? '<img class="av" src="'+esc(me.avatar)+'" alt="">'
+           : '<div class="av">'+esc(name.slice(0,1).toUpperCase())+'</div>')
+        +'<div><h1>'+esc(name)+'</h1><p class="at">@'+esc(me.handle)+'</p></div></div>'
+        +(me.bio?'<p class="bio">'+esc(me.bio)+'</p>':"");
+      var q="/posts?select=id,body,photos,link,created_at,edited_at"
+            +"&author=eq."+encodeURIComponent(me.user_id)
+            +(only?"&id=eq."+encodeURIComponent(only):"")
+            +"&order=created_at.desc&limit=100";
+      return get(q);
+    })
+    .then(function(posts){
+      if(!posts.length){
+        stream.innerHTML=message(only?"That post is gone.":"Nothing here yet.");
+      } else {
+        stream.innerHTML=posts.map(postHTML).join("");
+      }
+      foot.innerHTML=(only
+        ? '<a class="back" href="?u='+encodeURIComponent(handle)+'">← all posts</a>'
+        : '<span>Made with Everything</span>');
+    })
+    .catch(function(e){
+      if(e==="stop") return;
+      stream.innerHTML=message("Couldn't load this page.","Try again in a moment.");
+    });
+}
+})();
+</script>
+</html>

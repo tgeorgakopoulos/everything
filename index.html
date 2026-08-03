@@ -310,7 +310,7 @@
   .row-item .rdue .due{background:none;border:0;padding:0;font-weight:600;
     display:inline;white-space:nowrap}
   .row-item .quick{position:static;transform:none;flex:none;box-shadow:none;
-    background:none;border:0;padding:0;width:52px;justify-content:flex-end;z-index:4}
+    background:none;border:0;padding:0;width:112px;justify-content:flex-end;z-index:4}
   .row-item:hover .quick{transform:none}
   /* A row is only 46px tall in places — a corner ribbon would swallow it.
      Mark the whole left edge instead, which is the list idiom anyway. */
@@ -640,6 +640,88 @@
     animation:pop .18s cubic-bezier(.2,.8,.3,1)}
   @keyframes pop{from{opacity:0;transform:translateY(8px) scale(.98)}}
   .sheet input,.sheet textarea{width:100%;border:0;outline:none;background:none;margin-bottom:8px}
+
+  /* ---------- posts ---------- */
+  .psheet{width:min(620px,100%);padding:24px 26px 22px}
+  .phead{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .phead h3{margin:0;font-size:16px;font-weight:640;letter-spacing:-.01em}
+  .phead .where{margin-left:auto;font-size:12px;color:var(--faint)}
+  .pbody{font-size:calc(16px*var(--tscale));line-height:1.62;min-height:110px;
+    color:var(--ink);font-family:var(--content);outline:none;
+    white-space:pre-wrap;word-break:break-word;margin-bottom:12px}
+  .pbody:empty:before{content:attr(data-ph);color:var(--faint)}
+  .pbody strong,.pbody b{font-weight:700}
+  .pbody em,.pbody i{font-style:italic}
+  .pbody ul,.pbody ol{margin:.4em 0;padding-left:1.35em}
+  .pbody a{color:var(--blue)}
+  .pact{display:flex;gap:8px;align-items:center;padding-top:14px;margin-top:4px;
+    border-top:1px solid var(--line)}
+  .pact .grow{flex:1}
+  .pbtn{padding:9px 18px;border-radius:10px;font-size:13.5px;font-weight:620;
+    border:1px solid var(--line-strong);color:var(--ink);background:var(--surface)}
+  .pbtn:hover{border-color:var(--faint)}
+  .pbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .pbtn.primary:hover{filter:brightness(1.08)}
+  .pbtn.danger{color:var(--red);border-color:transparent}
+  .pbtn.danger:hover{border-color:var(--red)}
+  .pbtn:disabled{opacity:.5;cursor:default;filter:none}
+  .perr{color:var(--red);font-size:12.5px;margin-right:auto;max-width:340px}
+
+  /* the link card, in the composer and on a published post alike */
+  .plink{display:flex;gap:0;border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;margin-bottom:12px;background:var(--surface-2);position:relative}
+  .plink .pl-img{width:118px;flex:none;background:var(--line);object-fit:cover;align-self:stretch}
+  .plink .pl-txt{padding:10px 13px;min-width:0;flex:1}
+  .plink .pl-t{font-weight:600;font-size:13.5px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .plink .pl-s{font-size:11.5px;color:var(--faint);margin-top:4px}
+  .pdrop{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;
+    background:var(--surface);border:1px solid var(--line-strong);color:var(--muted);
+    display:grid;place-items:center;font-size:12px;line-height:1}
+  .pdrop:hover{color:var(--red);border-color:var(--red)}
+
+  .pphotos{display:grid;gap:4px;border-radius:12px;overflow:hidden;margin-bottom:12px}
+  .pphotos.n1{grid-template-columns:1fr}
+  .pphotos.n2{grid-template-columns:1fr 1fr}
+  .pphotos.n3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}
+  .pphotos.n3 .pph:first-child{grid-row:span 2}
+  .pphotos.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+  .pph{position:relative;margin:0;min-width:0}
+  .pph img{display:block;width:100%;height:100%;object-fit:cover}
+  .pphotos.n1 .pph img{max-height:380px}
+  .pphotos.n2 .pph img,.pphotos.n3 .pph img,.pphotos.n4 .pph img{height:150px}
+
+  /* a published post, as it looks inside the app */
+  .postcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:15px 17px;margin-bottom:12px;max-width:620px}
+  .postcard .pmeta{display:flex;align-items:center;gap:8px;font-size:12px;
+    color:var(--faint);margin-bottom:9px}
+  .postcard .pmeta .sp{margin-left:auto;display:flex;gap:4px}
+  .postcard .pmeta button{font-size:12px;font-weight:600;color:var(--ui);
+    padding:3px 9px;border-radius:7px}
+  .postcard .pmeta button:hover{background:var(--line);color:var(--ink)}
+  .postcard .pmeta button.rm:hover{background:none;color:var(--red)}
+  .postcard .ptext{font-size:calc(15px*var(--tscale));line-height:1.6;
+    font-family:var(--content);color:var(--ink);margin-bottom:10px;word-break:break-word}
+  .postcard .ptext:empty{display:none}
+  .postcard .ptext a{color:var(--blue)}
+
+  /* the strip at the top of the Posts page carrying your public address */
+  .pubbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:620px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+    padding:13px 16px;margin:4px 0 18px}
+  .pubbar .lbl{font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);font-weight:640}
+  .pubbar a{font-size:13px;color:var(--blue);word-break:break-all;flex:1;min-width:180px}
+  .pubbar button{font-size:12px;font-weight:620;color:var(--ui);padding:6px 11px;
+    border-radius:8px;border:1px solid var(--line-strong)}
+  .pubbar button:hover{color:var(--ink);border-color:var(--faint)}
+  .quick button.posted{color:var(--accent)}
+  /* Posts is not a view over your notes, so the controls that act on notes —
+     the capture box, the layout switch, compiling — have nothing to act on. */
+  body.on-posts .capwrap,
+  body.on-posts .lay,
+  body.on-posts #compilebtn{display:none}
   .etitle{font-size:calc(25px*var(--tscale));font-weight:660;letter-spacing:-.025em;line-height:1.25;
     color:var(--ink);margin-bottom:12px}
   /* the note body is the point of this window — give it room, weight and contrast */
@@ -850,6 +932,7 @@
     </div>
     <button class="nav" data-view="archived" id="nav-archived"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.4" y="4.3" width="17.2" height="4.6" rx="1.9"/><path d="M5.4 8.9v9.3a2.2 2.2 0 0 0 2.2 2.2h8.8a2.2 2.2 0 0 0 2.2-2.2V8.9"/><path d="M10 12.8h4"/></svg></span>Archived<span class="n" id="c-archived"></span></button>
     <div class="navsec">Tags</div>
+    <button class="nav" data-view="posts" id="nav-posts"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M7.4 16.6a6.5 6.5 0 0 1 0-9.2"/><path d="M16.6 7.4a6.5 6.5 0 0 1 0 9.2"/><path d="M4.6 19.4a10.5 10.5 0 0 1 0-14.8"/><path d="M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg></span>Posts<span class="n" id="c-posts"></span></button>
     <div id="taglist"></div>
     <div class="sidefoot">
       <button class="ghost" id="themebtn">◐ Theme</button>
@@ -935,6 +1018,10 @@
 </nav>
 
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
+<!-- The composer gets its own overlay. Sharing the editor's would mean the
+     editor's paste handler, its Escape key and its S.editing guard all firing
+     against a post, which is a class of bug not worth inviting. -->
+<div class="scrim" id="pscrim"><div class="sheet psheet" id="psheet"></div></div>
 <div class="dropveil" id="dropveil">Drop images to add them</div>
 <div class="dropline" id="dropline"></div>
 <div class="light" id="light"><img id="lightimg" alt=""><div class="nav" id="lightnav"></div></div>
@@ -991,6 +1078,7 @@ function migrate(old){
       due: o.due!=null?o.due:null,
       timed:!!(o.due&&(new Date(o.due).getHours()||new Date(o.due).getMinutes())), done:!!o.done,
       tint:o.tint||"", tags:o.tags||[], checks:o.checks||[], archived:!!o.archived, pin:!!o.pin,
+      postId:o.postId||"",   // which public post this note became, if any
       created:o.created||Date.now(), modified:o.created||Date.now()
     };
   });
@@ -1808,6 +1896,8 @@ function cardHTML(i){
       +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-addimg="'+i.id+'" title="Add images">⊞</button>'
+      +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">◈</button>'
     +'</div>'
     +gallery+cover
     +'<div class="head">'+checkbox+'<div style="min-width:0;flex:1">'+title+srcline+'</div></div>'
@@ -1855,6 +1945,8 @@ function rowHTML(i){
       +(L?'<button data-open="'+i.id+'" class="go" title="Open link in a new tab">↗</button>':"")
       +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
+      +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">◈</button>'
     +'</div></div>';
 }
 
@@ -1891,6 +1983,19 @@ function bucket(i){
 
 function render(){
   var list=visible(), lens=LENS[S.view]||LENS.all;
+
+  /* Posts is not a lens over your items — it lists a different table
+     entirely — so it takes the page before any of the item machinery runs. */
+  var onPosts=(S.view==="posts"&&!S.q&&!S.tag);
+  document.body.classList.toggle("on-posts",onPosts);
+  if(onPosts){
+    document.getElementById("viewtitle").textContent="Posts";
+    document.getElementById("lensnote").textContent="public — anyone with the address";
+    board.innerHTML=renderPosts();
+    paintSidebar();
+    return;
+  }
+
   document.getElementById("viewtitle").textContent =
     S.q?'"'+S.q+'"' : S.tag?"#"+S.tag : lens.title;
   document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
@@ -1922,7 +2027,12 @@ function render(){
   document.getElementById("compilebtn").style.display=nlinks?"":"none";
   paintSel();
   paintBackupHint();
+  paintSidebar();
+}
 
+/* Lenses, counts, tags and which nav row is lit. Split out of render because
+   the Posts page needs all of it and none of the item machinery above. */
+function paintSidebar(){
   var all=S.items;
   function count(v){ return all.filter(LENS[v].test).length }
   ["all","today","overdue","upcoming","someday","notes","links","tasks","done","archived","compiled"].forEach(function(v){
@@ -1965,6 +2075,11 @@ function render(){
   document.querySelectorAll(".mobtabs button").forEach(function(b){
     b.classList.toggle("on", !S.tag&&b.dataset.view===S.view);
   });
+
+  // Posts counts what is on the web, which is a different table
+  var cp=document.getElementById("c-posts");
+  if(cp) cp.textContent=POSTS.list.length||"";
+  document.getElementById("nav-posts").style.display=SYNC.session?"":"none";
 }
 
 /* =========================================================================
@@ -2124,6 +2239,8 @@ function withFreshSession(){
 }
 function signOut(){
   SYNC.session=null; SYNC.shadow={}; SYNC.queue={};
+  POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; POSTS.err="";
+  if(S.view==="posts") S.view="all";
   SYNC.lastPull="1970-01-01T00:00:00Z";
   keepSession(); paintSync(); render();
 }
@@ -2304,6 +2421,7 @@ function normalizeItem(o){
       .map(function(c){ return {t:String(c.t),d:!!c.d} }):[],
     archived:!!o.archived,
     pin:!!o.pin,
+    postId:typeof o.postId==="string"?o.postId:"",
     created:(typeof o.created==="number")?o.created:now,
     modified:(typeof o.modified==="number")?o.modified:(o.created||now)
   };
@@ -3411,6 +3529,17 @@ board.addEventListener("click",function(e){
     return;
   }
 
+  var pb=e.target.closest("[data-post]");
+  if(pb){
+    e.stopPropagation();
+    var pit=byId(pb.dataset.post);
+    if(!pit) return;
+    // already published: edit the post, not the note it came from
+    var live=pit.postId&&POSTS.list.filter(function(x){ return x.id===pit.postId })[0];
+    openComposer(live?draftFromPost(live):draftFromItem(pit));
+    return;
+  }
+
   var pn=e.target.closest("[data-pin]");
   if(pn){ e.stopPropagation(); var p=byId(pn.dataset.pin); if(p){ p.pin=!p.pin; save(); render() } return }
 
@@ -3551,6 +3680,440 @@ selbar.addEventListener("click",function(e){
 
 /* ---- a small dialog for choices that need more than yes/no ---- */
 var ask=document.getElementById("ask"), askbox=document.getElementById("askbox"), askCB=null;
+/* =========================================================================
+   POSTS — the public side.
+
+   Nothing in here reads or writes S.items. Publishing takes a copy, and the
+   copy is the only thing that ever leaves. That is deliberate: the private
+   library and the public one share no code path, so a mistake in this file
+   cannot expose a note you never published.
+
+   Everything in the posts table is public by definition — there is no flag
+   to get wrong. If you don't want it on the web, it isn't in the table.
+   ========================================================================= */
+var POSTS={
+  list:[],          // your published posts, newest first
+  profile:null,     // {handle, display_name, bio, avatar}
+  loaded:false,
+  busy:false,
+  err:"",
+  draft:null        // what the composer is holding, or null
+};
+
+/* The user id is in the access token, not in the session object we keep.
+   Decoding without verifying is fine here: we're reading our own id to put
+   in our own row, and the server checks it against auth.uid() regardless. */
+function jwtSub(tok){
+  try{
+    var p=(tok||"").split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+    p+="===".slice((p.length+3)%4);
+    return JSON.parse(atob(p)).sub||"";
+  }catch(e){ return "" }
+}
+function myUid(){ return SYNC.session?jwtSub(SYNC.session.access_token):"" }
+function uuid(){
+  if(window.crypto&&crypto.randomUUID) return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){
+    var r=Math.random()*16|0; return (c==="x"?r:(r&3|8)).toString(16);
+  });
+}
+function mediaBase(){ return SUPA.url+"/storage/v1/object/public/post-media/" }
+function copyText(t){
+  if(!t) return;
+  function fallback(){
+    var ta=document.createElement("textarea");
+    ta.value=t; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try{ document.execCommand("copy") }catch(e){}
+    document.body.removeChild(ta);
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText)
+    navigator.clipboard.writeText(t).catch(fallback);
+  else fallback();
+}
+function authHeaders(extra){
+  var h={ apikey:SUPA.key, Authorization:"Bearer "+(SYNC.session?SYNC.session.access_token:"") };
+  if(extra) Object.keys(extra).forEach(function(k){ h[k]=extra[k] });
+  return h;
+}
+function rest(path,opts){
+  opts=opts||{};
+  var h=authHeaders({ "Content-Type":"application/json" });
+  if(opts.prefer) h["Prefer"]=opts.prefer;
+  return fetch(SUPA.url+"/rest/v1"+path,{
+    method:opts.method||"GET", headers:h,
+    body:opts.body!==undefined?JSON.stringify(opts.body):undefined
+  }).then(function(r){
+    return r.text().then(function(t){
+      var j=null; try{ j=JSON.parse(t) }catch(e){}
+      if(!r.ok) throw { msg:(j&&(j.message||j.hint||j.error_description))||("HTTP "+r.status) };
+      return j;
+    });
+  });
+}
+
+/* Where the world reads you. Built from wherever the app is served, so it is
+   right on the live site and honest about being nothing on a local file. */
+function publicUrl(id){
+  var h=POSTS.profile&&POSTS.profile.handle;
+  if(!h||location.protocol==="file:") return "";
+  var dir=location.origin+location.pathname.replace(/[^/]*$/,"");
+  return dir+"p/?u="+encodeURIComponent(h)+(id?"&p="+encodeURIComponent(id):"");
+}
+
+function loadPosts(force){
+  if(!SYNC.session){ POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; return Promise.resolve() }
+  if(POSTS.loaded&&!force) return Promise.resolve();
+  POSTS.busy=true; if(S.view==="posts") render();
+  return withFreshSession().then(function(){
+    var uid=myUid();
+    if(!uid) throw { msg:"could not read your account id from the session" };
+    return Promise.all([
+      rest("/profiles?select=user_id,handle,display_name,bio,avatar&user_id=eq."+uid),
+      rest("/posts?select=id,body,photos,link,created_at,edited_at&author=eq."+uid
+           +"&order=created_at.desc")
+    ]);
+  }).then(function(r){
+    POSTS.profile=(r[0]||[])[0]||null;
+    POSTS.list=r[1]||[];
+    POSTS.loaded=true; POSTS.err="";
+  }).catch(function(e){
+    POSTS.err=(e&&e.msg)||"could not reach the server";
+  }).then(function(){
+    POSTS.busy=false;
+    if(S.view==="posts") render();
+  });
+}
+
+/* ---- media -----------------------------------------------------------
+   Photos live in the note as base64 data URLs, which is fine for a local
+   library and hopeless for a public page — a row would carry the bytes and
+   every visitor would download all of them before seeing a word. Publishing
+   uploads each one and keeps a URL. */
+function dataUrlToBlob(u){
+  var m=/^data:([^;,]+);base64,([\s\S]*)$/.exec(u||"");
+  if(!m) return null;
+  try{
+    var bin=atob(m[2]), arr=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    return new Blob([arr],{type:m[1]});
+  }catch(e){ return null }
+}
+function uploadPhoto(postId,photo,ix){
+  var src=(photo&&photo.src)||photo&&photo.url||"";
+  if(!/^data:/.test(src))                       // already uploaded — reuse it
+    return Promise.resolve(src?{url:src,w:photo.w||null,h:photo.h||null}:null);
+  var blob=dataUrlToBlob(src);
+  if(!blob) return Promise.resolve(null);
+  var ext=/png/i.test(blob.type)?"png":/webp/i.test(blob.type)?"webp":"jpg";
+  var path=myUid()+"/"+postId+"/"+ix+"."+ext;    // the folder is your user id,
+  return fetch(SUPA.url+"/storage/v1/object/post-media/"+path,{   // which is what
+    method:"POST",                                                // the storage
+    headers:authHeaders({ "Content-Type":blob.type, "x-upsert":"true" }),
+    body:blob                                                     // policy checks
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw { msg:"image upload failed — "+t.slice(0,120) } });
+    return { url:mediaBase()+path, w:photo.w||null, h:photo.h||null };
+  });
+}
+function dropMedia(post){
+  var paths=((post&&post.photos)||[]).map(function(p){
+    var m=/\/post-media\/(.+)$/.exec(p&&p.url||""); return m?decodeURIComponent(m[1]):null;
+  }).filter(Boolean);
+  if(!paths.length) return Promise.resolve();
+  return fetch(SUPA.url+"/storage/v1/object/post-media",{
+    method:"DELETE", headers:authHeaders({ "Content-Type":"application/json" }),
+    body:JSON.stringify({ prefixes:paths })
+  }).catch(function(){});   // an orphaned image is untidy, not dangerous
+}
+
+/* ---- publishing ---------------------------------------------------- */
+function publishDraft(d){
+  var isNew=!d.id, id=d.id||uuid();
+  return withFreshSession().then(function(){
+    return Promise.all((d.photos||[]).map(function(p,ix){ return uploadPhoto(id,p,ix) }));
+  }).then(function(shots){
+    var row={ body:sanitizeRich(d.body||""), photos:shots.filter(Boolean), link:d.link||null };
+    if(isNew){
+      row.id=id;
+      row.author=myUid();
+      return rest("/posts",{ method:"POST", prefer:"return=representation", body:row });
+    }
+    row.edited_at=new Date().toISOString();
+    return rest("/posts?id=eq."+id,{ method:"PATCH", prefer:"return=representation", body:row });
+  }).then(function(rows){
+    var saved=(rows||[])[0];
+    if(!saved) throw { msg:"the server accepted it but returned nothing" };
+    var at=POSTS.list.map(function(p){ return p.id }).indexOf(saved.id);
+    if(at>=0) POSTS.list[at]=saved; else POSTS.list.unshift(saved);
+    return saved;
+  });
+}
+function unpublish(id){
+  var post=POSTS.list.filter(function(p){ return p.id===id })[0];
+  return withFreshSession()
+    .then(function(){ return rest("/posts?id=eq."+id,{ method:"DELETE" }) })
+    .then(function(){ return dropMedia(post) })
+    .then(function(){
+      POSTS.list=POSTS.list.filter(function(p){ return p.id!==id });
+      // the note it came from stops claiming to be published
+      S.items.forEach(function(i){ if(i.postId===id){ i.postId=""; i.modified=Date.now() } });
+      save();
+    });
+}
+
+/* ---- turning things into drafts ------------------------------------- */
+function draftFromItem(i){
+  var link=hasLink(i)?{ url:i.url, title:i.title||"", desc:i.desc||"",
+                        image:i.image||"", site:i.site||host(i.url) }:null;
+  var body=i.body||"";
+  // With a link the title belongs to the card, so printing it twice reads badly
+  if(!link&&i.title) body='<strong>'+esc(i.title)+'</strong>'+(body?"<br>"+body:"");
+  return { id:"", source:i.id, body:body, link:link,
+           photos:(i.photos||[]).map(function(p){ return {src:p.src,w:p.w,h:p.h} }) };
+}
+function draftFromPost(p){
+  return { id:p.id, source:"", body:p.body||"", link:p.link||null,
+           photos:(p.photos||[]).map(function(x){ return {src:x.url,w:x.w,h:x.h} }) };
+}
+
+/* ---- the composer ---------------------------------------------------- */
+var pscrim=document.getElementById("pscrim"), psheet=document.getElementById("psheet");
+
+function linkCardHTML(l,removable){
+  if(!l) return "";
+  return '<div class="plink">'
+    +(l.image?'<img class="pl-img" src="'+esc(l.image)+'" alt="" loading="lazy">':"")
+    +'<div class="pl-txt"><div class="pl-t">'+esc(l.title||l.url)+'</div>'
+    +'<div class="pl-s">'+esc(l.site||host(l.url))+'</div></div>'
+    +(removable?'<button class="pdrop" data-droplink="1" title="Remove the link">✕</button>':"")
+    +'</div>';
+}
+function photoGridHTML(shots,removable){
+  var n=shots.length; if(!n) return "";
+  var shown=shots.slice(0,4);
+  return '<div class="pphotos n'+Math.min(n,4)+'">'+shown.map(function(p,ix){
+    return '<figure class="pph"><img src="'+esc(p.src||p.url)+'" alt="" loading="lazy">'
+      +(removable?'<button class="pdrop" data-dropimg="'+ix+'" title="Remove">✕</button>':"")
+      +'</figure>';
+  }).join("")+'</div>';
+}
+
+function paintComposer(){
+  var d=POSTS.draft; if(!d) return;
+  var handle=(POSTS.profile&&POSTS.profile.handle)||"";
+  psheet.innerHTML=
+     '<div class="phead"><h3>'+(d.id?"Edit post":"New post")+'</h3>'
+    +'<span class="where">'+(handle?"@"+esc(handle):"")+'</span></div>'
+    +'<div class="pbody" id="p-body" contenteditable="true" spellcheck="true" '
+      +'data-ph="Say something."></div>'
+    +'<div class="fmtbar" style="position:static;padding:0 0 12px;border:0">'
+      +'<button class="facet fmt" data-pf="bold" title="Bold — ⌘B"><b>B</b></button>'
+      +'<button class="facet fmt" data-pf="italic" title="Italic — ⌘I"><i>I</i></button>'
+      +'<button class="facet fmt" data-pf="link" title="Link the selected text — ⌘K">⚭</button>'
+      +'<button class="facet fmt" data-pf="ul" title="Bulleted list" aria-label="Bulleted list">'
+        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
+        +'<g fill="currentColor"><circle cx="2.3" cy="4" r="1.15"/>'
+        +'<circle cx="2.3" cy="8" r="1.15"/><circle cx="2.3" cy="12" r="1.15"/></g>'
+        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
+        +'<path d="M6.2 4h7.5M6.2 8h7.5M6.2 12h7.5"/></g></svg></button>'
+      +'<button class="facet fmt" data-pf="ol" title="Numbered list" aria-label="Numbered list">'
+        +'<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">'
+        +'<g fill="currentColor" font-size="5.4" font-weight="700" '
+        +'font-family="-apple-system,system-ui,sans-serif" text-anchor="middle">'
+        +'<text x="2.4" y="5.9">1</text><text x="2.4" y="9.9">2</text>'
+        +'<text x="2.4" y="13.9">3</text></g>'
+        +'<g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">'
+        +'<path d="M6.4 4h7.3M6.4 8h7.3M6.4 12h7.3"/></g></svg></button>'
+      +'<button class="facet fmt" data-pf="img" title="Add an image" style="width:auto;padding:0 10px">⊞</button>'
+    +'</div>'
+    + linkCardHTML(d.link,true)
+    + photoGridHTML(d.photos||[],true)
+    +'<div class="pact">'
+      +'<span class="perr" id="p-err"></span>'
+      +'<span class="grow"></span>'
+      +'<button class="pbtn" id="p-cancel">Cancel</button>'
+      +'<button class="pbtn primary" id="p-go">'+(d.id?"Update":"Publish")+'</button>'
+    +'</div>';
+  var body=document.getElementById("p-body");
+  body.innerHTML=sanitizeRich(d.body||"");
+  attachSmartQuotes(body,true);
+}
+
+function readComposer(){
+  var body=document.getElementById("p-body");
+  if(body) POSTS.draft.body=sanitizeRich(body.innerHTML);
+}
+function composerError(msg){
+  var e=document.getElementById("p-err"); if(e) e.textContent=msg||"";
+}
+function openComposer(draft){
+  if(!SYNC.session) return toast("Sign in first — posts live on the server");
+  if(!POSTS.profile) return toast("No public profile yet. Run the Posts setup in Supabase.");
+  POSTS.draft=draft;
+  paintComposer();
+  pscrim.classList.add("on");
+  setTimeout(function(){
+    var b=document.getElementById("p-body");
+    if(!b) return;
+    b.focus();
+    var r=document.createRange(); r.selectNodeContents(b); r.collapse(false);
+    var s=getSelection(); s.removeAllRanges(); s.addRange(r);
+  },50);
+}
+function closeComposer(){ POSTS.draft=null; pscrim.classList.remove("on"); psheet.innerHTML="" }
+
+pscrim.addEventListener("mousedown",function(e){ if(e.target===pscrim) closeComposer() });
+
+psheet.addEventListener("click",function(e){
+  var d=POSTS.draft; if(!d) return;
+  var f=e.target.closest("[data-pf]");
+  if(f){
+    e.preventDefault();
+    var k=f.dataset.pf;
+    if(k==="img"){ pickFiles(function(shots){
+      readComposer();
+      d.photos=(d.photos||[]).concat(shots.map(function(p){ return {src:p.src,w:p.w,h:p.h} }));
+      paintComposer();
+    }); return }
+    document.getElementById("p-body").focus();
+    if(k==="link"){
+      var sel=String(getSelection());
+      if(!sel) return composerError("Select some words first");
+      askText("Link","Where should “"+esc(sel)+"” point?","https://","Link",function(v){
+        v=(v||"").trim();
+        document.getElementById("p-body").focus();
+        if(v&&SAFE_HREF.test(v)) document.execCommand("createLink",false,v);
+      });
+      return;
+    }
+    try{
+      document.execCommand({bold:"bold",italic:"italic",
+        ul:"insertUnorderedList",ol:"insertOrderedList"}[k],false,null);
+    }catch(err){}
+    return;
+  }
+  if(e.target.closest("[data-droplink]")){ readComposer(); d.link=null; paintComposer(); return }
+  var ri=e.target.closest("[data-dropimg]");
+  if(ri){ readComposer(); d.photos.splice(+ri.dataset.dropimg,1); paintComposer(); return }
+  if(e.target.closest("#p-cancel")){ closeComposer(); return }
+  if(e.target.closest("#p-go")) submitComposer();
+});
+
+// keep the editor's rules: plain text in, images become attachments
+psheet.addEventListener("paste",function(e){
+  if(!POSTS.draft||!e.clipboardData) return;
+  var imgs=imageFilesFrom(e.clipboardData);
+  if(imgs.length){
+    e.preventDefault(); e.stopPropagation();
+    takeFiles(imgs,function(shots){
+      readComposer();
+      POSTS.draft.photos=(POSTS.draft.photos||[])
+        .concat(shots.map(function(p){ return {src:p.src,w:p.w,h:p.h} }));
+      paintComposer();
+    });
+    return;
+  }
+  var txt=e.clipboardData.getData("text/plain");
+  if(txt==null) return;
+  e.preventDefault();
+  try{ document.execCommand("insertText",false,txt) }catch(err){}
+},true);
+
+psheet.addEventListener("keydown",function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key==="Enter"){ e.preventDefault(); submitComposer() }
+});
+
+function submitComposer(){
+  var d=POSTS.draft; if(!d) return;
+  readComposer();
+  if(!richToText(d.body).trim()&&!d.link&&!(d.photos||[]).length)
+    return composerError("Nothing to post yet");
+  var go=document.getElementById("p-go");
+  go.disabled=true; go.textContent=d.id?"Updating…":"Publishing…";
+  composerError("");
+  publishDraft(d).then(function(saved){
+    // the note remembers what it became, so it can't be posted twice by accident
+    if(d.source){
+      var it=byId(d.source);
+      if(it&&!it.postId){ it.postId=saved.id; it.modified=Date.now(); save() }
+    }
+    closeComposer();
+    render();
+    toast(d.id?"Post updated":"Published");
+  }).catch(function(e){
+    go.disabled=false; go.textContent=d.id?"Update":"Publish";
+    composerError((e&&e.msg)||"could not publish");
+  });
+}
+
+/* ---- the Posts page -------------------------------------------------- */
+function postCardHTML(p){
+  var when=new Date(p.created_at);
+  return '<article class="postcard" data-post="'+esc(p.id)+'">'
+    +'<div class="pmeta"><span>'+esc(when.toLocaleDateString(undefined,
+        {day:"numeric",month:"short",year:"numeric"}))+'</span>'
+    +(p.edited_at?'<span>· edited</span>':"")
+    +'<span class="sp">'
+      +(publicUrl(p.id)?'<button data-plink="'+esc(p.id)+'">Copy link</button>':"")
+      +'<button data-pedit="'+esc(p.id)+'">Edit</button>'
+      +'<button class="rm" data-pdel="'+esc(p.id)+'">Unpublish</button>'
+    +'</span></div>'
+    +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
+    + photoGridHTML(p.photos||[],false)
+    + linkCardHTML(p.link,false)
+    +'</article>';
+}
+
+function renderPosts(){
+  var url=publicUrl();
+  var bar='<div class="pubbar"><span class="lbl">Your page</span>'
+    +(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>'
+        +'<button id="copypub">Copy</button>'
+      :'<span style="flex:1;font-size:13px;color:var(--faint)">'
+        +(POSTS.profile?"Visible once the app is on the web — a local file has no address."
+                       :"No profile yet. Run posts-setup.sql in Supabase.")+'</span>')
+    +'</div>';
+
+  if(!SYNC.session)
+    return bar+'<div class="empty"><div class="big">◌</div>Sign in to publish.</div>';
+  if(POSTS.err)
+    return bar+'<div class="empty"><div class="big">◌</div>'+esc(POSTS.err)+'</div>';
+  if(POSTS.busy&&!POSTS.loaded)
+    return bar+'<div class="empty"><div class="big">◌</div>Loading your posts…</div>';
+  if(!POSTS.list.length)
+    return bar+'<div class="empty"><div class="big">◌</div>'
+      +'Nothing published yet. Open any note and press ◈ to post it.</div>';
+  return bar+POSTS.list.map(postCardHTML).join("");
+}
+
+board.addEventListener("click",function(e){
+  var c=e.target.closest("#copypub");
+  if(c){ e.stopPropagation(); copyText(publicUrl()); toast("Address copied"); return }
+  var l=e.target.closest("[data-plink]");
+  if(l){ e.stopPropagation(); copyText(publicUrl(l.dataset.plink)); toast("Link copied"); return }
+  var ed=e.target.closest("[data-pedit]");
+  if(ed){
+    e.stopPropagation();
+    var p=POSTS.list.filter(function(x){ return x.id===ed.dataset.pedit })[0];
+    if(p) openComposer(draftFromPost(p));
+    return;
+  }
+  var dl=e.target.closest("[data-pdel]");
+  if(dl){
+    e.stopPropagation();
+    var id=dl.dataset.pdel;
+    askChoice("Unpublish this post?",
+      "It disappears from your public page straight away. The note it came from is untouched.",
+      [{label:"Keep it",value:0,kind:"sec"},{label:"Unpublish",value:1,kind:"danger"}],
+      function(v){
+        if(!v) return;
+        unpublish(id).then(function(){ render(); toast("Unpublished") })
+          .catch(function(e){ toast((e&&e.msg)||"could not unpublish") });
+      });
+  }
+},true);
+
 function askChoice(title,html,choices,cb){
   askCB=cb;
   askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p><div class="askrow">'
@@ -3724,7 +4287,12 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
   var v=e.target.closest("[data-view]"), t=e.target.closest("[data-tag]");
   // leaving a page ends the selection — carrying it somewhere invisible is
   // how you end up wondering why the toolbar won't go away
-  if(v){ S.view=v.dataset.view; S.tag=null; S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
+  if(v){
+    S.view=v.dataset.view; S.tag=null; S.q=""; S.sel={};
+    document.getElementById("q").value="";
+    if(S.view==="posts") loadPosts();
+    render();
+  }
   if(t){ S.tag=(S.tag===t.dataset.tag?null:t.dataset.tag); S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
 });
 /* Renaming a tag. The obvious place is the tag's own page, so there's a
@@ -3770,7 +4338,8 @@ document.getElementById("taglist").addEventListener("contextmenu",function(e){
 });
 
 document.querySelector(".mobtabs").addEventListener("click",function(e){
-  var v=e.target.closest("[data-view]"); if(v){ S.view=v.dataset.view; S.tag=null; S.sel={}; render() }
+  var v=e.target.closest("[data-view]");
+  if(v){ S.view=v.dataset.view; S.tag=null; S.sel={}; if(S.view==="posts") loadPosts(); render() }
 });
 document.getElementById("q").addEventListener("input",function(e){ S.q=e.target.value; S.sel={}; render() });
 /* Keyboard focus is layered, and each layer swallows what belongs to it.
@@ -3933,6 +4502,7 @@ document.getElementById("syncbtn").addEventListener("click",function(){
         }
         return syncNow();
       }).then(function(){
+        loadPosts(true);          // so the ◈ markers and the Posts count are true
         toast("Signed in — library synced");
       }).catch(function(e){
         toast(String(e&&(e.msg||e.error_description||e.message)||"Couldn't sign in"));
@@ -4013,6 +4583,8 @@ if(SYNC.on){
   paintSync();
   if(SYNC.session){
     syncNow();
+    loadPosts();                  // cheap, and the note cards need to know
+
     setInterval(function(){ if(SYNC.session&&SYNC.status!=="busy") pullChanges() },60000);
     window.addEventListener("focus",function(){ if(SYNC.session) syncNow() });
     window.addEventListener("online",function(){ if(SYNC.session) syncNow() });

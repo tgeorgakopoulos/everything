@@ -7,7 +7,7 @@
    Calls to Supabase are never cached. Sync must always hit the network or it
    would happily show you yesterday's library and call it success. */
 
-const VERSION = "everything-v2";
+const VERSION = "everything-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -39,6 +39,13 @@ self.addEventListener("fetch", e => {
   // anything that isn't this site — Supabase above all — goes straight out
   if (url.origin !== self.location.origin) return;
   if (e.request.method !== "GET") return;
+
+  /* The public page is not part of the app and must never be cached.
+     This worker is registered at the app's scope, which also covers /p/, so
+     without this a visitor who happened to have the app installed and was
+     offline would be handed the app's own shell in place of someone's posts.
+     Public pages are also somebody else's content: always fetch it fresh. */
+  if (/\/p\/?$/.test(url.pathname) || url.pathname.indexOf("/p/") >= 0) return;
 
   const isPage = e.request.mode === "navigate" ||
                  e.request.destination === "document";
