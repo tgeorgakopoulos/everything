@@ -179,6 +179,22 @@
     width:100%;text-align:left;position:relative}
   .nav:hover{background:var(--line);color:var(--ink)}
   .nav.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:560}
+  /* Aiming the task column, which is not the same act as choosing a page and
+     should not borrow its look. The row takes the column's own surface,
+     squares off the edge facing it, and runs out through the sidebar's
+     padding to meet it — one shape spanning both, rather than two selections
+     competing for the same meaning. */
+  .nav.tbon{background:var(--surface-2);color:var(--accent);font-weight:600;
+    border-radius:9px 0 0 9px}
+  .nav.tbon .n{color:var(--accent);opacity:.85}
+  .nav.tbon::after{content:"";position:absolute;right:-10px;top:0;bottom:0;width:10px;
+    background:var(--surface-2)}
+  /* Floating over the board, the column is detached, so the bridge would be
+     a lie. Keep the tint, drop the join. */
+  @media (max-width:1100px){
+    .nav.tbon{border-radius:9px}
+    .nav.tbon::after{display:none}
+  }
   /* Drawn icons rather than typographic symbols — consistent stroke and
      optical weight, and they carry the accent, which is the only colour in
      the sidebar besides the tag dots. */
@@ -1191,10 +1207,29 @@ function enrich(list){
   list.forEach(function(o){ o.body=toRich(o.body) });
   return list;
 }
+/* Bodies flattened into visible markup by the old toRich are put right here
+   as well as on the sync path. The sync path alone was not enough: a note
+   damaged yesterday is already sitting in localStorage, and nothing was going
+   to read it through normalizeItem ever again. save() afterwards pushes the
+   corrected copy, and the server's own modified stamp then carries it to the
+   other devices. */
+function repairBodies(list){
+  var fixed=0;
+  (list||[]).forEach(function(o){
+    if(o&&typeof o.body==="string"&&LOOKS_ESCAPED.test(o.body)){
+      o.body=unescapeRich(o.body); fixed++;
+    }
+  });
+  if(fixed) setTimeout(function(){
+    try{ save(); toast(fixed+" note"+(fixed===1?"":"s")+" repaired") }catch(e){}
+  },400);
+  return list;
+}
+
 function load(){
   try{
     var r=localStorage.getItem(KEY);
-    if(r) return JSON.parse(r);
+    if(r) return repairBodies(JSON.parse(r));
     var two=localStorage.getItem(K2);
     if(two){ var a=enrich(JSON.parse(two)); localStorage.setItem(KEY,JSON.stringify(a)); return a }
     var one=localStorage.getItem(K1);
@@ -2360,9 +2395,16 @@ function paintSidebar(){
 
   document.querySelectorAll(".sidebar .nav[data-view]").forEach(function(b){
     var v=b.dataset.view;
-    // task rows report the column; every other row reports the board
-    if(TBVIEWS[v]) b.classList.toggle("on", taskbarOpen()&&v===TB.filter);
-    else b.classList.toggle("on", !S.tag&&!S.q&&v===S.view);
+    /* Two rows lit the same way said the same thing twice and meant two
+       different things. A task row never takes the board's selected style
+       now: it gets the column's own surface and reaches toward it. */
+    if(TBVIEWS[v]){
+      b.classList.remove("on");
+      b.classList.toggle("tbon", taskbarOpen()&&v===TB.filter);
+    } else {
+      b.classList.remove("tbon");
+      b.classList.toggle("on", !S.tag&&!S.q&&v===S.view);
+    }
   });
   document.querySelectorAll(".mobtabs button").forEach(function(b){
     b.classList.toggle("on", !S.tag&&b.dataset.view===S.view);
@@ -3521,6 +3563,11 @@ sheet.addEventListener("drop",function(e){
   if(internalDrag) return;
   if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length) return;
   e.preventDefault(); e.stopPropagation();
+  /* stopPropagation is what this handler wants — and it also stopped the
+     window listener that clears the drop hint, so "Add to this note" sat at
+     the bottom of the screen until the page was reloaded. Anything that
+     swallows a drop has to tidy up after itself. */
+  endDrag();
   takeFiles(e.dataTransfer.files,function(photos){ addPhotosToEditing(photos) });
 });
 
@@ -3719,6 +3766,9 @@ window.addEventListener("dragleave",function(e){
   if(e.clientX<=0&&e.clientY<=0) endDrag();
 });
 window.addEventListener("dragend",endDrag);
+/* Capture phase, so it runs before any handler that might stop the event.
+   A hint left on screen is worse than a drop that does nothing. */
+window.addEventListener("drop",function(){ setTimeout(endDrag,0) },true);
 window.addEventListener("drop",function(e){
   if(internalDrag){ endDrag(); return }        // rearranging, not importing
   if(!e.dataTransfer||!e.dataTransfer.files||!e.dataTransfer.files.length){ endDrag(); return }
@@ -5042,6 +5092,11 @@ setTimeout(backfill,350);
 if(SYNC.on){
   loadSession();
   paintSync();
+  /* The first render happens above, before this block runs, so it painted a
+     sidebar for a signed-out user and hid Posts. Nothing corrected it until
+     the next render, which is why the row appeared the moment you clicked
+     anything at all. */
+  paintSidebar();
   if(SYNC.session){
     syncNow();
     loadPosts();                  // cheap, and the note cards need to know
