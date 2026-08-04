@@ -445,6 +445,8 @@
     background:rgba(26,25,23,.55);color:#fff;display:grid;place-items:center;
     font-size:18px;font-weight:640;letter-spacing:-.02em}
   .card.done .photos{filter:grayscale(1);opacity:.6}
+  /* bytes still coming out of IndexedDB — hold the space rather than flash */
+  .phwait{width:100%;height:100%;min-height:90px;background:var(--line)}
 
   /* Images must never be draggable themselves. A dragged <img> hands the
      browser an image payload, which the file importer then treated as an
@@ -1088,6 +1090,7 @@
           <button data-bk="export"><b>Export everything</b><span>One .json file you own</span></button>
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
           <button data-bk="storage"><b>Storage…</b><span>What this browser is holding, and how full it is</span></button>
+          <button data-bk="compare"><b>Check against the server…</b><span>Name anything the two disagree about</span></button>
         </div>
       </div>
       <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
@@ -1271,14 +1274,180 @@ function load(){
   }catch(e){}
   return mem;
 }
+/* =========================================================================
+   PHOTOGRAPHS — kept in IndexedDB, not in localStorage.
+
+   Your library measured 2720 KB, of which 2344 KB was eleven photographs.
+   localStorage caps at about 5 MB, and it held all of that twice. Everything
+   else in this file is arithmetic downstream of that fact.
+
+   IndexedDB is the store browsers actually provide for binary data — measured
+   in hundreds of megabytes rather than five. So the bytes go there, and
+   localStorage keeps `{k, w, h}`: a key and the dimensions, about forty bytes
+   a photograph.
+
+   The rule that makes this safe: a photograph is never removed from
+   localStorage until IndexedDB has confirmed it holds it. If the database is
+   unavailable — some private browsing modes — nothing is stripped and the app
+   behaves exactly as it did before. There is no window in which the only copy
+   is in flight.
+
+   Notes in memory keep their `src` throughout, so rendering, the editor, the
+   lightbox, export and sync are all untouched by this.
+   ========================================================================= */
+var PDB=null, PDBREADY=null, PKEYS={}, PHOTO_STORE="photos";
+
+function pdb(){
+  if(PDBREADY) return PDBREADY;
+  PDBREADY=new Promise(function(res){
+    try{
+      if(!window.indexedDB) return res(null);
+      var req=indexedDB.open("everything-photos",1);
+      req.onupgradeneeded=function(){
+        var db=req.result;
+        if(!db.objectStoreNames.contains(PHOTO_STORE)) db.createObjectStore(PHOTO_STORE);
+      };
+      req.onsuccess=function(){ PDB=req.result; res(PDB) };
+      req.onerror=function(){ res(null) };
+      req.onblocked=function(){ res(null) };
+    }catch(e){ res(null) }
+  });
+  return PDBREADY;
+}
+
+function photoKeysOf(items){
+  var out={};
+  (items||[]).forEach(function(i){
+    (i.photos||[]).forEach(function(p){ if(p&&p.k) out[p.k]=1 });
+  });
+  return out;
+}
+
+// every photograph needs a name of its own before it can be filed
+function assignPhotoKeys(){
+  S.items.forEach(function(i){
+    (i.photos||[]).forEach(function(p){ if(p&&p.src&&!p.k) p.k=uuid() });
+  });
+}
+
+function pdbPutMany(pairs){
+  if(!pairs.length) return Promise.resolve(0);
+  return pdb().then(function(db){
+    if(!db) return 0;
+    return new Promise(function(res){
+      var t, done=0;
+      try{ t=db.transaction(PHOTO_STORE,"readwrite") }catch(e){ return res(0) }
+      var st=t.objectStore(PHOTO_STORE);
+      pairs.forEach(function(pr){ try{ st.put(pr[1],pr[0]) }catch(e){} });
+      t.oncomplete=function(){
+        pairs.forEach(function(pr){ PKEYS[pr[0]]=1; done++ });
+        res(done);
+      };
+      t.onerror=function(){ res(0) };
+      t.onabort=function(){ res(0) };
+    });
+  });
+}
+function pdbReadAll(){
+  return pdb().then(function(db){
+    if(!db) return {};
+    return new Promise(function(res){
+      var out={}, t;
+      try{ t=db.transaction(PHOTO_STORE,"readonly") }catch(e){ return res({}) }
+      var req=t.objectStore(PHOTO_STORE).openCursor();
+      req.onsuccess=function(){
+        var c=req.result;
+        if(!c) return res(out);
+        out[c.key]=c.value; PKEYS[c.key]=1;
+        c.continue();
+      };
+      req.onerror=function(){ res(out) };
+      t.onabort=function(){ res(out) };
+    });
+  });
+}
+function pdbDrop(keys){
+  if(!keys.length) return Promise.resolve();
+  return pdb().then(function(db){
+    if(!db) return;
+    return new Promise(function(res){
+      var t;
+      try{ t=db.transaction(PHOTO_STORE,"readwrite") }catch(e){ return res() }
+      var st=t.objectStore(PHOTO_STORE);
+      keys.forEach(function(k){ try{ st.delete(k); delete PKEYS[k] }catch(e){} });
+      t.oncomplete=function(){ res() };
+      t.onerror=function(){ res() };
+      t.onabort=function(){ res() };
+    });
+  });
+}
+
+/* Is every photograph in the library already filed away? Only then may the
+   bytes be left out of localStorage. */
+function photosAllFiled(){
+  if(!PDB) return false;
+  return S.items.every(function(i){
+    return (i.photos||[]).every(function(p){ return !p||!p.src||(p.k&&PKEYS[p.k]) });
+  });
+}
+// the shape that goes to disk: dimensions, not bytes
+function slimPhotos(items){
+  return items.map(function(i){
+    if(!i.photos||!i.photos.length) return i;
+    var c={}; for(var k in i) c[k]=i[k];
+    c.photos=i.photos.map(function(p){ return {k:p.k,w:p.w,h:p.h} });
+    return c;
+  });
+}
+function writeItems(){
+  var payload=photosAllFiled()?slimPhotos(S.items):S.items;
+  localStorage.setItem(KEY,JSON.stringify(payload));
+}
+// file anything new, then write again now that the bytes are safe elsewhere
+function persistPhotos(){
+  var pairs=[];
+  S.items.forEach(function(i){
+    (i.photos||[]).forEach(function(p){
+      if(p&&p.src&&p.k&&!PKEYS[p.k]) pairs.push([p.k,p.src]);
+    });
+  });
+  if(!pairs.length) return Promise.resolve(0);
+  return pdbPutMany(pairs).then(function(n){
+    if(n) try{ writeItems() }catch(e){}
+    return n;
+  });
+}
+
+/* On start the records carry keys and no bytes. Put the bytes back, then
+   throw away anything no note refers to any more. */
+function hydratePhotos(){
+  var need=S.items.some(function(i){
+    return (i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
+  });
+  return pdbReadAll().then(function(store){
+    var filled=0;
+    S.items.forEach(function(i){
+      (i.photos||[]).forEach(function(p){
+        if(p&&p.k&&!p.src&&store[p.k]){ p.src=store[p.k]; filled++ }
+      });
+    });
+    if(filled) render();
+    var used=photoKeysOf(S.items), orphans=Object.keys(store).filter(function(k){ return !used[k] });
+    if(orphans.length) pdbDrop(orphans);
+    return filled;
+  }).catch(function(){ return 0 });
+}
+
 var SAVE_BROKEN=false;
 function save(){
   // the first save after startup is a real edit, so this stops being a demo
   if(BOOTED) notDemoAnyMore();
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
+  assignPhotoKeys();
+  persistPhotos();          // async; writes again once the bytes are filed
   try{
-    localStorage.setItem(KEY, JSON.stringify(S.items));
+    writeItems();
     if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger() }
   }catch(e){
     /* This used to be a toast. A toast is three seconds of grey text for an
@@ -2137,7 +2306,9 @@ function photoGrid(item,editable){
     // to fit a card is worse than a tall card
     if(n===1&&p.w&&p.h) cell+=' style="aspect-ratio:'+Math.min(2.4,Math.max(.5,p.w/p.h)).toFixed(3)+'"';
     cell+=' data-photo="'+item.id+'" data-idx="'+ix+'">';
-    return cell+'<img draggable="false" src="'+esc(p.src)+'" alt="" loading="lazy">'
+    return cell+(p.src
+        ? '<img draggable="false" src="'+esc(p.src)+'" alt="" loading="lazy">'
+        : '<div class="phwait" aria-label="loading"></div>')
       +(editable?'<button class="rm" data-rmimg="'+ix+'" title="Remove">✕</button>':"")+'</div>';
   }).join("")+'</div>';
 }
@@ -2736,7 +2907,14 @@ function signOut(){
 
    A length and a hash answer the same question in twenty bytes. */
 function sig(o){
-  var s=typeof o==="string"?o:JSON.stringify(o);
+  /* Hashing two megabytes of base64 on every keystroke is a poor use of a
+     laptop, and pointless: a photograph never changes once it is added, so
+     its key says everything its bytes would. Parse a legacy shadow string
+     first, or the same record would fingerprint two different ways. */
+  if(typeof o==="string"){
+    try{ o=JSON.parse(o) }catch(e){ return o.length+":"+hash32(o) }
+  }
+  var s=JSON.stringify(o&&o.photos?slimPhotos([o])[0]:o);
   return s.length+":"+hash32(s);
 }
 
@@ -3002,6 +3180,15 @@ function normalizeItem(o){
 }
 
 function exportLibrary(){
+  /* If the bytes are still being read back, wait for them. An export that
+     quietly omits your photographs is worse than one that takes a moment. */
+  var missing=S.items.some(function(i){
+    return (i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
+  });
+  if(missing){
+    toast("Collecting photographs…");
+    return hydratePhotos().then(exportLibrary);
+  }
   var payload={
     format:EXPORT_FORMAT,
     version:EXPORT_VERSION,
@@ -5009,6 +5196,7 @@ backupMenu.addEventListener("click",function(e){
   closeBackup();
   if(b.dataset.bk==="export") exportLibrary();
   else if(b.dataset.bk==="storage") showStorage();
+  else if(b.dataset.bk==="compare") showCompare();
   else { jsonpick.value=""; jsonpick.click() }
 });
 document.getElementById("danger").addEventListener("click",function(e){
@@ -5076,6 +5264,89 @@ function showStorage(){
       return !empty;
     });
     save(); render(); closeAsk(); toast(gone+" empty note"+(gone===1?"":"s")+" removed");
+  });
+}
+
+/* =========================================================================
+   LOCAL AGAINST THE SERVER
+
+   You should not have to take my word for it that nothing else was lost.
+   This reads every row the database holds and lays it beside what is in this
+   browser, naming anything the two disagree about. It writes nothing.
+   ========================================================================= */
+function compareWithServer(){
+  if(!SYNC.session) return Promise.reject({msg:"Sign in first"});
+  return withFreshSession().then(function(){
+    return fetch(SUPA.url+"/rest/v1/items?select=id,data,modified,deleted",
+      { headers:supaHeaders(true) });
+  }).then(function(r){
+    if(!r.ok) throw {msg:"Could not read the server ("+r.status+")"};
+    return r.json();
+  }).then(function(rows){
+    var here={}, out={ onlyHere:[], onlyServer:[], newerHere:[], newerServer:[], same:0,
+                       serverRows:rows.length, localRows:S.items.length };
+    S.items.forEach(function(i){ here[i.id]=i });
+    var seen={};
+    rows.forEach(function(row){
+      if(row.deleted) return;
+      seen[row.id]=1;
+      var mine=here[row.id];
+      var theirs=row.data&&row.data.id?normalizeItem(row.data):null;
+      if(!theirs) return;
+      if(!mine){ out.onlyServer.push(theirs); return }
+      if(sig(mine)===sig(theirs)){ out.same++; return }
+      ((mine.modified||0)>=(theirs.modified||0)?out.newerHere:out.newerServer)
+        .push({mine:mine,theirs:theirs});
+    });
+    S.items.forEach(function(i){ if(!seen[i.id]) out.onlyHere.push(i) });
+    return out;
+  });
+}
+
+function showCompare(){
+  askChoice("Checking…","<div class='stat'>Reading every row from the server.</div>",
+    [{label:"Cancel",value:0,kind:"sec"}],function(){});
+  compareWithServer().then(function(r){
+    var name=function(i){ return esc(i.title||richToText(i.body).slice(0,60)||"untitled") };
+    var block=function(title,list,render){
+      if(!list.length) return "";
+      return '<div class="stat"><b>'+esc(title)+' — '+list.length+'</b></div>'
+        +'<table class="sttab">'+list.slice(0,25).map(render).join("")+'</table>'
+        +(list.length>25?'<div class="stat">…and '+(list.length-25)+' more</div>':"");
+    };
+    var clean=!r.onlyHere.length&&!r.onlyServer.length&&!r.newerServer.length;
+    var html='<div class="stat"><b>'+r.localRows+'</b> notes here · <b>'
+      +r.serverRows+'</b> rows on the server · <b>'+r.same+'</b> identical</div>'
+      +(clean?'<div class="stat">Nothing is missing from this browser.</div>':"")
+      + block("Only on the server — this browser never got them",r.onlyServer,
+          function(i){ return '<tr><td>'+name(i)+'</td><td>'+esc(agoText(i.modified))+'</td></tr>' })
+      + block("Newer on the server than here",r.newerServer,
+          function(p){ return '<tr><td>'+name(p.theirs)+'</td><td>'+esc(agoText(p.theirs.modified))+'</td></tr>' })
+      + block("Only here, not yet uploaded",r.onlyHere,
+          function(i){ return '<tr><td>'+name(i)+'</td><td>'+esc(agoText(i.modified))+'</td></tr>' })
+      + block("Newer here than on the server",r.newerHere,
+          function(p){ return '<tr><td>'+name(p.mine)+'</td><td>'+esc(agoText(p.mine.modified))+'</td></tr>' })
+      +(clean?"":'<div class="stat">Nothing has been changed. Bring the server '
+        +'copies down, or let yours go up — either way the version that loses '
+        +'is kept in that note&rsquo;s History.</div>');
+    var choices=[{label:"Close",value:0,kind:"sec"}];
+    if(r.onlyServer.length||r.newerServer.length)
+      choices.push({label:"Take the server's copies",value:1});
+    askChoice("This browser against the server",html,choices,function(v){
+      if(v!==1) return;
+      var rows=r.onlyServer.map(function(i){ return {id:i.id,data:i,deleted:false,
+        modified:new Date().toISOString()} })
+        .concat(r.newerServer.map(function(p){ return {id:p.theirs.id,data:p.theirs,
+          deleted:false,modified:new Date().toISOString()} }));
+      // route it through the ordinary merge, so history is written as usual
+      rows.forEach(function(row){ delete SYNC.shadow[row.id] });
+      applyIncoming(rows);
+      save(); render();
+      toast(rows.length+" brought down from the server");
+    });
+  }).catch(function(e){
+    askChoice("Couldn't check","<div class='stat warn'>"+esc((e&&e.msg)||"Something went wrong")
+      +"</div>",[{label:"Close",value:0,kind:"sec"}],function(){});
   });
 }
 
@@ -5445,6 +5716,11 @@ BOOTED=true;   // from here on, a save means a person did something
 try{ if(localStorage.getItem(TBKEY)) setTaskbar(true) }catch(e){}
 // tasks are not a page any more; a stored one would show a board nothing points at
 if(TBVIEWS[S.view]){ S.view="all"; setTaskbar(true); setTaskFilter("tasks") }
+
+/* Photographs live in IndexedDB now, which is asynchronous, so the first
+   paint has the notes and not yet the pictures. This fills them in and
+   repaints — usually before anyone notices, and harmlessly if not. */
+hydratePhotos();
 
 setTimeout(backfill,350);
 
