@@ -120,9 +120,6 @@
   .tbx{width:24px;height:24px;border-radius:7px;font-size:12px;
     color:var(--ui);display:grid;place-items:center}
   .tbx:hover{background:var(--line);color:var(--ink)}
-  /* a task row aiming the column, as opposed to one showing a page */
-  .nav.aiming{color:var(--accent)}
-  .nav.aiming .n{color:var(--accent);opacity:.8}
   .tbin{flex:none;margin:0 14px 10px;padding:9px 11px;border-radius:10px;
     border:1px solid var(--line);background:var(--surface);color:var(--ink);
     font:inherit;font-size:13.5px;outline:none}
@@ -1896,10 +1893,55 @@ function richToText(html){
   return box.textContent||"";
 }
 // plain text (possibly with markdown in it) → rich HTML. Used once per note.
+/* Is this body already marked up, or is it plain text that wants converting?
+
+   The list used to read strong|b|em|i|u|br — written before notes could hold
+   lists or links, and never revisited. A note whose body was nothing but
+   <ol><li>…</li></ol> matched none of those, so it was judged to be plain
+   text and handed to md(), whose first act is esc(). The list came back as
+   &lt;ol&gt;&lt;li&gt;… — visible markup where a list used to be.
+
+   What made it look random: normalizeItem calls this on every record arriving
+   from sync. Nothing had to change and no new file had to be uploaded. A list
+   written on one device was fine until another device pulled it, and a list
+   containing one bold word survived while a plain one did not.
+
+   Rather than extend the list again and wait for the next tag to be
+   forgotten, this asks about every tag the editor can produce. */
+var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div";
+var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
+var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
+
+/* Bodies already damaged by the above are repaired in place. The risk is
+   somebody who genuinely wanted to display "&lt;ol&gt;" as text, which is a
+   fate worth accepting: the alternative is that every list flattened before
+   today stays broken for good. Put back through the sanitiser afterwards,
+   so unescaping cannot let anything new through. */
+function unescapeRich(s){
+  return sanitizeRich(String(s)
+    .replace(/&lt;/g,"<").replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+    .replace(/&amp;/g,"&"));          // ampersands last, or &amp;lt; unwinds twice
+}
+
+/* An entity is proof of HTML even when there isn't a tag in sight. Type
+   "5 < 6" into the editor and it is stored as "5 &lt; 6" — no tags at all,
+   so the tag test says plain text, and md() escapes it a second time into
+   "5 &amp;lt; 6". Same fault as the lists, different disguise.
+
+   Worth naming what is really wrong here: this function guesses the type of
+   its input, and a guess is wrong eventually. The real repair is for a body
+   to say what it is — a format field on the record — so nothing downstream
+   has to infer it. Until then these three tests cover every case the app
+   can actually produce. */
+var HAS_ENTITY=/&(?:lt|gt|amp|quot|nbsp|#\d+);/i;
+
 function toRich(s){
   if(!s) return "";
-  if(/<(strong|b|em|i|u|br)\b/i.test(s)) return s;
-  return md(s).replace(/\r?\n/g,"<br>");
+  if(LOOKS_ESCAPED.test(s)) return unescapeRich(s);   // damaged: put it back
+  if(LOOKS_RICH.test(s)) return s;                    // markup: leave alone
+  if(HAS_ENTITY.test(s)) return s;                    // HTML without tags
+  return md(s).replace(/\r?\n/g,"<br>");              // genuinely plain
 }
 
 function md(s){
@@ -2119,15 +2161,6 @@ function render(){
   if(!list.length){
     board.innerHTML='<div class="empty"><div class="big">◌</div>'
       +(S.q?"Nothing matches that.":"Nothing here yet — capture something above.")+'</div>';
-  } else if((S.view==="tasks"||S.view==="upcoming")&&!S.q&&!S.tag){
-    var order=["Overdue","Today","Tomorrow","This week","Later","Someday"], groups={};
-    list.forEach(function(i){ (groups[bucket(i)]=groups[bucket(i)]||[]).push(i) });
-    board.innerHTML=order.filter(function(k){return groups[k]}).map(function(k){
-      var g=groups[k], links=g.filter(hasLink).length;
-      return '<div class="grouphead">'+k+'<span class="gn">'+g.length
-        +(links?' · '+links+' also '+(links===1?'a link':'links'):"")+'</span></div>'
-        +block(g);
-    }).join("");
   } else if(S.view==="all"&&!S.q&&!S.tag){
     board.innerHTML=pinSplit(list,"Recent");
   } else {
@@ -2169,7 +2202,6 @@ var TBVIEWS={tasks:"Tasks",today:"Today",overdue:"Overdue",
 var TB={filter:"tasks"};
 function taskbarOpen(){ return document.querySelector(".app").classList.contains("tb") }
 function setTaskbar(on){
-  if(!on) TB.filter="tasks";     // reopening should not resume a forgotten filter
   document.querySelector(".app").classList.toggle("tb",!!on);
   var b=document.querySelector("[data-taskbar]");
   if(b) b.classList.toggle("on",!!on);
@@ -2299,9 +2331,9 @@ function paintSidebar(){
   document.getElementById("nav-archived").style.display=(narch||S.view==="archived")?"":"none";
   // Overdue only exists when something is overdue — an empty warning is noise
   var od=count("overdue");
-  document.getElementById("nav-overdue").style.display=(od||S.view==="overdue")?"":"none";
-  // a task subcategory is open: make sure the group it lives in is visible
-  if({today:1,overdue:1,upcoming:1,someday:1,done:1}[S.view]){
+  document.getElementById("nav-overdue").style.display=(od||TB.filter==="overdue")?"":"none";
+  // a task subcategory is aiming the column: keep the group it lives in open
+  if(taskbarOpen()&&{today:1,overdue:1,upcoming:1,someday:1,done:1}[TB.filter]){
     document.getElementById("grp-tasks").classList.remove("closed");
     document.querySelector('[data-toggle="tasks"]').classList.remove("closed");
   }
@@ -2326,11 +2358,11 @@ function paintSidebar(){
         +esc(k)+'<span class="n">'+counts[k]+'</span></button>';
     }).join("");
 
-  var aim=taskbarOpen();
   document.querySelectorAll(".sidebar .nav[data-view]").forEach(function(b){
     var v=b.dataset.view;
-    b.classList.toggle("on", !S.tag&&!S.q&&v===S.view);
-    b.classList.toggle("aiming", aim&&!!TBVIEWS[v]&&v===TB.filter&&v!==S.view);
+    // task rows report the column; every other row reports the board
+    if(TBVIEWS[v]) b.classList.toggle("on", taskbarOpen()&&v===TB.filter);
+    else b.classList.toggle("on", !S.tag&&!S.q&&v===S.view);
   });
   document.querySelectorAll(".mobtabs button").forEach(function(b){
     b.classList.toggle("on", !S.tag&&b.dataset.view===S.view);
@@ -4692,10 +4724,14 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
   // leaving a page ends the selection — carrying it somewhere invisible is
   // how you end up wondering why the toolbar won't go away
   if(v){
-    /* With the column open, a task category aims it rather than replacing
-       the board. The board is what you were working on; losing it to look at
-       today's list is the very thing the column exists to prevent. */
-    if(taskbarOpen()&&TBVIEWS[v.dataset.view]){ setTaskFilter(v.dataset.view); return }
+    /* Tasks live in the column. Always — not "when the column happens to be
+       open", which made the same button do two different things depending on
+       state the row gave no sign of. If the column is shut, this opens it. */
+    if(TBVIEWS[v.dataset.view]){
+      if(!taskbarOpen()) setTaskbar(true);
+      setTaskFilter(v.dataset.view);
+      return;
+    }
     S.view=v.dataset.view; S.tag=null; S.q=""; S.sel={};
     document.getElementById("q").value="";
     if(S.view==="posts") loadPosts();
@@ -4747,7 +4783,15 @@ document.getElementById("taglist").addEventListener("contextmenu",function(e){
 
 document.querySelector(".mobtabs").addEventListener("click",function(e){
   var v=e.target.closest("[data-view]");
-  if(v){ S.view=v.dataset.view; S.tag=null; S.sel={}; if(S.view==="posts") loadPosts(); render() }
+  if(!v) return;
+  if(TBVIEWS[v.dataset.view]){
+    if(!taskbarOpen()) setTaskbar(true);
+    setTaskFilter(v.dataset.view);
+    return;
+  }
+  S.view=v.dataset.view; S.tag=null; S.sel={};
+  if(S.view==="posts") loadPosts();
+  render();
 });
 document.getElementById("q").addEventListener("input",function(e){ S.q=e.target.value; S.sel={}; render() });
 /* Keyboard focus is layered, and each layer swallows what belongs to it.
@@ -4989,6 +5033,8 @@ save(); render(); refreshCap();
 BOOTED=true;   // from here on, a save means a person did something
 // the column is a per-screen preference, so it stays on this device
 try{ if(localStorage.getItem(TBKEY)) setTaskbar(true) }catch(e){}
+// tasks are not a page any more; a stored one would show a board nothing points at
+if(TBVIEWS[S.view]){ S.view="all"; setTaskbar(true); setTaskFilter("tasks") }
 
 setTimeout(backfill,350);
 
