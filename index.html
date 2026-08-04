@@ -219,15 +219,10 @@
     color:var(--ui);transition:transform .15s,background .12s,color .12s;border-radius:6px}
   .caret:hover{color:var(--ink);background:var(--line-strong)}
   /* opens the task column — sits beside the caret, same shape, quieter */
-  /* Two controls share this row, so the count needs to clear both of them.
-     .nav reserves 26px on the right for the caret alone; the row carrying a
-     column toggle as well reserves twice that, or the number sits underneath. */
-  .nav.hastwo{padding-right:50px}
-  .tsplit{position:absolute;right:26px;top:50%;margin-top:-11px;
-    width:22px;height:22px;line-height:21px;text-align:center;font-size:12px;
-    color:var(--ui);opacity:.55;border-radius:6px;transition:.12s}
-  .tsplit:hover{opacity:1;color:var(--ink);background:var(--line-strong)}
-  .tsplit.on{opacity:1;color:var(--accent)}
+  /* The ◧ toggle that used to live here has gone. Once the Tasks row itself
+     opened the column, the button beside it did the same job from the same
+     place — two controls, one meaning, and it crowded the count. Opening is
+     the row, closing is the ✕ on the column or ⌘J. */
   .caret.closed{transform:rotate(-90deg)}
   .dot{width:8px;height:8px;border-radius:50%;flex:none}
   /* a tag the app assigns and you can't edit — the glyph replaces the dot */
@@ -731,6 +726,24 @@
   .empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
 
   /* ---------- editor ---------- */
+  /* Not a toast. A toast is for things you may ignore. */
+  .danger{position:fixed;left:0;right:0;bottom:0;z-index:90;
+    background:var(--red);color:#fff;padding:13px 20px;font-size:13.5px;
+    line-height:1.5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
+    box-shadow:0 -6px 24px -10px rgba(0,0,0,.4)}
+  .danger[hidden]{display:none}
+  .danger strong{font-weight:700}
+  .danger button{background:rgba(255,255,255,.16);color:#fff;font-weight:620;
+    padding:6px 13px;border-radius:8px;font-size:12.5px}
+  .danger button:hover{background:rgba(255,255,255,.28)}
+  .stat{font-size:13px;color:var(--read);margin:8px 0;line-height:1.5}
+  .stat.warn{color:var(--red)}
+  .stat b{color:var(--ink);font-weight:640}
+  .sttab{width:100%;font-size:12px;color:var(--muted);margin:10px 0;
+    font-variant-numeric:tabular-nums}
+  .sttab td{padding:3px 0;border-bottom:1px solid var(--line)}
+  .sttab td:last-child{text-align:right}
+
   .scrim{position:fixed;inset:0;background:rgba(26,25,23,.28);backdrop-filter:blur(3px);
     display:none;place-items:center;z-index:50;padding:20px}
   .scrim.on{display:grid}
@@ -801,8 +814,14 @@
     padding:3px 9px;border-radius:7px}
   .postcard .pmeta button:hover{background:var(--line);color:var(--ink)}
   .postcard .pmeta button.rm:hover{background:none;color:var(--red)}
+  /* Matched to .cbody. It was setting a family but inheriting a weight, so
+     Geologica came through at the browser's idea of normal rather than the
+     ExtraLight the rest of the app is set in. */
   .postcard .ptext{font-size:calc(15px*var(--tscale));line-height:1.6;
-    font-family:var(--content);color:var(--ink);margin-bottom:10px;word-break:break-word}
+    font-family:var(--content);font-weight:inherit;color:var(--read);
+    margin-bottom:10px;word-break:break-word}
+  .postcard .ptext strong,.postcard .ptext b{font-weight:700;color:var(--ink)}
+  .postcard .ptext em,.postcard .ptext i{font-style:italic}
   .postcard .ptext:empty{display:none}
   .postcard .ptext a{color:var(--blue)}
 
@@ -1042,8 +1061,7 @@
     <button class="nav" data-view="posts" id="nav-posts"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M7.4 16.6a6.5 6.5 0 0 1 0-9.2"/><path d="M16.6 7.4a6.5 6.5 0 0 1 0 9.2"/><path d="M4.6 19.4a10.5 10.5 0 0 1 0-14.8"/><path d="M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg></span>Posts<span class="n" id="c-posts"></span></button>
     <button class="nav" data-view="notes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="4.5" y="3.5" width="15" height="17" rx="3.2"/><path d="M8.2 9h7.6M8.2 12.8h7.6M8.2 16.6h4.6"/></svg></span>Notes<span class="n" id="c-notes"></span></button>
     <button class="nav" data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links<span class="n" id="c-links"></span></button>
-    <button class="nav hastwo" data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks<span class="n" id="c-tasks"></span>
-      <span class="tsplit" data-taskbar="1" title="Keep tasks beside your work">◧</span>
+    <button class="nav" data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks<span class="n" id="c-tasks"></span>
       <span class="caret" data-toggle="tasks">▾</span></button>
     <div class="navgroup" id="grp-tasks">
       <button class="nav sub" data-view="today"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.1 1.9"/></svg></span>Today<span class="n" id="c-today"></span></button>
@@ -1069,6 +1087,7 @@
         <div class="menu up" id="backupmenu">
           <button data-bk="export"><b>Export everything</b><span>One .json file you own</span></button>
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
+          <button data-bk="storage"><b>Storage…</b><span>What this browser is holding, and how full it is</span></button>
         </div>
       </div>
       <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
@@ -1150,6 +1169,7 @@
   <button data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks</button>
 </nav>
 
+<div class="danger" id="danger" hidden></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <!-- The composer gets its own overlay. Sharing the editor's would mean the
      editor's paste handler, its Escape key and its S.editing guard all firing
@@ -1251,17 +1271,40 @@ function load(){
   }catch(e){}
   return mem;
 }
+var SAVE_BROKEN=false;
 function save(){
   // the first save after startup is a real edit, so this stops being a demo
   if(BOOTED) notDemoAnyMore();
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
-  try{ localStorage.setItem(KEY, JSON.stringify(S.items)) }catch(e){
-    // Browsers cap localStorage at ~5MB. Images are the only thing big enough to hit it.
-    // A native app writes real files to disk and never has this problem.
-    if(typeof toast==="function") toast("Storage full — this browser caps saved images");
+  try{
+    localStorage.setItem(KEY, JSON.stringify(S.items));
+    if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger() }
+  }catch(e){
+    /* This used to be a toast. A toast is three seconds of grey text for an
+       event that means every edit from here on is being kept in memory only
+       and will be gone at the next refresh. It now stays on screen until it
+       is fixed, and it offers the export while the data still exists.
+
+       Freeing room: the shadow no longer keeps a second copy of everything,
+       and history is capped by size. What is left is photographs, which are
+       stored as base64 inside the record. Those belong in Supabase Storage,
+       the way post images already are. */
+    SAVE_BROKEN=true; paintDanger();
   }
   mem=S.items;
+}
+
+function paintDanger(){
+  var el=document.getElementById("danger");
+  if(!el) return;
+  el.hidden=!SAVE_BROKEN;
+  if(SAVE_BROKEN) el.innerHTML=
+     '<strong>This browser will not save any more.</strong> '
+    +'Everything you change from now on is in memory only and will be lost when '
+    +'the page reloads. Your notes on the server are safe. '
+    +'<button id="dngexp">Export now</button>'
+    +'<button id="dngwhy">Why</button>';
 }
 
 /* =========================================================================
@@ -1280,7 +1323,7 @@ function save(){
    backup. It exists so that no single bug in the code above can cost you an
    afternoon.
    ========================================================================= */
-var HKEY="trove.history", HPER=10, HMAX=300;
+var HKEY="trove.history", HPER=10, HMAX=300, HBYTES=300*1024;
 
 function agoText(ts){
   var s=Math.max(0,Date.now()-ts);
@@ -1330,10 +1373,13 @@ function remember(item,why){
     if(per[h[j].id]<=HPER) kept.unshift(h[j]);
   }
   if(kept.length>HMAX) kept=kept.slice(kept.length-HMAX);
-  try{ localStorage.setItem(HKEY,JSON.stringify(kept)) }
-  catch(e){                                   // out of room: halve it and retry
+  /* A hard ceiling in bytes as well as in entries. History is a safety net;
+     a safety net that fills the same five megabytes the library lives in is
+     not a net, it is another way to lose things. */
+  while(kept.length>1&&JSON.stringify(kept).length>HBYTES) kept.shift();
+  try{ localStorage.setItem(HKEY,JSON.stringify(kept)) }catch(e){
     try{ localStorage.setItem(HKEY,JSON.stringify(kept.slice(Math.floor(kept.length/2)))) }
-    catch(e2){}
+    catch(e2){ try{ localStorage.removeItem(HKEY) }catch(e3){} }
   }
 }
 
@@ -2325,10 +2371,10 @@ var TB={filter:"tasks"};
 function taskbarOpen(){ return document.querySelector(".app").classList.contains("tb") }
 function setTaskbar(on){
   document.querySelector(".app").classList.toggle("tb",!!on);
-  var b=document.querySelector("[data-taskbar]");
-  if(b) b.classList.toggle("on",!!on);
   try{ localStorage.setItem(TBKEY,on?"1":"") }catch(e){}
   if(on) paintTaskbar();
+  // the sidebar has to be repainted either way, or the row it lit stays lit
+  paintSidebar();
 }
 function toggleTaskbar(){ setTaskbar(!taskbarOpen()) }
 
@@ -2552,7 +2598,14 @@ function loadSession(){
     if(raw) SYNC.session=JSON.parse(raw);
     SYNC.lastPull=localStorage.getItem("trove.lastPull")||SYNC.lastPull;
     var sh=localStorage.getItem("trove.shadow");
-    if(sh) SYNC.shadow=JSON.parse(sh);
+    if(sh){
+      SYNC.shadow=JSON.parse(sh);
+      // shrink a shadow written by an older build, which held whole records
+      Object.keys(SYNC.shadow).forEach(function(k){
+        var v=SYNC.shadow[k];
+        if(typeof v==="string"&&v.charAt(0)==="{") SYNC.shadow[k]=sig(v);
+      });
+    }
     var q=localStorage.getItem("trove.queue");
     if(q) SYNC.queue=JSON.parse(q);
   }catch(e){}
@@ -2673,13 +2726,26 @@ function signOut(){
    The app mutates S.items freely and calls save(). Rather than ask every
    mutation site to declare what it touched, compare against a shadow copy of
    what the server last saw. Cheap at this scale, and impossible to forget. */
+/* A fingerprint of a record, not the record.
+
+   The shadow existed to answer one question — has this changed since the
+   server last saw it — and it answered it by keeping a complete second copy
+   of every note, base64 photographs and all, in the same five megabytes as
+   the library itself. Two copies of everything, plus a history log, against
+   a cap that a few dozen photographs will reach on their own.
+
+   A length and a hash answer the same question in twenty bytes. */
+function sig(o){
+  var s=typeof o==="string"?o:JSON.stringify(o);
+  return s.length+":"+hash32(s);
+}
+
 function stampChanges(){
   if(!SYNC.on) return;
   var seen={};
   S.items.forEach(function(i){
     seen[i.id]=1;
-    var now=JSON.stringify(i);
-    if(SYNC.shadow[i.id]!==now) SYNC.queue[i.id]="put";
+    if(SYNC.shadow[i.id]!==sig(i)) SYNC.queue[i.id]="put";
   });
   Object.keys(SYNC.shadow).forEach(function(id){
     if(!seen[id]) SYNC.queue[id]="del";
@@ -2722,7 +2788,7 @@ function pushChanges(){
     if(!r.ok) throw new Error("HTTP "+r.status);
     rows.forEach(function(row){
       if(row.deleted) delete SYNC.shadow[row.id];
-      else SYNC.shadow[row.id]=JSON.stringify(row.data);
+      else SYNC.shadow[row.id]=sig(row.data);
       delete SYNC.queue[row.id];
     });
     SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
@@ -2810,6 +2876,14 @@ function applyIncoming(rows){
       return;
     }
 
+    /* normalizeItem fills in every field, so an empty payload becomes a
+       perfectly formed note containing nothing — which is how a blank card
+       appears in Notes out of nowhere. A row with no id in its data is not
+       a note; it is a row that went wrong. */
+    if(!row.data||typeof row.data!=="object"||!row.data.id){
+      SYNC.shadow[row.id]=sig(row.data||{});
+      return;
+    }
     var incoming=normalizeItem(row.data);
     if(!incoming) return;
 
@@ -2817,21 +2891,21 @@ function applyIncoming(rows){
       /* Arrive at the top, not the bottom. Array order is the manual order,
          and the device that made this put it at the front. */
       S.items.unshift(incoming); rebuildIndex(); changed++;
-      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      SYNC.shadow[row.id]=sig(incoming);
       return;
     }
 
-    var mine=JSON.stringify(here);
+    var mine=sig(here);
     // do we hold edits the server has not seen?
     var dirty=SYNC.shadow[row.id]!==undefined&&SYNC.shadow[row.id]!==mine;
 
     if(!dirty){
       // nothing of ours is at stake; take theirs
-      if(JSON.stringify(incoming)!==mine){
+      if(sig(incoming)!==mine){
         remember(here,"replaced by a newer copy from another device");
         S.items[ix]=incoming; changed++;
       }
-      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      SYNC.shadow[row.id]=sig(incoming);
       return;
     }
 
@@ -2839,13 +2913,13 @@ function applyIncoming(rows){
     if((incoming.modified||0)>(here.modified||0)){
       remember(here,"your edit, overtaken by a newer one elsewhere");
       S.items[ix]=incoming; changed++;
-      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      SYNC.shadow[row.id]=sig(incoming);
       toast("A note changed on another device — your copy is in its history");
     } else {
       remember(incoming,"an older copy from another device");
       // keep ours, and make sure it goes up: the shadow must describe the
       // server, not what we wish were there
-      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      SYNC.shadow[row.id]=sig(incoming);
       SYNC.queue[row.id]="put";
       schedulePush();
     }
@@ -4934,8 +5008,77 @@ backupMenu.addEventListener("click",function(e){
   var b=e.target.closest("[data-bk]"); if(!b) return;
   closeBackup();
   if(b.dataset.bk==="export") exportLibrary();
+  else if(b.dataset.bk==="storage") showStorage();
   else { jsonpick.value=""; jsonpick.click() }
 });
+document.getElementById("danger").addEventListener("click",function(e){
+  if(e.target.id==="dngexp") exportLibrary();
+  if(e.target.id==="dngwhy") showStorage();
+});
+
+/* =========================================================================
+   WHAT IS ACTUALLY IN THIS BROWSER
+
+   Written because a note lost changes on reload and there was no way to see
+   why from the outside. A separate diagnostic page cannot help: localStorage
+   belongs to one origin, so the only place that can measure this is the app.
+   ========================================================================= */
+function storageReport(){
+  var rows=[], total=0;
+  for(var k=0;k<localStorage.length;k++){
+    var key=localStorage.key(k);
+    var n=(localStorage.getItem(key)||"").length;
+    rows.push({key:key,bytes:n}); total+=n;
+  }
+  rows.sort(function(a,b){ return b.bytes-a.bytes });
+
+  var photoBytes=0, withPhotos=0, biggest=null, empties=[];
+  S.items.forEach(function(i){
+    var pb=(i.photos||[]).reduce(function(t,p){ return t+((p.src||"").length) },0);
+    if(pb){ photoBytes+=pb; withPhotos++ }
+    var size=JSON.stringify(i).length;
+    if(!biggest||size>biggest.size) biggest={id:i.id,title:i.title,size:size};
+    var empty=!i.title&&!richToText(i.body).trim()&&!i.url
+      &&!(i.photos||[]).length&&!(i.checks||[]).length;
+    if(empty) empties.push(i);
+  });
+  return { rows:rows, total:total, items:S.items.length, photoBytes:photoBytes,
+           withPhotos:withPhotos, biggest:biggest, empties:empties,
+           queued:Object.keys(SYNC.queue).length,
+           shadowed:Object.keys(SYNC.shadow).length };
+}
+
+function showStorage(){
+  var r=storageReport();
+  var kb=function(n){ return (n/1024).toFixed(0)+" KB" };
+  var pct=Math.round(r.total/5242880*100);
+  var html='<div class="stat"><b>'+kb(r.total)+'</b> used of roughly 5 MB — <b>'
+    +pct+'%</b></div>'
+    +'<table class="sttab">'+r.rows.map(function(x){
+      return '<tr><td>'+esc(x.key)+'</td><td>'+kb(x.bytes)+'</td></tr>' }).join("")
+    +'</table>'
+    +'<div class="stat">'+r.items+' notes · '+r.withPhotos+' with photographs, '
+    +kb(r.photoBytes)+' of image data'+(r.photoBytes?' — this is what fills it up':'')+'</div>'
+    +(r.biggest?'<div class="stat">Largest note: '+esc(r.biggest.title||"untitled")
+      +' at '+kb(r.biggest.size)+'</div>':"")
+    +'<div class="stat">'+r.queued+' waiting to sync · '+r.shadowed+' tracked</div>'
+    +(r.empties.length?'<div class="stat warn">'+r.empties.length
+      +' note'+(r.empties.length===1?'':'s')+' with nothing in them '
+      +'<button class="btn" id="stpurge">Remove them</button></div>':"");
+  askChoice("Storage",html,[{label:"Close",value:0,kind:"sec"}],function(){});
+  var purge=document.getElementById("stpurge");
+  if(purge) purge.addEventListener("click",function(){
+    var gone=0;
+    S.items=S.items.filter(function(i){
+      var empty=!i.title&&!richToText(i.body).trim()&&!i.url
+        &&!(i.photos||[]).length&&!(i.checks||[]).length;
+      if(empty){ remember(i,"empty note removed"); gone++ }
+      return !empty;
+    });
+    save(); render(); closeAsk(); toast(gone+" empty note"+(gone===1?"":"s")+" removed");
+  });
+}
+
 jsonpick.addEventListener("change",function(){
   if(jsonpick.files&&jsonpick.files[0]) readImportFile(jsonpick.files[0]);
 });
@@ -4978,9 +5121,6 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
   if(e.target.closest("[data-view],[data-tag]")) openDrawer(false);
 
   // the disclosure arrow folds the group; the row itself still navigates
-  var tb=e.target.closest("[data-taskbar]");
-  if(tb){ e.preventDefault(); e.stopPropagation(); toggleTaskbar(); return }
-
   var tog=e.target.closest("[data-toggle]");
   if(tog){
     e.stopPropagation();
