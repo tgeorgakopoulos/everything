@@ -548,6 +548,20 @@
   .fmt i{font-family:Georgia,serif}
   .fmt.li{font-size:14px;font-weight:700;letter-spacing:-.04em}
 
+  /* history — earlier versions of the open note */
+  .histbox{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);
+    margin:14px 0 2px;max-height:290px;overflow-y:auto}
+  .hrow{padding:11px 14px;border-bottom:1px solid var(--line);position:relative}
+  .hrow:last-child{border-bottom:0}
+  .hmeta{font-size:11px;color:var(--faint);letter-spacing:.01em}
+  .hprev{font-size:13px;line-height:1.5;color:var(--read);margin:4px 0 8px;
+    padding-right:96px;word-break:break-word}
+  .hput{position:absolute;right:12px;top:11px;font-size:11.5px;font-weight:620;
+    color:var(--accent);border:1px solid var(--line-strong);border-radius:8px;
+    padding:4px 9px;background:var(--surface)}
+  .hput:hover{border-color:var(--accent)}
+  .hempty{padding:16px;font-size:13px;color:var(--faint);line-height:1.55}
+
   /* head row */
   .head{display:flex;gap:9px;align-items:flex-start}
   .ctitle{font-weight:600;font-size:calc(14.5px*var(--tscale));letter-spacing:-.01em;line-height:1.35}
@@ -1248,6 +1262,79 @@ function save(){
     if(typeof toast==="function") toast("Storage full — this browser caps saved images");
   }
   mem=S.items;
+}
+
+/* =========================================================================
+   HISTORY — the last few versions of anything that changed.
+
+   Sync decides who wins a conflict. This decides that losing is survivable.
+   Every version that gets replaced — by your own edit, by a merge, by a
+   delete arriving from another device — is written here first, and the note
+   can be put back from the editor.
+
+   Text only. Photos are base64 and would exhaust a browser's five megabytes
+   in an afternoon, and the thing people lose is words. Ten versions per note,
+   three hundred in total, oldest discarded first.
+
+   This is a floor, not a ceiling: it is local to one device and it is not a
+   backup. It exists so that no single bug in the code above can cost you an
+   afternoon.
+   ========================================================================= */
+var HKEY="trove.history", HPER=10, HMAX=300;
+
+function agoText(ts){
+  var s=Math.max(0,Date.now()-ts);
+  if(s<60000) return "just now";
+  if(s<36e5) return Math.round(s/6e4)+" min ago";
+  if(s<864e5) return Math.round(s/36e5)+" h ago";
+  var d=new Date(ts);
+  return d.toLocaleDateString(undefined,{day:"numeric",month:"short"})
+    +" "+d.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"});
+}
+function historyAll(){
+  try{ return JSON.parse(localStorage.getItem(HKEY)||"[]") }catch(e){ return [] }
+}
+function historyFor(id){
+  /* Several versions can land in the same millisecond — a merge that
+     replaces three notes at once, say — so the timestamps tie and sorting
+     alone would hand back the oldest first. The log is in the order things
+     happened, so reverse it before sorting; sort is stable, and ties then
+     keep the order they were written in. */
+  return historyAll().filter(function(e){ return e.id===id })
+    .reverse()
+    .sort(function(a,b){ return b.at-a.at });
+}
+function remember(item,why){
+  if(!item||!item.id) return;
+  var slim={
+    id:item.id, at:Date.now(), why:why||"",
+    title:item.title||"", body:item.body||"",
+    tags:(item.tags||[]).slice(), url:item.url||"",
+    due:(typeof item.due==="number")?item.due:null,
+    checks:(item.checks||[]).map(function(c){ return {t:c.t,d:!!c.d} }),
+    tint:item.tint||"", photos:(item.photos||[]).length
+  };
+  var h=historyAll();
+  // an unchanged version is not a version
+  for(var k=h.length-1;k>=0;k--){
+    if(h[k].id!==slim.id) continue;
+    if(h[k].title===slim.title&&h[k].body===slim.body
+       &&JSON.stringify(h[k].tags)===JSON.stringify(slim.tags)) return;
+    break;
+  }
+  h.push(slim);
+
+  var kept=[], per={};
+  for(var j=h.length-1;j>=0;j--){
+    per[h[j].id]=(per[h[j].id]||0)+1;
+    if(per[h[j].id]<=HPER) kept.unshift(h[j]);
+  }
+  if(kept.length>HMAX) kept=kept.slice(kept.length-HMAX);
+  try{ localStorage.setItem(HKEY,JSON.stringify(kept)) }
+  catch(e){                                   // out of room: halve it and retry
+    try{ localStorage.setItem(HKEY,JSON.stringify(kept.slice(Math.floor(kept.length/2)))) }
+    catch(e2){}
+  }
 }
 
 var S={items:[], view:"all", q:"", tag:null, layouts:{}, sel:{}};
@@ -2446,6 +2533,8 @@ var SYNC={
   shadow:{},             // id -> the JSON we believe the server has
   queue:{},              // id -> "put" | "del"
   lastPull:"1970-01-01T00:00:00Z",
+  pending:{},            // rows held back because their note was open
+  pulledOnce:false,      // have we heard from the server at all this session?
   status:"off",          // off | out | idle | busy | error | offline
   note:"",
   timer:null
@@ -2572,7 +2661,8 @@ function withFreshSession(){
   return refreshSession();
 }
 function signOut(){
-  SYNC.session=null; SYNC.shadow={}; SYNC.queue={};
+  SYNC.session=null; SYNC.shadow={}; SYNC.queue={}; SYNC.pending={};
+  SYNC.pulledOnce=false;
   POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; POSTS.err="";
   if(S.view==="posts") S.view="all";
   SYNC.lastPull="1970-01-01T00:00:00Z";
@@ -2607,6 +2697,10 @@ function schedulePush(){
 /* ---- push ---- */
 function pushChanges(){
   if(!SYNC.on||!SYNC.session) return Promise.resolve();
+  /* Uploading before the first pull of the session means uploading a picture
+     of the world as it was when this tab was last open. Anything queued can
+     wait a second; overwriting a newer copy cannot be undone. */
+  if(!SYNC.pulledOnce){ schedulePush(); return Promise.resolve() }
   var ids=Object.keys(SYNC.queue);
   if(!ids.length){ SYNC.status="idle"; paintSync(); return Promise.resolve() }
 
@@ -2653,8 +2747,8 @@ function pullChanges(){
     if(!r.ok) throw new Error("HTTP "+r.status);
     return r.json();
   }).then(function(rows){
-    if(rows.length) applyIncoming(rows);
-    if(rows.length) SYNC.lastPull=rows[rows.length-1].modified;
+    if(rows.length) applyIncoming(rows);   // which advances lastPull itself,
+    SYNC.pulledOnce=true;                  // only as far as it actually got
     SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
     return rows.length;
   }).catch(function(e){
@@ -2667,40 +2761,112 @@ function pullChanges(){
 /* Merge rule: the later edit wins, per item, judged by the app's own
    `modified` stamp rather than the server's. The server clock says when a row
    arrived; the item's own stamp says when a person actually changed it. */
+/* =========================================================================
+   MERGING — the rule is that nothing is ever discarded silently.
+
+   The version this replaces lost work in three ways, and they compounded:
+
+   1. A row arriving while its note was open in the editor was skipped, and
+      lastPull was advanced past it anyway. The newer copy was never applied
+      and never offered again. Editing that note later stamped the OLD text
+      with a NEW time, pushed it, and the newer version on the server was
+      overwritten. That is a note reverting to how it was an hour ago.
+
+   2. The shadow — our record of what the server holds — was written even
+      when the row was rejected, so the two disagreed afterwards.
+
+   3. Everything hung on `modified`, a client clock. A device running a few
+      minutes slow silently loses every conflict it takes part in.
+
+   What follows keeps last-write-wins, because for one person on three
+   devices it is almost always right. What it adds is that the loser of any
+   conflict is written to a local history first, so "almost always" stops
+   being a synonym for "sometimes your afternoon is gone".
+   ========================================================================= */
 function applyIncoming(rows){
-  var byId={}, changed=0;
+  var byId={}, changed=0, deferred=false, safeUpto=SYNC.lastPull;
   S.items.forEach(function(i,ix){ byId[i.id]=ix });
+  function rebuildIndex(){ byId={}; S.items.forEach(function(i,ix){ byId[i.id]=ix }) }
 
   rows.forEach(function(row){
-    var here=byId[row.id]!==undefined?S.items[byId[row.id]]:null;
+    var ix=byId[row.id], here=ix!==undefined?S.items[ix]:null;
+
+    /* Rows arrive oldest first. Once one is held back, nothing after it may
+       be marked as seen either, or the next pull starts beyond a row we
+       never applied. */
+    if(S.editing===row.id){
+      SYNC.pending[row.id]=row;
+      deferred=true;
+      return;
+    }
+    if(!deferred) safeUpto=row.modified;
 
     if(row.deleted){
-      if(here){ S.items.splice(byId[row.id],1); rebuildIndex(); changed++ }
+      if(here){
+        remember(here,"deleted on another device");
+        S.items.splice(ix,1); rebuildIndex(); changed++;
+      }
       delete SYNC.shadow[row.id];
       return;
     }
+
     var incoming=normalizeItem(row.data);
     if(!incoming) return;
+
     if(!here){
       /* Arrive at the top, not the bottom. Array order is the manual order,
-         and the device that made this put it at the front — appending here
-         meant the same note sat first on one machine and last on another. */
+         and the device that made this put it at the front. */
       S.items.unshift(incoming); rebuildIndex(); changed++;
-    } else if((incoming.modified||0)>(here.modified||0)){
-      // don't clobber something being edited right now
-      if(S.editing===incoming.id) return;
-      S.items[byId[row.id]]=incoming; changed++;
+      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      return;
     }
-    SYNC.shadow[row.id]=JSON.stringify(incoming);
+
+    var mine=JSON.stringify(here);
+    // do we hold edits the server has not seen?
+    var dirty=SYNC.shadow[row.id]!==undefined&&SYNC.shadow[row.id]!==mine;
+
+    if(!dirty){
+      // nothing of ours is at stake; take theirs
+      if(JSON.stringify(incoming)!==mine){
+        remember(here,"replaced by a newer copy from another device");
+        S.items[ix]=incoming; changed++;
+      }
+      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      return;
+    }
+
+    /* Both sides moved. Someone has to win, but nobody gets erased. */
+    if((incoming.modified||0)>(here.modified||0)){
+      remember(here,"your edit, overtaken by a newer one elsewhere");
+      S.items[ix]=incoming; changed++;
+      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      toast("A note changed on another device — your copy is in its history");
+    } else {
+      remember(incoming,"an older copy from another device");
+      // keep ours, and make sure it goes up: the shadow must describe the
+      // server, not what we wish were there
+      SYNC.shadow[row.id]=JSON.stringify(incoming);
+      SYNC.queue[row.id]="put";
+      schedulePush();
+    }
   });
 
-  function rebuildIndex(){ byId={}; S.items.forEach(function(i,ix){ byId[i.id]=ix }) }
+  SYNC.lastPull=safeUpto;
 
   if(changed){
     try{ localStorage.setItem(KEY,JSON.stringify(S.items)) }catch(e){}
     render();
     toast(changed+" change"+(changed===1?"":"s")+" from another device");
   }
+}
+
+/* Rows held back while you were editing, applied the moment you are done. */
+function flushPending(){
+  var ids=Object.keys(SYNC.pending);
+  if(!ids.length) return;
+  var rows=ids.map(function(k){ return SYNC.pending[k] });
+  SYNC.pending={};
+  applyIncoming(rows);
 }
 
 function syncNow(){
@@ -3111,10 +3277,12 @@ function openEditor(id){
       +'<button class="addimg" id="e-addimg">⊞ Add images</button>'
       +'<button class="addimg" id="e-addchk">☑ Checklist item</button>'
     +'</div>'
+    +'<div class="histbox" id="e-histbox" hidden></div>'
     +'<div class="facetbar">'
       +'<button class="facet'+(d.url?" on":"")+'" id="f-link"><span class="fi">⚭</span>Link</button>'
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
       +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
+      +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
       +'<div class="swatches" id="e-tint" style="margin-left:auto">'
         +TINTS.map(function(t){ return '<div class="sw'+((i.tint||"")===t?" on":"")+'" data-tint="'+t+'" style="background:'+TINTHEX[t]+'"></div>' }).join("")
       +'</div>'
@@ -3473,6 +3641,7 @@ function openEditor(id){
      by reaching for Archive instead of Done. */
   function applyEdits(){
     var hadUrl=!!i.url;
+    remember(i,"before your edit");
     i.title=q("#e-title").value.trim();
     i.body=sanitizeRich(q("#e-body").innerHTML);
     i.url=q("#p-link").classList.contains("on")?q("#e-url").value.trim():"";
@@ -3489,6 +3658,52 @@ function openEditor(id){
     save(); close(); render();
     if(i.url&&!hadUrl) fetchMeta(i,true);
   }
+  /* ---- history ----
+     Restoring writes into the open fields, not into the note. Nothing is
+     committed until you press Done, so looking is free and a restore you
+     dislike is undone by pressing Cancel. */
+  var histBox=q("#e-histbox");
+  function paintHistory(){
+    var list=historyFor(id);
+    if(!list.length){
+      histBox.innerHTML='<div class="hempty">No earlier versions of this note yet. '
+        +'From now on every change keeps the one before it.</div>';
+      return;
+    }
+    histBox.innerHTML=list.map(function(e,ix){
+      var txt=richToText(e.body).replace(/\s+/g," ").trim();
+      return '<div class="hrow"><div class="hmeta">'+esc(agoText(e.at))
+        +(e.why?' · '+esc(e.why):"")+'</div>'
+        +'<div class="hprev">'+esc((e.title?e.title+" — ":"")+txt).slice(0,180)
+        +(txt.length>180?"…":"")+'</div>'
+        +(e.tags.length?'<div class="hmeta">'+esc(e.tags.map(function(t){return "#"+t}).join(" "))+'</div>':"")
+        +'<button class="hput" data-ver="'+ix+'">Put this back</button></div>';
+    }).join("");
+  }
+  q("#e-hist").addEventListener("click",function(){
+    var showing=!histBox.hasAttribute("hidden");
+    if(showing){ histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on"); return }
+    paintHistory();
+    histBox.removeAttribute("hidden");
+    q("#e-hist").classList.add("on");
+  });
+  histBox.addEventListener("click",function(e){
+    var b=e.target.closest("[data-ver]"); if(!b) return;
+    var v=historyFor(id)[+b.dataset.ver]; if(!v) return;
+    remember(readEditorNow(),"before putting an older version back");
+    q("#e-title").value=v.title;
+    q("#e-body").innerHTML=sanitizeRich(v.body);
+    q("#e-tags").value=(v.tags||[]).join(", ");
+    histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on");
+    toast("Restored — press Done to keep it, Cancel to think again");
+  });
+  // what is on screen this second, so a restore can be undone as well
+  function readEditorNow(){
+    return { id:id, title:q("#e-title").value, body:sanitizeRich(q("#e-body").innerHTML),
+      tags:q("#e-tags").value.split(",").map(function(t){ return t.trim() }).filter(Boolean),
+      url:i.url, due:i.due, checks:i.checks, tint:i.tint, photos:i.photos };
+  }
+
   editorApply=applyEdits;                 // so dismissing the sheet saves too
   q("#e-save").addEventListener("click",function(){ applyEdits(); toast("Updated") });
   q("#e-arch").addEventListener("click",function(){
@@ -3499,7 +3714,10 @@ function openEditor(id){
   });
   setTimeout(function(){ q("#e-title").focus() },40);
 }
-function close(){ scrim.classList.remove("on"); S.editing=null; editorApply=null }
+function close(){
+  scrim.classList.remove("on"); S.editing=null; editorApply=null;
+  flushPending();          // rows that arrived while this note was open
+}
 
 /* Dismissing an open note SAVES it. Losing a page of writing because a
    selection drag ended outside the sheet, or because Escape felt like
@@ -3968,8 +4186,10 @@ selbar.addEventListener("click",function(e){
       [{label:"Cancel",value:false,kind:"sec"},{label:"Delete",value:true,kind:"dan"}],
       function(go){
         if(!go) return;
+        // keep the words before the rows go
+        S.items.forEach(function(x){ if(S.sel[x.id]) remember(x,"deleted by you") });
         S.items=S.items.filter(function(x){ return !S.sel[x.id] });
-        S.sel={}; save(); render(); toast(n+" deleted");
+        S.sel={}; save(); render(); toast(n+" deleted — the text is in History");
       });
     return;
   }
