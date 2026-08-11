@@ -568,6 +568,11 @@
   /* head row */
   .head{display:flex;gap:9px;align-items:flex-start}
   .ctitle{font-weight:600;font-size:calc(14.5px*var(--tscale));letter-spacing:-.01em;line-height:1.35}
+  /* written by you, not fetched */
+  .ctitle.own{font-size:calc(17.5px*var(--tscale));font-weight:640;
+    letter-spacing:-.018em;line-height:1.28;color:var(--ink)}
+  [data-font="geologica"] .ctitle.own{font-weight:540}
+  .row-item .rtitle.own{font-size:calc(14.5px*var(--tscale));font-weight:640}
   .srcline{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px}
   .fav{width:15px;height:15px;border-radius:4px;flex:none;display:grid;place-items:center;
     font-size:8.5px;font-weight:700;color:#fff;overflow:hidden;position:relative}
@@ -579,6 +584,14 @@
   .cbody{color:var(--read);font-size:calc(13.5px*var(--tscale));line-height:1.58;margin-top:7px;
     display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;
     word-break:break-word}
+  .cbody h3,.ebody h3,.ptext h3,.pbody h3{
+    font-size:1.24em;font-weight:650;line-height:1.3;letter-spacing:-.014em;
+    color:var(--ink);margin:.75em 0 .3em}
+  .cbody h3:first-child,.ebody h3:first-child,
+  .ptext h3:first-child,.pbody h3:first-child{margin-top:0}
+  [data-font="geologica"] .cbody h3,[data-font="geologica"] .ebody h3,
+  [data-font="geologica"] .ptext h3,[data-font="geologica"] .pbody h3{font-weight:520}
+  .fmt.hd{font-size:15px;font-weight:700;letter-spacing:.01em}
   .cbody strong,.cbody b{font-weight:700;color:var(--ink)}
   .cbody em,.cbody i{font-style:italic}
   .cbody u{text-decoration:underline}
@@ -1451,11 +1464,29 @@ function save(){
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
   assignPhotoKeys();
-  persistPhotos();          // async; writes again once the bytes are filed
+  mem=S.items;                  // memory is current whatever the disk says
+  var filing=persistPhotos();   // async; writes again once the bytes are filed
   try{
     writeItems();
-    if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger() }
+    if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger(); toast("Saving is working again") }
   }catch(e){
+    /* Not necessarily out of room. A note with a photograph just added is
+       written whole the first time, because the bytes are not yet in
+       IndexedDB and stripping them before they are safe is how a photograph
+       disappears. That one write can be two megabytes; a moment later the
+       same record is forty bytes. So wait for the filing and try once more
+       before crying wolf — the alarm you saw was raised at the worst possible
+       instant and cleared itself before you could read it. */
+    return filing.then(function(){
+      try{
+        writeItems();
+        if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger() }
+      }catch(e2){ reallyBroken() }
+    },reallyBroken);
+  }
+  return;
+
+  function reallyBroken(){
     /* This used to be a toast. A toast is three seconds of grey text for an
        event that means every edit from here on is being kept in memory only
        and will be gone at the next refresh. It now stays on screen until it
@@ -1467,7 +1498,6 @@ function save(){
        the way post images already are. */
     SAVE_BROKEN=true; paintDanger();
   }
-  mem=S.items;
 }
 
 function paintDanger(){
@@ -2179,7 +2209,25 @@ function setNoteSize(ix){
    md() below is kept only to upgrade older plain-text notes on first load,
    and would be reused by a Markdown export.
    --------------------------------------------------------------------- */
-var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1};
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1};
+
+/* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
+   obvious way to ask and disagrees between browsers — Safari answers "h3",
+   Chrome sometimes "H3", sometimes nothing at all — so walk up instead. */
+function inHeading(){
+  try{
+    var sel=getSelection();
+    if(!sel||!sel.rangeCount) return false;
+    var n=sel.getRangeAt(0).startContainer;
+    while(n&&n.nodeType!==1) n=n.parentNode;
+    while(n&&n.tagName){
+      if(n.tagName==="H3") return true;
+      if(n.getAttribute&&n.getAttribute("contenteditable")) return false;   // reached the field
+      n=n.parentNode;
+    }
+  }catch(e){}
+  return false;
+}
 
 var SAFE_HREF=/^(https?:|mailto:)/i;
 // these are removed along with everything inside them, rather than unwrapped
@@ -2251,7 +2299,7 @@ function richToText(html){
 
    Rather than extend the list again and wait for the next tag to be
    forgotten, this asks about every tag the editor can produce. */
-var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div";
+var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div|h3";
 var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
 var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
 
@@ -2345,7 +2393,11 @@ function cardHTML(i){
   }
 
   var checkbox=A?'<div class="box" data-check="'+i.id+'">✓</div>':"";
-  var title=i.title?'<div class="ctitle">'+esc(i.title)+'</div>':"";
+  /* A title lifted from a web page is a label; a title you typed is a
+     decision. titleAuto already knows which is which, so the one you wrote
+     gets the size it deserves. */
+  var title=i.title
+    ?'<div class="ctitle'+(i.titleAuto?"":" own")+'">'+esc(i.title)+'</div>':"";
 
   var srcline="";
   if(L){
@@ -2431,7 +2483,8 @@ function rowHTML(i){
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
     +(A?'<div class="box" data-check="'+i.id+'">✓</div>':"")
     +thumb
-    +'<div class="rtitle">'+(esc(i.title)||'<span style="color:var(--faint)">Untitled</span>')+'</div>'
+    +'<div class="rtitle'+(i.title&&!i.titleAuto?" own":"")+'">'
+      +(esc(i.title)||'<span style="color:var(--faint)">Untitled</span>')+'</div>'
     +'<div class="rexc">'+exc.join(" · ")+'</div>'
     +'<div class="rtags">'+tags+'</div>'
     +'<div class="rdue">'+due+'</div>'
@@ -3537,6 +3590,8 @@ function openEditor(id){
          every other control. */
       +'<button class="facet fmt li" id="e-ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button class="facet fmt li" id="e-ol" title="Numbered list" aria-label="Numbered list">1.</button>'
+      +'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
+        +'aria-label="Heading">T</button>'
       +'<span class="wc" id="e-wc"></span>'
     +'</div>'
     +'<div class="cklist" id="e-cklist"></div>'
@@ -3637,9 +3692,9 @@ function openEditor(id){
   body.addEventListener("keyup",function(e){
     if(e.key&&e.key.indexOf("Arrow")===0) keepCaretVisible(true);
   });
-  function fmt(cmd){
+  function fmt(cmd,arg){
     body.focus();
-    try{ document.execCommand(cmd,false,null) }catch(e){}
+    try{ document.execCommand(cmd,false,arg||null) }catch(e){}
     countWords(); syncFmtButtons();
   }
   function syncFmtButtons(){
@@ -3672,6 +3727,13 @@ function openEditor(id){
   q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
   q("#e-ul").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertUnorderedList") });
   q("#e-ol").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertOrderedList") });
+  q("#e-h").addEventListener("mousedown",function(e){
+    e.preventDefault();
+    /* A toggle, not a one-way trip. formatBlock has no "undo" of its own, so
+       ask what the caret is already sitting in and turn it back to a plain
+       paragraph if it is a heading. */
+    fmt("formatBlock", inHeading()?"<div>":"<h3>");
+  });
   body.addEventListener("keydown",function(e){
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
       e.preventDefault(); e.stopPropagation();   // don't fall through to capture
@@ -4731,6 +4793,7 @@ function paintComposer(){
       +'<button class="facet fmt" data-pf="link" title="Link the selected text — ⌘K">⚭</button>'
       +'<button class="facet fmt li" data-pf="ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button class="facet fmt li" data-pf="ol" title="Numbered list" aria-label="Numbered list">1.</button>'
+      +'<button class="facet fmt hd" data-pf="h" title="Heading" aria-label="Heading">T</button>'
       +'<button class="facet fmt" data-pf="img" title="Add an image" style="width:auto;padding:0 10px">⊞</button>'
       +(d.link?"":'<button class="facet fmt" data-pf="addlink" title="Attach a link" '
         +'style="width:auto;padding:0 10px">＋⚭</button>')
@@ -4945,7 +5008,8 @@ psheet.addEventListener("click",function(e){
       return;
     }
     try{
-      document.execCommand({bold:"bold",italic:"italic",
+      if(k==="h") document.execCommand("formatBlock",false,inHeading()?"<div>":"<h3>");
+      else document.execCommand({bold:"bold",italic:"italic",
         ul:"insertUnorderedList",ol:"insertOrderedList"}[k],false,null);
     }catch(err){}
     return;
