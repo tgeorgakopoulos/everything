@@ -54,7 +54,7 @@
      the sidebar, buttons and headings stay on the system face, which keeps
      the chrome quiet and lets the typeface switch be about your words. */
   .ctitle,.cbody,.desc,.etitle,.ebody,.rtitle,.rexc,.chk,.ckin,
-  .cap textarea{font-family:var(--content)}
+  .ptext,.pbody,.cap textarea{font-family:var(--content)}
 
   /* Geologica at ExtraLight (200), scoped to that content only. */
   [data-font="geologica"]{
@@ -69,6 +69,8 @@
   [data-font="geologica"] .desc,
   [data-font="geologica"] .rexc,
   [data-font="geologica"] .chk,
+  [data-font="geologica"] .ptext,
+  [data-font="geologica"] .pbody,
   [data-font="geologica"] .cap textarea{font-weight:300;letter-spacing:.004em}
   /* Titles need real weight against a 200 body. 360 was too close to the
      body text to read as a heading, and collapses entirely if only the
@@ -80,7 +82,11 @@
   [data-font="geologica"] .cbody strong,
   [data-font="geologica"] .cbody b,
   [data-font="geologica"] .ebody strong,
-  [data-font="geologica"] .ebody b{font-weight:600}
+  [data-font="geologica"] .ebody b,
+  [data-font="geologica"] .ptext strong,
+  [data-font="geologica"] .ptext b,
+  [data-font="geologica"] .pbody strong,
+  [data-font="geologica"] .pbody b{font-weight:600}
   [data-theme="dark"]{
     --bg:#101413; --surface:#181E1D; --surface-2:#1D2423;
     --ink:#E8EDEC; --muted:#9EAAA8; --faint:#798482; --read:#BFC8C7;
@@ -816,12 +822,12 @@
     padding:3px 9px;border-radius:7px}
   .postcard .pmeta button:hover{background:var(--line);color:var(--ink)}
   .postcard .pmeta button.rm:hover{background:none;color:var(--red)}
-  /* Matched to .cbody. It was setting a family but inheriting a weight, so
-     Geologica came through at the browser's idea of normal rather than the
-     ExtraLight the rest of the app is set in. */
+  /* Weight is not inherited into here from anywhere useful: the typeface
+     rules at the top of the sheet name every element that carries your
+     writing, and .ptext was simply missing from the list. It is on it now,
+     which is why this rule no longer says anything about weight. */
   .postcard .ptext{font-size:calc(15px*var(--tscale));line-height:1.6;
-    font-family:var(--content);font-weight:inherit;color:var(--read);
-    margin-bottom:10px;word-break:break-word}
+    color:var(--read);margin-bottom:10px;word-break:break-word}
   .postcard .ptext strong,.postcard .ptext b{font-weight:700;color:var(--ink)}
   .postcard .ptext em,.postcard .ptext i{font-style:italic}
   .postcard .ptext:empty{display:none}
@@ -5284,11 +5290,15 @@ function compareWithServer(){
     return r.json();
   }).then(function(rows){
     var here={}, out={ onlyHere:[], onlyServer:[], newerHere:[], newerServer:[], same:0,
-                       serverRows:rows.length, localRows:S.items.length };
+                       tombstones:0, serverRows:rows.length, localRows:S.items.length };
     S.items.forEach(function(i){ here[i.id]=i });
     var seen={};
     rows.forEach(function(row){
-      if(row.deleted) return;
+      /* Deletes are soft: the row stays with a flag so other devices learn
+         about it instead of resurrecting the note. Counted rather than
+         ignored — an unexplained difference between two totals is precisely
+         the kind of thing that makes a person distrust the report. */
+      if(row.deleted){ out.tombstones++; return }
       seen[row.id]=1;
       var mine=here[row.id];
       var theirs=row.data&&row.data.id?normalizeItem(row.data):null;
@@ -5315,8 +5325,12 @@ function showCompare(){
         +(list.length>25?'<div class="stat">…and '+(list.length-25)+' more</div>':"");
     };
     var clean=!r.onlyHere.length&&!r.onlyServer.length&&!r.newerServer.length;
-    var html='<div class="stat"><b>'+r.localRows+'</b> notes here · <b>'
-      +r.serverRows+'</b> rows on the server · <b>'+r.same+'</b> identical</div>'
+    var live=r.serverRows-r.tombstones;
+    var html='<div class="stat"><b>'+r.localRows+'</b> notes here · <b>'+live
+      +'</b> live on the server · <b>'+r.same+'</b> identical</div>'
+      +(r.tombstones?'<div class="stat">'+r.tombstones+' further rows are notes you have '
+        +'deleted. They stay as markers so your other devices delete them too, and hold '
+        +'no content.</div>':"")
       +(clean?'<div class="stat">Nothing is missing from this browser.</div>':"")
       + block("Only on the server — this browser never got them",r.onlyServer,
           function(i){ return '<tr><td>'+name(i)+'</td><td>'+esc(agoText(i.modified))+'</td></tr>' })
@@ -5711,6 +5725,14 @@ if(stored){
   try{ localStorage.setItem("trove.demo","1") }catch(e){}
 }
 save(); render(); refreshCap();
+/* One more sidebar paint after the first frame. I could not reproduce the
+   missing Notes count in a simulated browser, and rather than guess at a
+   cause for a third time, this simply repaints once the page is real. It
+   costs a fraction of a millisecond; a count that is silently absent costs
+   more than that in doubt. If it turns out to be a real ordering fault, this
+   hides the symptom — so it is written down here, not buried. */
+if(window.requestAnimationFrame) requestAnimationFrame(function(){ paintSidebar() });
+else setTimeout(paintSidebar,0);
 BOOTED=true;   // from here on, a save means a person did something
 // the column is a per-screen preference, so it stays on this device
 try{ if(localStorage.getItem(TBKEY)) setTaskbar(true) }catch(e){}
