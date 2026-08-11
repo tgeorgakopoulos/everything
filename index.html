@@ -610,12 +610,25 @@
   .card.display{padding:20px 20px}
   .card.display .cbody{font-size:calc(18.5px*var(--tscale));line-height:1.46;color:var(--ink);
     letter-spacing:-.011em;-webkit-line-clamp:12;margin-top:6px}
+  /* In a short text-only note the body is the star, so a title that was
+     merely fetched steps back to being a label. */
   .card.display .ctitle{font-size:14px;font-weight:620;color:var(--muted);
     text-transform:none;letter-spacing:0}
+  /* …unless you wrote the title, in which case it leads and the body returns
+     to ordinary size. Two large things on one small card compete, and the
+     one you typed should win. */
+  .card.display.owntitle .ctitle{font-size:calc(17.5px*var(--tscale));font-weight:640;
+    color:var(--ink);letter-spacing:-.018em;line-height:1.28}
+  .card.display.owntitle .cbody,
+  .card.display.owntitle.xl .cbody{font-size:calc(13.5px*var(--tscale));
+    line-height:1.58;color:var(--read);letter-spacing:0}
   .card.display.xl .cbody{font-size:calc(23px*var(--tscale));line-height:1.38;letter-spacing:-.018em}
-  .card.display.titleonly .ctitle{font-size:calc(18.5px*var(--tscale));font-weight:600;color:var(--ink);
-    line-height:1.45;letter-spacing:-.011em}
-  .card.display.titleonly.xl .ctitle{font-size:calc(23px*var(--tscale));line-height:1.38;letter-spacing:-.018em}
+  /* A note that is nothing but a title has no body to lead, so the title is
+     the body. Only the very short ones get the statement size — the middling
+     ones stay at the same 17.5px as every other title you wrote, because
+     three sizes of the same thing on one screen reads as an accident. */
+  .card.display.titleonly.xl .ctitle{font-size:calc(23px*var(--tscale));font-weight:600;
+    color:var(--ink);line-height:1.38;letter-spacing:-.018em}
 
   /* action facet */
   .box{width:17px;height:17px;border-radius:50%;border:1.8px solid var(--muted);
@@ -2369,11 +2382,16 @@ function photoGrid(item,editable){
 
 function cardHTML(i){
   var L=hasLink(i), A=hasAction(i), P=hasPhotos(i);
-  var cls="card"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(L?" haslink":"");
+  var cls="card"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(L?" haslink":"")
+    +(i.title&&!i.titleAuto?" owntitle":"");
 
   // A short, text-only note is set large. Nothing but words, and few of them,
   // means it's a thought — it should look like one rather than a clipped paragraph.
-  if(isPlain(i)&&!P&&!i.done){
+  /* A checklist has structure of its own and is not a stray thought. It was
+     slipping in here because the word count only looks at the title and the
+     body — so "A test checklist" counted as three words and was set at
+     twenty-three pixels. */
+  if(isPlain(i)&&!P&&!i.done&&!hasChecks(i)){
     var wc=words(i.title)+words(richToText(i.body));
     if(wc>0&&wc<=30) cls+=" display"+(wc<=12?" xl":"")+(i.body?"":" titleonly");
   }
@@ -3742,13 +3760,31 @@ function openEditor(id){
   });
   body.addEventListener("keyup",syncFmtButtons);
   body.addEventListener("mouseup",syncFmtButtons);
-  // paste as plain text — keeps other apps' styling out of the note
+  /* Paste keeps what the note can hold and discards the rest.
+
+     This used to take text/plain and nothing else, on the reasoning that
+     another app's styling has no business in here. True, but it threw the
+     links away with the fonts — copy a paragraph with three references in it
+     and you got the words and none of the addresses.
+
+     So take text/html when it is offered and put it through the same
+     sanitiser everything else goes through: bold, italic, lists, headings and
+     safe links survive; colours, fonts, tables, scripts and everything else
+     do not. It is not a looser rule, it is the same rule applied to a richer
+     input. */
   body.addEventListener("paste",function(e){
     if(!e.clipboardData) return;
+    var html=e.clipboardData.getData("text/html");
     var txt=e.clipboardData.getData("text/plain");
-    if(txt==null) return;
+    if(html==null&&txt==null) return;
     e.preventDefault();
-    try{ document.execCommand("insertText",false,txt) }catch(err){}
+    var clean=html?sanitizeRich(html):"";
+    try{
+      if(clean&&richToText(clean).trim()) document.execCommand("insertHTML",false,clean);
+      else document.execCommand("insertText",false,txt||"");
+    }catch(err){
+      try{ document.execCommand("insertText",false,txt||"") }catch(e2){}
+    }
     countWords();
   });
   q("#e-addimg").addEventListener("click",function(){
@@ -5035,10 +5071,17 @@ psheet.addEventListener("paste",function(e){
     });
     return;
   }
+  var html=e.clipboardData.getData("text/html");
   var txt=e.clipboardData.getData("text/plain");
-  if(txt==null) return;
+  if(html==null&&txt==null) return;
   e.preventDefault();
-  try{ document.execCommand("insertText",false,txt) }catch(err){}
+  var clean=html?sanitizeRich(html):"";
+  try{
+    if(clean&&richToText(clean).trim()) document.execCommand("insertHTML",false,clean);
+    else document.execCommand("insertText",false,txt||"");
+  }catch(err){
+    try{ document.execCommand("insertText",false,txt||"") }catch(e2){}
+  }
 },true);
 
 psheet.addEventListener("keydown",function(e){
