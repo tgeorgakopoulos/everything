@@ -2828,6 +2828,7 @@ var SYNC={
   queue:{},              // id -> "put" | "del"
   lastPull:"1970-01-01T00:00:00Z",
   pending:{},            // rows held back because their note was open
+  rehydrated:false,      // guards one retry when a push needs photo bytes
   pulledOnce:false,      // have we heard from the server at all this session?
   status:"off",          // off | out | idle | busy | error | offline
   note:"",
@@ -3027,6 +3028,34 @@ function pushChanges(){
 
   var byId={};
   S.items.forEach(function(i){ byId[i.id]=i });
+
+  /* A note whose photographs have not been read back out of IndexedDB yet
+     holds keys and dimensions and no image. Uploading that overwrites the
+     only full copy — the server's — with an empty frame. The queue outlives
+     a reload, so an edit made yesterday would do exactly this at start-up
+     tomorrow, before hydration had finished.
+
+     So: fetch the bytes first. If they still cannot be found, the record is
+     held back rather than sent hollow. A note that syncs late is an
+     inconvenience; a photograph deleted from the last place it exists is
+     not. */
+  function hollow(i){
+    return i&&(i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
+  }
+  if(ids.some(function(id){ return hollow(byId[id]) })&&!SYNC.rehydrated){
+    SYNC.rehydrated=true;      // stays set through the retry, or this recurses for ever
+    return hydratePhotos()
+      .then(function(){ return pushChanges() })
+      .then(function(v){ SYNC.rehydrated=false; return v },
+            function(e){ SYNC.rehydrated=false; throw e });
+  }
+  var held=ids.filter(function(id){ return hollow(byId[id]) });
+  ids=ids.filter(function(id){ return !hollow(byId[id]) });
+  if(held.length){
+    SYNC.note=held.length+" note"+(held.length===1?"":"s")+" waiting for images";
+    if(!ids.length){ paintSync(); return Promise.resolve() }
+  }
+
   var rows=ids.map(function(id){
     if(SYNC.queue[id]==="del"||!byId[id]) return { id:id, data:{}, deleted:true };
     return { id:id, data:byId[id], deleted:false };
