@@ -760,6 +760,38 @@
   .empty .big{font-size:34px;margin-bottom:10px;opacity:.5}
 
   /* ---------- editor ---------- */
+  /* ---------- the door ----------
+     Over everything, opaque, and shown before the app has drawn a single
+     card. Somebody who was not invited never sees the inside. */
+  .gate{position:fixed;inset:0;z-index:200;background:var(--bg);
+    display:grid;place-items:center;padding:28px 20px;overflow-y:auto}
+  .gate[hidden]{display:none}
+  .gatebox{width:100%;max-width:420px;text-align:center}
+  .gtag{font-size:15px;line-height:1.5;color:var(--muted);margin:0 0 6px;font-weight:560}
+  .gsub{font-size:15px;line-height:1.5;color:var(--faint);margin:0 0 34px}
+  .gthis{font-size:16px;color:var(--muted);margin:0;letter-spacing:.01em}
+  .gname{font-family:"Cookie","Snell Roundhand","Brush Script MT",cursive;
+    font-size:78px;font-weight:400;line-height:.98;margin:0 0 34px;color:var(--ink)}
+  .gpanel{text-align:left}
+  .gask{font-size:15px;line-height:1.55;color:var(--ink);margin:0 0 4px;font-weight:560}
+  .ghint{font-size:13.5px;line-height:1.55;color:var(--muted);margin:0 0 14px}
+  .gin{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--surface);
+    border:1px solid var(--line-strong);border-radius:11px;padding:12px 14px;
+    outline:none;margin-bottom:10px}
+  .gin:focus{border-color:var(--accent)}
+  .gin::placeholder{color:var(--faint)}
+  .gbtn{width:100%;background:var(--accent);color:#fff;font:inherit;font-size:15px;
+    font-weight:620;padding:12px 16px;border-radius:11px;margin-top:4px}
+  .gbtn:hover{filter:brightness(1.08)}
+  .gbtn:disabled{opacity:.55;cursor:default;filter:none}
+  .glink{display:block;width:100%;text-align:center;margin-top:16px;
+    font-size:13.5px;color:var(--muted);padding:6px}
+  .glink:hover{color:var(--ink)}
+  .gerr{font-size:13.5px;color:var(--red);margin:2px 0 10px;line-height:1.5}
+  .gok{font-size:15px;line-height:1.6;color:var(--ink);margin:0 0 16px}
+  .gwait{font-size:13.5px;color:var(--faint);margin:10px 0 0;text-align:center}
+  @media (max-width:520px){ .gname{font-size:62px} }
+
   /* Not a toast. A toast is for things you may ignore. */
   .danger{position:fixed;left:0;right:0;bottom:0;z-index:90;
     background:var(--red);color:#fff;padding:13px 20px;font-size:13.5px;
@@ -1123,6 +1155,7 @@
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
           <button data-bk="storage"><b>Storage…</b><span>What this browser is holding, and how full it is</span></button>
           <button data-bk="compare"><b>Check against the server…</b><span>Name anything the two disagree about</span></button>
+          <button data-bk="asuser"><b>See it as a user does</b><span>Hide the tools only you have</span></button>
         </div>
       </div>
       <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
@@ -1203,6 +1236,18 @@
   <button data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links</button>
   <button data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks</button>
 </nav>
+
+<!-- The door. Shown whenever nobody is signed in, over everything else, so
+     an uninvited visitor never sees the app at all. -->
+<div class="gate" id="gate" hidden>
+  <div class="gatebox">
+    <p class="gtag">Notes. Links. To-dos. Reminders. Public&nbsp;Posts.</p>
+    <p class="gsub">An organizer for your digital life.</p>
+    <p class="gthis">This is</p>
+    <h1 class="gname">Everything</h1>
+    <div class="gpanel" id="gpanel"></div>
+  </div>
+</div>
 
 <div class="danger" id="danger" hidden></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
@@ -2607,6 +2652,24 @@ function render(){
    It renders from the same items as everything else, with the same buckets
    the Tasks page uses, so the two can never disagree.
    ========================================================================= */
+/* Export and Import are for everyone: it is their library and hiding the way
+   out of it would be a poor way to treat people. Storage and the server
+   comparison are instruments — useful to whoever is maintaining this, noise
+   to anybody else. They are hidden rather than protected, which is honest
+   about what this is: tidiness, not a permission. Both only ever read and
+   write your own rows. */
+var ASUSER=false;                       // an admin pretending not to be one
+function isAdmin(){ return !!(POSTS.profile&&POSTS.profile.is_admin)&&!ASUSER }
+function paintAdminBits(){
+  var on=isAdmin();
+  ["storage","compare","asuser"].forEach(function(k){
+    var b=document.querySelector('[data-bk="'+k+'"]');
+    if(b) b.style.display=on||(k==="asuser"&&ASUSER)?"":"none";
+  });
+  var t=document.querySelector('[data-bk="asuser"] b');
+  if(t) t.textContent=ASUSER?"Back to admin view":"See it as a user does";
+}
+
 var TBKEY="trove.taskbar";
 /* Which slice of the task list the column is showing. While the column is
    open the sidebar's task rows aim it instead of navigating the board — you
@@ -2792,6 +2855,7 @@ function paintSidebar(){
   });
 
   // Posts counts what is on the web, which is a different table
+  paintAdminBits();
   var cp=document.getElementById("c-posts");
   if(cp) cp.textContent=POSTS.list.length||"";
   document.getElementById("nav-posts").style.display=SYNC.session?"":"none";
@@ -2918,29 +2982,13 @@ function signUpPassword(email,pw){
 function errText(e){
   return String((e&&(e.error_description||e.msg||e.message||e.error))||"");
 }
+/* Kept for the extension, which still signs in with a password and has no
+   door of its own. It no longer tries to create an account: sign-up is off
+   at the server, so the attempt could only ever produce a confusing error
+   about configuration in place of "wrong password". */
 function signInOrUp(email,pw){
   return signInPassword(email,pw).catch(function(e){
-    var msg=errText(e);
-    if(!/invalid login credentials/i.test(msg)) throw e;
-
-    /* Supabase answers "invalid login credentials" both for an unknown email
-       and for a wrong password — deliberately, so nobody can probe which
-       addresses exist. So try creating the account, and read the failure:
-
-         "already registered"  -> the email is known, the password is wrong
-         "signups not allowed" -> we can't create one, so the pair simply
-                                  doesn't open anything here
-
-       Reporting the signup error verbatim was misleading: it made a mistyped
-       password look like a configuration problem. */
-    return signUpPassword(email,pw).catch(function(e2){
-      var m2=errText(e2);
-      if(/already registered|already exists|user_already/i.test(m2))
-        throw { msg:"Wrong password for "+email };
-      if(/signup|sign.?up/i.test(m2)&&/disabled|not allowed/i.test(m2))
-        throw { msg:"No account here matches that email and password — check both" };
-      throw e2;
-    });
+    throw { msg:"That email and password don't match an account here" };
   });
 }
 
@@ -2965,6 +3013,8 @@ function withFreshSession(){
 function signOut(){
   SYNC.session=null; SYNC.shadow={}; SYNC.queue={}; SYNC.pending={};
   SYNC.pulledOnce=false;
+  GATE.email=SYNC.session&&SYNC.session.email||GATE.email;
+  gateShow(true);
   POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; POSTS.err="";
   if(S.view==="posts") S.view="all";
   SYNC.lastPull="1970-01-01T00:00:00Z";
@@ -4714,7 +4764,7 @@ function loadPosts(force){
     var uid=myUid();
     if(!uid) throw { msg:"could not read your account id from the session" };
     return Promise.all([
-      rest("/profiles?select=user_id,handle,display_name,bio,avatar&user_id=eq."+uid),
+      rest("/profiles?select=user_id,handle,display_name,bio,avatar,is_admin&user_id=eq."+uid),
       rest("/posts?select=id,body,photos,link,created_at,edited_at&author=eq."+uid
            +"&order=created_at.desc")
     ]);
@@ -5220,6 +5270,246 @@ board.addEventListener("click",function(e){
   }
 },true);
 
+/* =========================================================================
+   THE DOOR
+
+   Public sign-up is off in Supabase, so an account can only be created by
+   the invite-signup function, which checks the guest list with a key that
+   never leaves the server. This screen is the polite face of that: it can
+   tell somebody whether they were invited, and it can hand their details to
+   the function, but it cannot let anyone in on its own authority.
+
+   That distinction is the whole reason it is worth having. A check written
+   here would be a doorman; the lock is elsewhere.
+   ========================================================================= */
+var GATE={ email:"", busy:false };
+var gate=document.getElementById("gate"), gpanel=document.getElementById("gpanel");
+
+function fnUrl(name){ return SUPA.url+"/functions/v1/"+name }
+
+function callInvite(payload){
+  return fetch(fnUrl("invite-signup"),{
+    method:"POST",
+    headers:{ "Content-Type":"application/json",
+              apikey:SUPA.key, Authorization:"Bearer "+SUPA.key },
+    body:JSON.stringify(payload)
+  }).then(function(r){
+    return r.json().then(function(j){
+      if(!r.ok) throw { msg:(j&&j.error)||("Something went wrong ("+r.status+")") };
+      return j;
+    });
+  },function(){ throw { msg:"Couldn't reach the server — check your connection" } });
+}
+
+function gateShow(on){
+  gate.hidden=!on;
+  if(on) gateAsk();
+}
+function gbusy(on,label){
+  GATE.busy=on;
+  var b=gpanel.querySelector(".gbtn");
+  if(b){ b.disabled=on; if(label) b.textContent=label }
+}
+function gerr(msg){
+  var e=gpanel.querySelector(".gerr");
+  if(e) e.textContent=msg||"";
+}
+
+/* ---- 1. were you invited? ---- */
+function gateAsk(msg){
+  gpanel.innerHTML=
+     '<p class="gask">Were you invited to try Everything?</p>'
+    +'<p class="ghint">Enter the email your invitation came to.</p>'
+    +'<div class="gerr"></div>'
+    +'<input class="gin" id="g-email" type="email" autocomplete="email" '
+      +'placeholder="you@example.com" value="'+esc(GATE.email)+'">'
+    +'<button class="gbtn" id="g-go">Continue</button>'
+    +'<button class="glink" id="g-signin">I already have an account</button>';
+  if(msg) gerr(msg);
+  setTimeout(function(){ var f=document.getElementById("g-email"); if(f) f.focus() },60);
+}
+
+/* ---- 2. you were ---- */
+function gateClaim(){
+  gpanel.innerHTML=
+     '<p class="gok">You were invited to Everything.<br>'
+      +'Please select a password to create your account now.</p>'
+    +'<div class="gerr"></div>'
+    +'<input class="gin" id="g-name" maxlength="60" placeholder="Your name">'
+    +'<input class="gin" id="g-handle" maxlength="24" spellcheck="false" '
+      +'placeholder="username — this is your public address">'
+    +'<input class="gin" id="g-pw" type="password" autocomplete="new-password" '
+      +'placeholder="A password, at least eight characters">'
+    +'<button class="gbtn" id="g-make">Create my account</button>'
+    +'<button class="glink" id="g-back">Use a different email</button>';
+  setTimeout(function(){ var f=document.getElementById("g-name"); if(f) f.focus() },60);
+}
+
+/* ---- 3. in you come ---- */
+function gateWelcome(){
+  gpanel.innerHTML='<p class="gok">Welcome to Everything.</p>'
+    +'<p class="gwait">Setting your library up…</p>';
+}
+
+/* ---- the other door, for people who already have an account ---- */
+function gateSignIn(msg){
+  gpanel.innerHTML=
+     '<p class="gask">Sign in</p>'
+    +'<p class="ghint">The email and password you chose.</p>'
+    +'<div class="gerr"></div>'
+    +'<input class="gin" id="g-email" type="email" autocomplete="email" '
+      +'placeholder="you@example.com" value="'+esc(GATE.email)+'">'
+    +'<input class="gin" id="g-pw" type="password" autocomplete="current-password" '
+      +'placeholder="Password">'
+    +'<button class="gbtn" id="g-in">Sign in</button>'
+    +'<button class="glink" id="g-invited">I have an invitation</button>';
+  if(msg) gerr(msg);
+  setTimeout(function(){
+    var f=document.getElementById(GATE.email?"g-pw":"g-email"); if(f) f.focus();
+  },60);
+}
+
+gate.addEventListener("keydown",function(e){
+  if(e.key!=="Enter"||GATE.busy) return;
+  var b=gpanel.querySelector(".gbtn");
+  if(b){ e.preventDefault(); b.click() }
+});
+
+gate.addEventListener("click",function(e){
+  if(GATE.busy) return;
+  var id=e.target.id;
+
+  if(id==="g-signin"){ GATE.email=(document.getElementById("g-email")||{}).value||GATE.email; gateSignIn(); return }
+  if(id==="g-invited"){ gateAsk(); return }
+  if(id==="g-back"){ gateAsk(); return }
+
+  if(id==="g-go"){
+    var email=(document.getElementById("g-email").value||"").trim().toLowerCase();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return gerr("That doesn't look like an email address");
+    GATE.email=email;
+    gbusy(true,"Checking…"); gerr("");
+    callInvite({ action:"check", email:email }).then(function(r){
+      gbusy(false,"Continue");
+      if(r.claimed) return gateSignIn("That invitation has already been used. Sign in below.");
+      if(!r.invited) return gerr("We can't find an invitation for that address.");
+      gateClaim();
+    }).catch(function(err){ gbusy(false,"Continue"); gerr(err.msg) });
+    return;
+  }
+
+  if(id==="g-make"){
+    var pw=document.getElementById("g-pw").value||"";
+    var handle=(document.getElementById("g-handle").value||"").trim().toLowerCase();
+    var name=(document.getElementById("g-name").value||"").trim();
+    if(pw.length<8) return gerr("Use at least eight characters");
+    if(!/^[a-z0-9_]{2,24}$/.test(handle))
+      return gerr("A username is 2–24 characters: letters, numbers and _");
+    gbusy(true,"Creating…"); gerr("");
+    callInvite({ action:"claim", email:GATE.email, password:pw, handle:handle, name:name })
+      .then(function(){ return signInPassword(GATE.email,pw) })
+      .then(function(){ gateWelcome(); return firstRun() })
+      .catch(function(err){ gbusy(false,"Create my account"); gerr(err.msg||"Could not create the account") });
+    return;
+  }
+
+  if(id==="g-in"){
+    var em=(document.getElementById("g-email").value||"").trim().toLowerCase();
+    var p=document.getElementById("g-pw").value||"";
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) return gerr("That doesn't look like an email address");
+    if(!p) return gerr("Enter your password");
+    GATE.email=em;
+    gbusy(true,"Signing in…"); gerr("");
+    signInPassword(em,p).then(function(){
+      gateWelcome(); return firstRun();
+    }).catch(function(){
+      gbusy(false,"Sign in");
+      /* Supabase answers the same way for an unknown address and a wrong
+         password, on purpose, so nobody can probe which accounts exist.
+         Since sign-up is off there is no second call that could tell them
+         apart, and inventing a distinction would be a lie. */
+      gerr("That email and password don't match an account here.");
+    });
+    return;
+  }
+});
+
+/* The one thing in a brand-new library. Written as a note rather than a
+   tour, because the fastest way to learn this app is to look at a note that
+   is using the features it describes. */
+function addTutorial(){
+  var now=Date.now();
+  S.items.unshift({
+    id:uid(),
+    title:"How Everything Works",
+    titleAuto:false,
+    body:
+       "<h3>One kind of thing</h3>"
+      +"Everything holds notes. A note can also carry a link, or a date, or "
+      +"both — those are not separate types of item, they are things a note "
+      +"can have. That is why the same note can be a link you are keeping "
+      +"<em>and</em> something you have to do by Friday."
+      +"<br><br>"
+      +"<h3>The sidebar sorts, it does not file</h3>"
+      +"<strong>Notes</strong>, <strong>Links</strong> and <strong>Tasks</strong> "
+      +"are lenses, not folders. A note with a link and a date appears in all "
+      +"three. Nothing is ever in one place only."
+      +"<br><br>"
+      +"<h3>Writing</h3>"
+      +"The box at the top takes anything. Paste a link and it fetches the "
+      +"title. Write <em>call Elena friday</em> and it becomes a task, dated. "
+      +"Add <em>#tags</em> anywhere in the text."
+      +"<br><br>"
+      +"Inside a note, the bar at the bottom does bold, italic, links, lists "
+      +"and headings — the <strong>T</strong> turns a line into a heading, "
+      +"like the ones in this note."
+      +"<br><br>"
+      +"<h3>Tasks live beside your work</h3>"
+      +"Click <strong>Tasks</strong> in the sidebar and a column opens next "
+      +"to whatever you are reading, rather than replacing it. Add one from "
+      +"the field at its top. <strong>⌘J</strong> opens and closes it."
+      +"<br><br>"
+      +"<h3>Posts are public</h3>"
+      +"Press <strong>◈</strong> on any note to publish it to your own page, "
+      +"which anyone with the address can read. Nothing else you write is "
+      +"ever visible to anybody."
+      +"<br><br>"
+      +"<h3>Nothing is lost</h3>"
+      +"Every version of a note is kept. Open one and press "
+      +"<strong>⟲ History</strong> to see earlier drafts and put one back. "
+      +"Your library syncs to every device you sign in on, and "
+      +"<strong>Export</strong> in settings gives you the whole thing as a "
+      +"file you own."
+      +"<br><br>"
+      +"<h3>Delete this note</h3>"
+      +"You will not need it twice.",
+    url:"", image:"", desc:"", logo:"", site:"", metaState:null,
+    actionable:false, due:null, timed:false, done:false, tint:"", compiled:false,
+    tags:[], photos:[], checks:[], archived:false, pin:true, postId:"",
+    created:now, modified:now
+  });
+  save();
+}
+
+/* Everything that has to happen once somebody is actually in. */
+function firstRun(){
+  paintSync();
+  // sample content must never be mistaken for, or uploaded as, theirs
+  if(DEMO){
+    S.items=[]; SYNC.shadow={}; SYNC.queue={};
+    SYNC.lastPull="1970-01-01T00:00:00Z";
+    notDemoAnyMore();
+    try{ localStorage.setItem(KEY,"[]") }catch(e){}
+  }
+  return syncNow()
+    .then(function(){ return loadPosts(true) })
+    .then(function(){
+      if(!S.items.length) addTutorial();
+      gateShow(false);
+      render();
+    })
+    .catch(function(){ gateShow(false); render() });
+}
+
 function askChoice(title,html,choices,cb){
   askCB=cb;
   askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p><div class="askrow">'
@@ -5339,6 +5629,10 @@ backupMenu.addEventListener("click",function(e){
   if(b.dataset.bk==="export") exportLibrary();
   else if(b.dataset.bk==="storage") showStorage();
   else if(b.dataset.bk==="compare") showCompare();
+  else if(b.dataset.bk==="asuser"){
+    ASUSER=!ASUSER; paintAdminBits();
+    toast(ASUSER?"Showing what everyone else sees":"Your own tools are back");
+  }
   else { jsonpick.value=""; jsonpick.click() }
 });
 document.getElementById("danger").addEventListener("click",function(e){
@@ -5657,6 +5951,11 @@ document.addEventListener("keydown",function(e){
     return;
   }
 
+  /* Nothing behind the door responds to the keyboard. Opening the task
+     column with ⌘J while the sign-in screen is up would be absurd, and the
+     door has its own Enter handling. */
+  if(!gate.hidden) return;
+
   // 3. app-level shortcuts, only once nothing above has claimed the keyboard
   if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
     e.preventDefault(); capin.focus(); return;
@@ -5773,30 +6072,7 @@ function paintSync(){
 }
 
 document.getElementById("syncbtn").addEventListener("click",function(){
-  if(!SYNC.session){
-    askLogin(function(email,pw){
-      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return toast("That doesn't look like an email");
-      if(!pw||pw.length<6) return toast("Use at least six characters");
-      toast("Signing in…");
-      signInOrUp(email,pw).then(function(){
-        paintSync();
-        // never let sample content masquerade as yours
-        if(DEMO){
-          S.items=[]; SYNC.shadow={}; SYNC.queue={};
-          SYNC.lastPull="1970-01-01T00:00:00Z";
-          notDemoAnyMore();
-          try{ localStorage.setItem(KEY,"[]") }catch(e){}
-        }
-        return syncNow();
-      }).then(function(){
-        loadPosts(true);          // so the ◈ markers and the Posts count are true
-        toast("Signed in — library synced");
-      }).catch(function(e){
-        toast(String(e&&(e.msg||e.error_description||e.message)||"Couldn't sign in"));
-      });
-    });
-    return;
-  }
+  if(!SYNC.session){ gateShow(true); return }
   askChoice("Sync",
     (SYNC.session.email?"Signed in as <b>"+esc(SYNC.session.email)+"</b>.":"Signed in.")
     +" "+(Object.keys(SYNC.queue).length
@@ -5855,10 +6131,22 @@ var stored=load();
 if(stored){
   S.items=stored;
   try{ DEMO=localStorage.getItem("trove.demo")==="1" }catch(e){}
-} else {
+} else if(!SYNC.on){
+  /* Sample content only where there is no server to sign in to — a copy of
+     this file opened straight from disk, which is how it began.
+
+     It used to be seeded always, and cleared on sign-in by a DEMO flag. The
+     flag was too easy to lose: notDemoAnyMore() fires on any save once the
+     app has booted, and the metadata backfill saves within half a second of
+     opening. A new person who paused before signing in would therefore have
+     had the flag cleared for them, and thirteen sample notes uploaded as
+     their own work. Nobody needs the demo now — an invited person meets the
+     door, and behind it a library with one note in it explaining the app. */
   S.items=enrich(seed());
   DEMO=true;
   try{ localStorage.setItem("trove.demo","1") }catch(e){}
+} else {
+  S.items=[];
 }
 save(); render(); refreshCap();
 /* One more sidebar paint after the first frame. I could not reproduce the
@@ -5885,6 +6173,9 @@ setTimeout(backfill,350);
 /* ---- start syncing ---- */
 if(SYNC.on){
   loadSession();
+  /* Decided before the first paint, so nobody sees a flash of somebody
+     else's app. Signed out means the door, not a demo library. */
+  gateShow(!SYNC.session);
   paintSync();
   /* The first render happens above, before this block runs, so it painted a
      sidebar for a signed-out user and hid Posts. Nothing corrected it until
