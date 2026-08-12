@@ -766,16 +766,24 @@
   .gate{position:fixed;inset:0;z-index:200;background:var(--bg);
     display:grid;place-items:center;padding:28px 20px;overflow-y:auto}
   .gate[hidden]{display:none}
-  .gatebox{width:100%;max-width:420px;text-align:center}
-  .gtag{font-size:15px;line-height:1.5;color:var(--muted);margin:0 0 6px;font-weight:560}
-  .gsub{font-size:15px;line-height:1.5;color:var(--faint);margin:0 0 34px}
-  .gthis{font-size:16px;color:var(--muted);margin:0;letter-spacing:.01em}
+  .gatebox{width:100%;max-width:460px;text-align:center}
+  /* This is the first thing anybody sees. It should read like a statement,
+     not like a caption. */
+  .gtag{font-size:30px;line-height:1.22;color:var(--ink);margin:0 0 14px;
+    font-weight:700;letter-spacing:-.028em}
+  .gsub{font-size:19px;line-height:1.4;color:var(--muted);margin:0 0 44px;
+    font-weight:500;letter-spacing:-.012em}
+  .gthis{font-size:19px;color:var(--muted);margin:0;letter-spacing:.01em;font-weight:500}
   .gname{font-family:"Cookie","Snell Roundhand","Brush Script MT",cursive;
-    font-size:78px;font-weight:400;line-height:.98;margin:0 0 34px;color:var(--ink)}
-  .gpanel{text-align:left}
-  .gask{font-size:15px;line-height:1.55;color:var(--ink);margin:0 0 4px;font-weight:560}
-  .ghint{font-size:13.5px;line-height:1.55;color:var(--muted);margin:0 0 14px}
-  .gin{width:100%;font:inherit;font-size:15px;color:var(--ink);background:var(--surface);
+    font-size:96px;font-weight:400;line-height:.96;margin:0 0 40px;color:var(--ink)}
+  .gpanel{text-align:center}
+  .gask{font-size:16px;line-height:1.55;color:var(--ink);margin:0 0 4px;font-weight:600}
+  .ghint{font-size:14px;line-height:1.55;color:var(--muted);margin:0 0 16px}
+  .gfoot{margin-top:46px;padding-top:22px;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    font-size:12.5px;color:var(--faint)}
+  .gin{width:100%;font:inherit;font-size:15px;text-align:center;
+    color:var(--ink);background:var(--surface);
     border:1px solid var(--line-strong);border-radius:11px;padding:12px 14px;
     outline:none;margin-bottom:10px}
   .gin:focus{border-color:var(--accent)}
@@ -790,18 +798,26 @@
   .gerr{font-size:13.5px;color:var(--red);margin:2px 0 10px;line-height:1.5}
   .gok{font-size:15px;line-height:1.6;color:var(--ink);margin:0 0 16px}
   .gwait{font-size:13.5px;color:var(--faint);margin:10px 0 0;text-align:center}
-  @media (max-width:520px){ .gname{font-size:62px} }
+  @media (max-width:520px){
+    .gname{font-size:68px}
+    .gtag{font-size:25px}
+    .gsub{font-size:17px;margin-bottom:34px}
+  }
 
   /* Not a toast. A toast is for things you may ignore. */
-  .danger{position:fixed;left:0;right:0;bottom:0;z-index:90;
+  /* Named .savebar, not .danger: askChoice already used kind:"danger" for a
+     destructive button, so that button inherited position:fixed and bottom:0
+     and left the dialog entirely — which is why Unpublish appeared to have
+     no second option. A class name is an interface. */
+  .savebar{position:fixed;left:0;right:0;bottom:0;z-index:90;
     background:var(--red);color:#fff;padding:13px 20px;font-size:13.5px;
     line-height:1.5;display:flex;gap:12px;align-items:center;flex-wrap:wrap;
     box-shadow:0 -6px 24px -10px rgba(0,0,0,.4)}
-  .danger[hidden]{display:none}
-  .danger strong{font-weight:700}
-  .danger button{background:rgba(255,255,255,.16);color:#fff;font-weight:620;
+  .savebar[hidden]{display:none}
+  .savebar strong{font-weight:700}
+  .savebar button{background:rgba(255,255,255,.16);color:#fff;font-weight:620;
     padding:6px 13px;border-radius:8px;font-size:12.5px}
-  .danger button:hover{background:rgba(255,255,255,.28)}
+  .savebar button:hover{background:rgba(255,255,255,.28)}
   .stat{font-size:13px;color:var(--read);margin:8px 0;line-height:1.5}
   .stat.warn{color:var(--red)}
   .stat b{color:var(--ink);font-weight:640}
@@ -1241,15 +1257,19 @@
      an uninvited visitor never sees the app at all. -->
 <div class="gate" id="gate" hidden>
   <div class="gatebox">
-    <p class="gtag">Notes. Links. To-dos. Reminders. Public&nbsp;Posts.</p>
+    <p class="gtag">Notes. Links. To-dos.<br>Reminders. Public&nbsp;Posts.</p>
     <p class="gsub">An organizer for your digital life.</p>
     <p class="gthis">This is</p>
     <h1 class="gname">Everything</h1>
     <div class="gpanel" id="gpanel"></div>
+    <footer class="gfoot">
+      <span>This is Everything</span>
+      <span id="gcopy"></span>
+    </footer>
   </div>
 </div>
 
-<div class="danger" id="danger" hidden></div>
+<div class="savebar" id="danger" hidden></div>
 <div class="scrim" id="scrim"><div class="sheet" id="sheet"></div></div>
 <!-- The composer gets its own overlay. Sharing the editor's would mean the
      editor's paste handler, its Escape key and its S.editing guard all firing
@@ -1518,7 +1538,6 @@ function hydratePhotos(){
 var SAVE_BROKEN=false;
 function save(){
   // the first save after startup is a real edit, so this stops being a demo
-  if(BOOTED) notDemoAnyMore();
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
   assignPhotoKeys();
@@ -1648,15 +1667,51 @@ function remember(item,why){
 
 var S={items:[], view:"all", q:"", tag:null, layouts:{}, sel:{}};
 
-/* A device opening the app for the first time gets the sample library so it
-   isn't a blank page. That content must never be mistaken for yours — signing
-   in on a fresh device would otherwise push twelve demo notes into your real
-   library. DEMO stays true until you actually change something. */
-var DEMO=false, BOOTED=false;
-function notDemoAnyMore(){
-  if(!DEMO) return;
-  DEMO=false;
-  try{ localStorage.removeItem("trove.demo") }catch(e){}
+var BOOTED=false;
+
+/* Sample notes are gone from the code, but they are still sitting in the
+   browsers and databases of anyone who opened the app before today. They have
+   no ids of their own to match on, so this recognises them by their words —
+   an exact title and body pair from the set that shipped. Only a note that is
+   still untouched matches; edit one and it is yours, and it stays.
+
+   Deleted through the ordinary path, so the removal syncs to the other
+   devices and the text goes to History rather than the bin. */
+var SAMPLE_TITLES=[
+  "Local-first software: you own your data",
+  "Send the studio contract back",
+  "Water the olive tree",
+  "App idea",
+  "Nielsen Norman Group — article archive",
+  "Book flights for Naxos",
+  "Yiayia's avgolemono",
+  "Kinfolk",
+  "Colour studies",
+  "Kitchen tiles, Sifnos",
+  "Packing list",
+  "Reply to Maria about the exhibition"
+];
+// the two that had no title of their own
+var SAMPLE_BODIES=[
+  "The best interface is the one you don",              // the quotation
+  "One place for everything I save. Capture has to be"
+];
+function purgeSamples(list){
+  var gone=0;
+  var kept=(list||[]).filter(function(i){
+    if(!i||i.postId) return true;                      // published: never touch it
+    var sample=(i.title&&SAMPLE_TITLES.indexOf(i.title)>=0)
+      || (!i.title&&i.body&&SAMPLE_BODIES.some(function(f){ return i.body.indexOf(f)>=0 }));
+    if(sample){ if(typeof remember==="function") remember(i,"sample note removed"); gone++ }
+    return !sample;
+  });
+  if(gone){
+    try{ localStorage.setItem("trove.purged",String(Date.now())) }catch(e){}
+    setTimeout(function(){
+      try{ save(); toast(gone+" sample note"+(gone===1?"":"s")+" removed") }catch(e){}
+    },600);
+  }
+  return kept;
 }
 
 /* Each lens remembers its own layout, the way Raindrop gives every collection
@@ -1985,75 +2040,14 @@ function newItemWithPhotos(photos){
   toast(photos.length>1?photos.length+" images saved as a note":"Image saved as a note");
 }
 
-/* =========================================================================
-   SEED — note how several items carry two facets at once
-   ========================================================================= */
-// Small generated SVGs so the demo shows real header images without shipping photo files.
-function demoImg(w,h,c1,c2,shapes){
-  var s='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'">'
-    +'<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
-    +'<stop offset="0" stop-color="'+c1+'"/><stop offset="1" stop-color="'+c2+'"/>'
-    +'</linearGradient></defs><rect width="'+w+'" height="'+h+'" fill="url(#g)"/>'+shapes+'</svg>';
-  return {src:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent(s), w:w, h:h};
-}
+/* The sample library that used to live here has been deleted.
 
-function seed(){
-  var t=todayKey(), D=86400000, now=Date.now();
-  function it(o){
-    return Object.assign({id:uid(),title:"",body:"",url:"",image:"",desc:"",logo:"",site:"",
-      metaState:null,titleAuto:false,actionable:false,due:null,timed:false,done:false,tint:"",tags:[],
-      photos:[],checks:[],archived:false,pin:false,created:now,modified:now},o);
-  }
-  return [
-    // TEXT + LINK + ACTION — the combination the old model couldn't express
-    it({title:"Local-first software: you own your data",
-        url:"https://www.inkandswitch.com/local-first/",
-        desc:"Seven ideals for software that keeps your data on your own devices while still syncing seamlessly.",
-        body:"Read before deciding on the sync approach.",
-        actionable:true, due:t+2*D, tags:["reading","tech"], created:now-5e6}),
-    it({title:"Send the studio contract back", actionable:true, due:t+18*36e5,
-        tags:["work"], created:now-1e5}),
-    it({title:"Water the olive tree", actionable:true, due:t-1*D, tags:["home"], created:now-9e6}),
-    it({title:"App idea",
-        body:"One place for everything I save. Capture has to be one gesture — share sheet on iPhone, ⌘⇧Space on the Mac. If it takes more than two seconds I won't use it.",
-        tint:"amber", pin:true, tags:["ideas"], created:now-1e6}),
-    it({title:"Nielsen Norman Group — article archive",
-        url:"https://www.nngroup.com/articles/",
-        desc:"Evidence-based user experience research, training, and consulting.",
-        pin:true, tags:["design","reading"], created:now-3e6}),
-    // TEXT + ACTION, no date — a "someday" task
-    it({title:"Book flights for Naxos", actionable:true, tags:["travel"], created:now-2e6}),
-    it({title:"Yiayia's avgolemono",
-        body:"3 eggs, juice of 1½ lemons, ladle of hot broth whisked in slowly — off the heat, always off the heat.\n\nRice goes in 15 min before.",
-        tint:"sage", tags:["recipes"], created:now-8e6}),
-    it({body:"\"The best interface is the one you don't notice.\"", tint:"lilac", created:now-11e6}),
-    it({title:"Kinfolk", url:"https://www.kinfolk.com/",
-        desc:"Slow living, design, and the quiet corners of everyday life.",
-        tags:["design"], created:now-14e6}),
-    // TEXT + PHOTOS — three images, laid out as a header
-    it({title:"Colour studies", body:"For the kitchen. The terracotta one, probably.",
-        tags:["design","home"], created:now-4e6, photos:[
-          demoImg(800,600,"#E8C4A0","#C2683F",'<circle cx="560" cy="200" r="150" fill="#8C4A2F" opacity=".55"/><circle cx="260" cy="420" r="110" fill="#F5E6D3" opacity=".7"/>'),
-          demoImg(800,600,"#B8CDC0","#4B7B52",'<rect x="80" y="120" width="300" height="360" rx="16" fill="#2E5233" opacity=".45"/><circle cx="580" cy="380" r="130" fill="#EDF3EC" opacity=".6"/>'),
-          demoImg(800,600,"#C6D6E8","#3E6EA8",'<path d="M0 420 Q200 280 400 400 T800 340 L800 600 L0 600Z" fill="#1F3F63" opacity=".5"/><circle cx="640" cy="150" r="80" fill="#EAF1F8" opacity=".75"/>')
-        ]}),
-    // TEXT + ONE PHOTO — single image keeps its natural proportions
-    it({title:"Kitchen tiles, Sifnos", body:"Found in a courtyard near the port. Hand-painted, faded blue.",
-        tint:"sky", tags:["travel","design"], created:now-6e6, photos:[
-          demoImg(900,675,"#EAF1F8","#7FA8D8",'<g fill="#2C5480" opacity=".38"><rect x="90" y="90" width="160" height="160" rx="8"/><rect x="310" y="90" width="160" height="160" rx="8"/><rect x="530" y="90" width="160" height="160" rx="8"/><rect x="90" y="310" width="160" height="160" rx="8"/><rect x="310" y="310" width="160" height="160" rx="8"/><rect x="530" y="310" width="160" height="160" rx="8"/></g><circle cx="450" cy="300" r="190" fill="#FFFFFF" opacity=".18"/>')
-        ]}),
-    // a note whose contents are tickable — separate from the item's own checkbox
-    it({title:"Packing list", tint:"sky", actionable:true, due:t+3*D,
-        tags:["travel"], created:now-16e6, checks:[
-          {t:"linen shirts ×3",d:true},{t:"the good sandals",d:true},
-          {t:"charger + adapter",d:false},{t:"book: Cavafy",d:false},
-          {t:"sunglasses",d:false}
-        ]}),
-    it({title:"Reply to Maria about the exhibition", actionable:true, due:t-7*D,
-        done:true, tags:["work"], created:now-2e7})
-  ];
-}
-
+   It existed to make the app look alive on a first open, back when there was
+   nothing else to look at. It has cost more than it was worth: it was cleared
+   on sign-in by a flag that any background save could reset, and a new person
+   could end up with thirteen invented notes uploaded as their own work. An
+   invited person now meets the door, and behind it one note explaining the
+   app. Nothing is invented on anyone's behalf. */
 /* =========================================================================
    LENSES
    ========================================================================= */
@@ -5261,7 +5255,7 @@ board.addEventListener("click",function(e){
     var id=dl.dataset.pdel;
     askChoice("Unpublish this post?",
       "It disappears from your public page straight away. The note it came from is untouched.",
-      [{label:"Keep it",value:0,kind:"sec"},{label:"Unpublish",value:1,kind:"danger"}],
+      [{label:"Keep it",value:0,kind:"sec"},{label:"Unpublish",value:1,kind:"dan"}],
       function(v){
         if(!v) return;
         unpublish(id).then(function(){ render(); toast("Unpublished") })
@@ -5302,6 +5296,8 @@ function callInvite(payload){
 }
 
 function gateShow(on){
+  var c=document.getElementById("gcopy");
+  if(c) c.textContent="© "+new Date().getFullYear()+" Social Capital";
   gate.hidden=!on;
   if(on) gateAsk();
 }
@@ -5318,8 +5314,8 @@ function gerr(msg){
 /* ---- 1. were you invited? ---- */
 function gateAsk(msg){
   gpanel.innerHTML=
-     '<p class="gask">Were you invited to try Everything?</p>'
-    +'<p class="ghint">Enter the email your invitation came to.</p>'
+     '<p class="gask">were you invited to try Everything?</p>'
+    +'<p class="ghint">enter the email your invitation came to.</p>'
     +'<div class="gerr"></div>'
     +'<input class="gin" id="g-email" type="email" autocomplete="email" '
       +'placeholder="you@example.com" value="'+esc(GATE.email)+'">'
@@ -5354,8 +5350,8 @@ function gateWelcome(){
 /* ---- the other door, for people who already have an account ---- */
 function gateSignIn(msg){
   gpanel.innerHTML=
-     '<p class="gask">Sign in</p>'
-    +'<p class="ghint">The email and password you chose.</p>'
+     '<p class="gask">sign in</p>'
+    +'<p class="ghint">the email and password you chose.</p>'
     +'<div class="gerr"></div>'
     +'<input class="gin" id="g-email" type="email" autocomplete="email" '
       +'placeholder="you@example.com" value="'+esc(GATE.email)+'">'
@@ -5493,13 +5489,6 @@ function addTutorial(){
 /* Everything that has to happen once somebody is actually in. */
 function firstRun(){
   paintSync();
-  // sample content must never be mistaken for, or uploaded as, theirs
-  if(DEMO){
-    S.items=[]; SYNC.shadow={}; SYNC.queue={};
-    SYNC.lastPull="1970-01-01T00:00:00Z";
-    notDemoAnyMore();
-    try{ localStorage.setItem(KEY,"[]") }catch(e){}
-  }
   return syncNow()
     .then(function(){ return loadPosts(true) })
     .then(function(){
@@ -6003,9 +5992,9 @@ document.getElementById("fontbtn").addEventListener("click",function(){
   if(!cur) toast("Geologica — needs a connection the first time");
 });
 
-/* The name. "Everything" is the one in use; "Trove" is kept as the fallback,
-   one click away on the logo. */
-var BRANDS=["Everything","Trove"];
+/* One name. "Trove" was the working title and was kept as an alternate on the
+   logo long after it stopped being a candidate. */
+var BRANDS=["Everything"];
 /* Set it as large as the sidebar will take, then back off one pixel at a time
    until it fits. Guessing from character counts is unreliable with a script
    face — and the font arrives after first paint, so this runs again then. */
@@ -6043,10 +6032,8 @@ if(document.fonts&&document.fonts.ready){
   document.fonts.ready.then(function(){ fitBrand(); checkBrandFont() });
 }
 window.addEventListener("resize",fitBrand);
-document.getElementById("brand").addEventListener("click",function(){
-  var cur=document.getElementById("brandname").textContent;
-  setBrand(BRANDS[(BRANDS.indexOf(cur)+1)%BRANDS.length]);
-});
+// the logo used to cycle between two names; there is only one now, so it
+// does nothing but sit there being the logo
 
 /* ---- sync controls ---- */
 function paintSync(){
@@ -6129,22 +6116,7 @@ try{
 attachSmartQuotes(capin,false);
 var stored=load();
 if(stored){
-  S.items=stored;
-  try{ DEMO=localStorage.getItem("trove.demo")==="1" }catch(e){}
-} else if(!SYNC.on){
-  /* Sample content only where there is no server to sign in to — a copy of
-     this file opened straight from disk, which is how it began.
-
-     It used to be seeded always, and cleared on sign-in by a DEMO flag. The
-     flag was too easy to lose: notDemoAnyMore() fires on any save once the
-     app has booted, and the metadata backfill saves within half a second of
-     opening. A new person who paused before signing in would therefore have
-     had the flag cleared for them, and thirteen sample notes uploaded as
-     their own work. Nobody needs the demo now — an invited person meets the
-     door, and behind it a library with one note in it explaining the app. */
-  S.items=enrich(seed());
-  DEMO=true;
-  try{ localStorage.setItem("trove.demo","1") }catch(e){}
+  S.items=purgeSamples(stored);
 } else {
   S.items=[];
 }
