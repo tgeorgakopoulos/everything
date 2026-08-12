@@ -2887,6 +2887,8 @@ var SYNC={
   lastPull:"1970-01-01T00:00:00Z",
   pending:{},            // rows held back because their note was open
   rehydrated:false,      // guards one retry when a push needs photo bytes
+  massOk:false,          // you confirmed a large deletion this session
+  asking:false,
   pulledOnce:false,      // have we heard from the server at all this session?
   status:"off",          // off | out | idle | busy | error | offline
   note:"",
@@ -3040,6 +3042,11 @@ function sig(o){
   return s.length+":"+hash32(s);
 }
 
+/* How many notes may vanish before this is treated as an accident rather
+   than an intention. Deleting nine by hand is a chore; deleting a hundred
+   and sixty-nine in one second is not something a person does. */
+var MASS_DELETE=10;
+
 function stampChanges(){
   if(!SYNC.on) return;
   var seen={};
@@ -3047,11 +3054,63 @@ function stampChanges(){
     seen[i.id]=1;
     if(SYNC.shadow[i.id]!==sig(i)) SYNC.queue[i.id]="put";
   });
-  Object.keys(SYNC.shadow).forEach(function(id){
-    if(!seen[id]) SYNC.queue[id]="del";
-  });
+
+  var missing=Object.keys(SYNC.shadow).filter(function(id){ return !seen[id] });
+
+  /* An empty library beside a full record of one is not a deletion. It is a
+     load that failed — storage full, storage cleared, a new address with an
+     old bookkeeping file. This is exactly the state that emptied a library:
+     the notes did not fit in localStorage, the small bookkeeping file did,
+     and on the next open the difference between them was read as an
+     instruction. It never is. */
+  if(!S.items.length&&missing.length){
+    SYNC.note="library did not load — nothing uploaded";
+    console.warn("Everything: refusing to delete "+missing.length
+      +" notes; the local library is empty, which means it failed to load.");
+    paintSync();
+    return;
+  }
+
+  /* And even with a library present, a disappearance on this scale is
+     reported rather than performed. */
+  if(missing.length>=MASS_DELETE&&!SYNC.massOk){
+    askMassDelete(missing);
+    keepSession();
+    return;
+  }
+
+  missing.forEach(function(id){ SYNC.queue[id]="del" });
   keepSession();
   schedulePush();
+}
+
+/* Asked once, and only about a real disappearance. Answering "these are
+   gone" sets a flag for this session so the question is not repeated on
+   every keystroke. */
+function askMassDelete(missing){
+  if(SYNC.asking) return;
+  SYNC.asking=true;
+  askChoice(missing.length+" notes have disappeared from this browser",
+    "That is a great many at once. If you deleted them, say so and they will "
+    +"be removed from your other devices too. If you did not — and this is "
+    +"usually a sign that the library failed to load — say nothing was "
+    +"deleted, and the copies on the server will be left alone.",
+    [{label:"Nothing was deleted",value:0,kind:"sec"},
+     {label:"Yes, I deleted them",value:1,kind:"dan"}],
+    function(v){
+      SYNC.asking=false;
+      if(!v){                       // keep the server; forget our own record
+        missing.forEach(function(id){ delete SYNC.shadow[id] });
+        SYNC.lastPull="1970-01-01T00:00:00Z";   // and fetch them back
+        keepSession();
+        syncNow();
+        return;
+      }
+      SYNC.massOk=true;
+      missing.forEach(function(id){ SYNC.queue[id]="del" });
+      keepSession();
+      schedulePush();
+    });
 }
 function schedulePush(){
   if(!SYNC.on||!SYNC.session) { paintSync(); return }
@@ -3100,25 +3159,45 @@ function pushChanges(){
     if(!ids.length){ paintSync(); return Promise.resolve() }
   }
 
-  var rows=ids.map(function(id){
-    if(SYNC.queue[id]==="del"||!byId[id]) return { id:id, data:{}, deleted:true };
-    return { id:id, data:byId[id], deleted:false };
-  });
+  /* Deletions are sent as a flag, not as a row.
+
+     They used to go up through the same upsert as everything else, carrying
+     `data: {}` — which overwrote the note's contents with an empty object.
+     So a "soft delete" kept the row and destroyed the note, and the promise
+     that nothing is ever really gone was not true. A hundred and sixty-nine
+     notes were emptied that way in one second.
+
+     Now a delete PATCHes the flag and leaves the payload alone. The row can
+     be brought back with a single UPDATE, which is what soft deletion is
+     supposed to mean. */
+  var dels=ids.filter(function(id){ return SYNC.queue[id]==="del"||!byId[id] });
+  var puts=ids.filter(function(id){ return dels.indexOf(id)<0 });
+  var rows=puts.map(function(id){ return { id:id, data:byId[id], deleted:false } });
 
   SYNC.status="busy"; paintSync();
   return withFreshSession().then(function(){
-    return fetch(SUPA.url+"/rest/v1/items?on_conflict=id",{
-      method:"POST",
-      headers:Object.assign(supaHeaders(true),{ "Prefer":"resolution=merge-duplicates,return=minimal" }),
-      body:JSON.stringify(rows)
-    });
-  }).then(function(r){
-    if(!r.ok) throw new Error("HTTP "+r.status);
+    var jobs=[];
+    if(rows.length) jobs.push(
+      fetch(SUPA.url+"/rest/v1/items?on_conflict=id",{
+        method:"POST",
+        headers:Object.assign(supaHeaders(true),{ "Prefer":"resolution=merge-duplicates,return=minimal" }),
+        body:JSON.stringify(rows)
+      }).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status) })
+    );
+    if(dels.length) jobs.push(
+      fetch(SUPA.url+"/rest/v1/items?id=in.("+dels.map(encodeURIComponent).join(",")+")",{
+        method:"PATCH",
+        headers:Object.assign(supaHeaders(true),{ "Prefer":"return=minimal" }),
+        body:JSON.stringify({ deleted:true })     // the note itself is left intact
+      }).then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status) })
+    );
+    return Promise.all(jobs);
+  }).then(function(){
     rows.forEach(function(row){
-      if(row.deleted) delete SYNC.shadow[row.id];
-      else SYNC.shadow[row.id]=sig(row.data);
+      SYNC.shadow[row.id]=sig(row.data);
       delete SYNC.queue[row.id];
     });
+    dels.forEach(function(id){ delete SYNC.shadow[id]; delete SYNC.queue[id] });
     SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
   }).catch(function(e){
     // keep the queue; it'll go up on the next attempt
@@ -6119,6 +6198,30 @@ if(stored){
   S.items=purgeSamples(stored);
 } else {
   S.items=[];
+}
+
+/* The library and the record of what the server holds are two separate
+   files, and the small one survives when the big one fails to write. That
+   asymmetry is what made a full-storage moment look, one reload later, like
+   a deliberate mass deletion.
+
+   So they are reconciled here, before anything else runs: no library and a
+   record of one means the record is wrong. Throw it away and fetch
+   everything again from the server, which is the one place that still
+   knows. */
+if(!S.items.length&&SYNC.on){
+  try{
+    var ghost=JSON.parse(localStorage.getItem("trove.shadow")||"{}");
+    if(Object.keys(ghost).length){
+      console.warn("Everything: local library is empty but "
+        +Object.keys(ghost).length+" notes were expected — refetching from the server.");
+      SYNC.shadow={}; SYNC.queue={};
+      SYNC.lastPull="1970-01-01T00:00:00Z";
+      localStorage.setItem("trove.shadow","{}");
+      localStorage.setItem("trove.queue","{}");
+      localStorage.setItem("trove.lastPull",SYNC.lastPull);
+    }
+  }catch(e){}
 }
 save(); render(); refreshCap();
 /* One more sidebar paint after the first frame. I could not reproduce the
