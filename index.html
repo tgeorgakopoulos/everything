@@ -344,7 +344,7 @@
   /* Cards: every card exactly the same height. The title takes up to three
      lines; whatever it doesn't use, the body gets. Adjust --cardh to taste. */
   .grid.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(244px,1fr));
-    gap:14px;align-items:start;--cardh:334px}
+    gap:14px;align-items:start;--cardh:360px}   /* one more line of body */
   .grid.cards .card{margin-bottom:0;height:var(--cardh);
     display:flex;flex-direction:column;overflow:hidden}
   /* image block is a constant, so the text area below it is constant too */
@@ -532,6 +532,9 @@
     color:var(--ui);font-size:12.5px;font-weight:560}
   .addimg:hover{border-color:var(--accent);color:var(--accent)}
   .wc{margin-left:auto;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+  /* when it last changed, quietly, next to the count */
+  .edat{font-size:11.5px;color:var(--faint);opacity:.85}
+  .wc:empty + .edat{margin-left:auto}
   .szgrp{display:flex;gap:1px;align-items:center}
   .szbtn{padding:5px 7px;font-size:11.5px;font-weight:600}
   .szbtn:disabled{opacity:.3;cursor:default}
@@ -1112,7 +1115,7 @@
     .rdue{width:auto}
     .row-item .quick{display:none}
     .lay{margin-left:0!important}
-    .grid.cards{--cardh:300px}
+    .grid.cards{--cardh:322px}
     .card{margin-bottom:10px}
     .quick{opacity:.5;transform:none}
     .search input{width:140px}.search input:focus{width:160px}
@@ -3763,6 +3766,7 @@ function openEditor(id){
       +'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
         +'aria-label="Heading">T</button>'
       +'<span class="wc" id="e-wc"></span>'
+      +'<span class="edat" id="e-when" title="When this note last changed"></span>'
     +'</div>'
     +'<div class="cklist" id="e-cklist"></div>'
     +'<div class="egalbar">'
@@ -3825,6 +3829,12 @@ function openEditor(id){
     var n=words(richToText(body.innerHTML));
     q("#e-wc").textContent = n ? n.toLocaleString()+" word"+(n===1?"":"s") : "";
   }
+  function paintWhen(){
+    var el=q("#e-when"); if(!el) return;
+    var t=i.modified||i.created;
+    el.textContent = t ? "edited "+agoText(t) : "";
+  }
+  paintWhen();
   /* Browsers don't reliably scroll a contenteditable caret into view, and the
      sticky action bar covers the bottom of the sheet — so a long note left the
      cursor underneath it. Nudge the sheet whenever the caret leaves the frame. */
