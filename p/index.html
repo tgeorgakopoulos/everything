@@ -67,7 +67,8 @@
   .text h3:first-child{margin-top:0}
   .text hr{border:0;border-top:1px solid var(--line-strong);margin:1.1em 0;height:0}
   .text a{color:var(--blue)}
-  .text + .shots,.text + .card{margin-top:14px}
+  .fold + .shots,.fold + .card{margin-top:14px}
+  .shots + .card{margin-top:10px}
 
   .shots{display:grid;gap:4px;border-radius:var(--r);overflow:hidden}
   .shots.n1{grid-template-columns:1fr}
@@ -99,9 +100,13 @@
   .fold::after{content:"";position:absolute;left:0;right:0;bottom:0;height:96px;
     pointer-events:none;background:linear-gradient(transparent,var(--bg))}
   .fold.open::after,.fold.short::after{display:none}
-  .more{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:8px;border:0;
-    background:none;font:inherit;font-size:13px;font-weight:600;color:var(--accent);
-    text-align:center;cursor:pointer}
+  .more{position:absolute;left:0;right:0;bottom:0;z-index:2;border:0;cursor:pointer;
+    display:flex;justify-content:center;padding:18px 0 2px;
+    background:linear-gradient(transparent,var(--bg) 44%)}
+  .more::before{content:"More";padding:5px 16px;border-radius:99px;
+    border:1px solid var(--line);background:var(--bg);
+    font:inherit;font-size:12.5px;font-weight:640;color:var(--accent)}
+  .more:hover::before{border-color:var(--accent)}
   .fold.open .more,.fold.short .more{display:none}
 
   .msg{padding:70px 0;text-align:center;color:var(--faint)}
@@ -235,12 +240,13 @@ function postHTML(p){
                     +esc(when(p.created_at))+'</a>');
   return '<article>'
     +'<time>'+(link||esc(when(p.created_at)))+(p.edited_at?" · edited":"")+'</time>'
+    // only the words fold — a photograph is often the whole post
     +'<div class="fold">'
       +'<div class="text">'+body(p.body)+'</div>'
-      + shotsHTML(p.photos)
-      + cardHTML(p.link)
-      +'<button class="more">More</button>'
+      +'<button class="more" aria-label="Show the rest"></button>'
     +'</div>'
+    + shotsHTML(p.photos)
+    + cardHTML(p.link)
     +'</article>';
 }
 function message(t,sub){
