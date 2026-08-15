@@ -271,7 +271,10 @@
     line-height:1.4;text-align:center}
   .bkhint.warn{color:var(--accent);font-weight:560}
   /* fixed width so a changing label can't reflow the settings row */
-  .syncbtn{min-width:92px;text-align:center;white-space:nowrap}
+  /* It used to sit on its own line, centred, while everything else in this
+     cluster was left-aligned. Same row, same edge, same shape as its
+     neighbours. */
+  .syncbtn{min-width:92px;text-align:left;white-space:nowrap}
   .syncbtn.busy{color:var(--accent);border-color:var(--accent)}
   .syncbtn.err{color:var(--red);border-color:var(--red)}
   .syncbtn.out{border-style:dashed}
@@ -534,6 +537,7 @@
   .wc{margin-left:auto;font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums}
   /* when it last changed, quietly, next to the count */
   .edat{font-size:11.5px;color:var(--faint);opacity:.85}
+  .wc:not(:empty) + .edat::before{content:"|";margin:0 7px;opacity:.5}
   .wc:empty + .edat{margin-left:auto}
   .szgrp{display:flex;gap:1px;align-items:center}
   .szbtn{padding:5px 7px;font-size:11.5px;font-weight:600}
@@ -587,6 +591,8 @@
   .cbody{color:var(--read);font-size:calc(13.5px*var(--tscale));line-height:1.58;margin-top:7px;
     display:-webkit-box;-webkit-line-clamp:8;-webkit-box-orient:vertical;overflow:hidden;
     word-break:break-word}
+  .cbody hr,.ebody hr,.ptext hr,.pbody hr,.text hr{
+    border:0;border-top:1px solid var(--line-strong);margin:1.1em 0;height:0}
   .cbody h3,.ebody h3,.ptext h3,.pbody h3{
     font-size:1.24em;font-weight:650;line-height:1.3;letter-spacing:-.014em;
     color:var(--ink);margin:.75em 0 .3em}
@@ -886,7 +892,8 @@
   .pphotos.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
   .pph{position:relative;margin:0;min-width:0}
   .pph img{display:block;width:100%;height:100%;object-fit:cover}
-  .pphotos.n1 .pph img{max-height:380px}
+  .pphotos.n1 .pph{max-height:none}
+  .pphotos.n1 .pph img{height:100%;object-fit:cover}
   .pphotos.n2 .pph img,.pphotos.n3 .pph img,.pphotos.n4 .pph img{height:150px}
 
   /* a published post, as it looks inside the app */
@@ -908,6 +915,16 @@
   .postcard .ptext strong,.postcard .ptext b{font-weight:700;color:var(--ink)}
   .postcard .ptext em,.postcard .ptext i{font-style:italic}
   .postcard .ptext:empty{display:none}
+  /* A post is folded to roughly a square and opens on request. A feed of
+     things you have to scroll past is a feed nobody reads. */
+  .pfold{position:relative;max-height:min(600px,72vh);overflow:hidden}
+  .pfold.open{max-height:none}
+  .pfold::after{content:"";position:absolute;left:0;right:0;bottom:0;height:96px;
+    pointer-events:none;background:linear-gradient(transparent,var(--surface))}
+  .pfold.open::after,.pfold.short::after{display:none}
+  .pmore{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:8px;
+    font-size:12.5px;font-weight:640;color:var(--accent);text-align:center}
+  .pfold.open .pmore,.pfold.short .pmore{display:none}
   .postcard .ptext a{color:var(--blue)}
 
   /* the strip at the top of the Posts page carrying your public address */
@@ -1177,7 +1194,8 @@
           <button data-bk="asuser"><b>See it as a user does</b><span>Hide the tools only you have</span></button>
         </div>
       </div>
-      <button class="ghost syncbtn" id="syncbtn">☁ Sync</button>
+      <button class="ghost" id="aboutbtn">? About</button>
+      <button class="ghost syncbtn" id="syncbtn">● Sync</button>
       <div class="bkhint" id="bkhint"></div>
       <div class="bkhint warn" id="fonthint" style="display:none">
         Logo font missing — see fonts/fonts.css</div>
@@ -2264,7 +2282,7 @@ function setNoteSize(ix){
    md() below is kept only to upgrade older plain-text notes on first load,
    and would be reused by a Markdown export.
    --------------------------------------------------------------------- */
-var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1};
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1};
 
 /* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
    obvious way to ask and disagrees between browsers — Safari answers "h3",
@@ -2354,7 +2372,7 @@ function richToText(html){
 
    Rather than extend the list again and wait for the next tag to be
    forgotten, this asks about every tag the editor can produce. */
-var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div|h3";
+var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div|h3|hr";
 var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
 var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
 
@@ -2503,7 +2521,7 @@ function cardHTML(i){
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-addimg="'+i.id+'" title="Add images">⊞</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
-        +(i.postId?"Published — open the post":"Post this publicly")+'">◈</button>'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">◎</button>'
     +'</div>'
     +gallery+cover
     +'<div class="head">'+checkbox+'<div style="min-width:0;flex:1">'+title+srcline+'</div></div>'
@@ -2553,7 +2571,7 @@ function rowHTML(i){
       +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
-        +(i.postId?"Published — open the post":"Post this publicly")+'">◈</button>'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">◎</button>'
     +'</div></div>';
 }
 
@@ -2612,8 +2630,15 @@ function render(){
     return;
   }
 
-  document.getElementById("viewtitle").textContent =
-    S.q?'"'+S.q+'"' : S.tag?"#"+S.tag : lens.title;
+  var vt=document.getElementById("viewtitle");
+  if(S.tag&&!S.q){
+    /* The dot beside a tag in the sidebar is the only colour in the chrome.
+       Carrying it onto the page the tag opens costs nothing and makes the
+       two obviously the same thing. */
+    vt.innerHTML='<span class="tdot" style="background:'+tagColor(S.tag)+'"></span>#'+esc(S.tag);
+  } else {
+    vt.textContent = S.q?'"'+S.q+'"' : lens.title;
+  }
   document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
 
   if(!list.length){
@@ -3779,6 +3804,8 @@ function openEditor(id){
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
       +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
       +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
+      +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">◎</span>'
+        +(i.postId?"Posted":"Post")+'</button>'
       +'<div class="swatches" id="e-tint" style="margin-left:auto">'
         +TINTS.map(function(t){ return '<div class="sw'+((i.tint||"")===t?" on":"")+'" data-tint="'+t+'" style="background:'+TINTHEX[t]+'"></div>' }).join("")
       +'</div>'
@@ -3920,6 +3947,30 @@ function openEditor(id){
       linkSelection();
     }
   });
+  /* Two dashes on a line of their own become a divider.
+
+     Done with execCommand rather than by editing the DOM directly, because
+     that is what puts it on the browser's own undo stack: ⌘Z gives you the
+     two dashes back, which is the escape hatch for anyone who wanted to
+     type two dashes and meant it. */
+  body.addEventListener("input",function(){
+    var sel=getSelection();
+    if(!sel||!sel.rangeCount||!sel.isCollapsed) return;
+    var r=sel.getRangeAt(0), n=r.startContainer;
+    if(n.nodeType!==3) return;
+    var at=r.startOffset;
+    if(at<2||n.data.slice(at-2,at)!=="--") return;
+    // only at the start of a line, so a range like 10--20 is left alone
+    if(at>2) return;
+    var prev=n.previousSibling;
+    if(prev&&prev.nodeName!=="BR") return;
+    var kill=document.createRange();
+    kill.setStart(n,at-2); kill.setEnd(n,at);
+    sel.removeAllRanges(); sel.addRange(kill);
+    try{ document.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
+    countWords();
+  });
+
   body.addEventListener("keyup",syncFmtButtons);
   body.addEventListener("mouseup",syncFmtButtons);
   /* Paste keeps what the note can hold and discards the rest.
@@ -4230,6 +4281,16 @@ function openEditor(id){
       tags:q("#e-tags").value.split(",").map(function(t){ return t.trim() }).filter(Boolean),
       url:i.url, due:i.due, checks:i.checks, tint:i.tint, photos:i.photos };
   }
+
+  /* Publishing from inside the note. Edits are applied first: publishing a
+     version you can see on screen but have not saved would be a strange
+     thing to do to somebody. */
+  q("#e-post").addEventListener("click",function(){
+    applyEdits();
+    var it=byId(id); if(!it) return;
+    var live=it.postId&&POSTS.list.filter(function(x){ return x.id===it.postId })[0];
+    openComposer(live?draftFromPost(live):draftFromItem(it));
+  });
 
   editorApply=applyEdits;                 // so dismissing the sheet saves too
   q("#e-save").addEventListener("click",function(){ applyEdits(); toast("Updated") });
@@ -4971,7 +5032,13 @@ function photoGridHTML(shots,removable){
   var n=shots.length; if(!n) return "";
   var shown=shots.slice(0,4);
   return '<div class="pphotos n'+Math.min(n,4)+'">'+shown.map(function(p,ix){
-    return '<figure class="pph"><img src="'+esc(p.src||p.url)+'" alt="" loading="lazy">'
+    /* A single photograph keeps the shape it was taken in, the way it does on
+       a note. Cropping a portrait to a letterbox because the layout finds
+       that tidier is the app deciding it knows better than the photographer. */
+    var style="";
+    if(n===1&&p.w&&p.h)
+      style=' style="aspect-ratio:'+Math.min(2.4,Math.max(.5,p.w/p.h)).toFixed(3)+'"';
+    return '<figure class="pph"'+style+'><img src="'+esc(p.src||p.url)+'" alt="" loading="lazy">'
       +(removable?'<button class="pdrop" data-dropimg="'+ix+'" title="Remove">✕</button>':"")
       +'</figure>';
   }).join("")+'</div>';
@@ -5288,9 +5355,12 @@ function postCardHTML(p){
       +'<button data-pedit="'+esc(p.id)+'">Edit</button>'
       +'<button class="rm" data-pdel="'+esc(p.id)+'">Unpublish</button>'
     +'</span></div>'
-    +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
-    + photoGridHTML(p.photos||[],false)
-    + linkCardHTML(p.link,false)
+    +'<div class="pfold" data-fold="'+esc(p.id)+'">'
+      +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
+      + photoGridHTML(p.photos||[],false)
+      + linkCardHTML(p.link,false)
+      +'<button class="pmore" data-more="'+esc(p.id)+'">More</button>'
+    +'</div>'
     +'</article>';
 }
 
@@ -5319,12 +5389,27 @@ function renderPosts(){
     return bar+'<div class="empty"><div class="big">◌</div>Loading your posts…</div>';
   if(!POSTS.list.length)
     return bar+'<div class="empty"><div class="big">◌</div>'
-      +'Nothing published yet. Write one here, or press ◈ on any note.</div>';
+      +'Nothing published yet. Write one here, or press ◎ on any note.</div>';
+  setTimeout(unfoldShortPosts,0);
   return bar+POSTS.list.map(postCardHTML).join("");
+}
+/* Measured rather than guessed: a post only keeps its fold if it is actually
+   taller than the fold. Otherwise a three-line post would carry a "More"
+   button that does nothing. */
+function unfoldShortPosts(){
+  document.querySelectorAll(".pfold").forEach(function(f){
+    if(f.scrollHeight<=f.clientHeight+4) f.classList.add("short");
+  });
 }
 function blankDraft(){ return { id:"", source:"", body:"", link:null, photos:[] } }
 
 board.addEventListener("click",function(e){
+  var mo=e.target.closest("[data-more]");
+  if(mo){
+    e.stopPropagation();
+    mo.parentNode.classList.add("open");
+    return;
+  }
   if(e.target.closest("#newpost")){ e.stopPropagation(); openComposer(blankDraft()); return }
   if(e.target.closest("#editprof")){ e.stopPropagation(); openProfile(); return }
   var c=e.target.closest("#copypub");
@@ -5554,7 +5639,7 @@ function addTutorial(){
       +"the field at its top. <strong>⌘J</strong> opens and closes it."
       +"<br><br>"
       +"<h3>Posts are public</h3>"
-      +"Press <strong>◈</strong> on any note to publish it to your own page, "
+      +"Press <strong>◎</strong> on any note to publish it to your own page, "
       +"which anyone with the address can read. Nothing else you write is "
       +"ever visible to anybody."
       +"<br><br>"
@@ -6124,6 +6209,53 @@ window.addEventListener("resize",fitBrand);
 // the logo used to cycle between two names; there is only one now, so it
 // does nothing but sit there being the logo
 
+/* About. A note you cannot edit, shown in the same sheet a note is shown in,
+   because it is the same kind of thing — and because a person who has been
+   reading notes all day already knows how to close one. */
+function showAbout(){
+  var year=new Date().getFullYear();
+  sheet.className="sheet";
+  sheet.innerHTML=
+     '<div class="etitle">About Everything</div>'
+    +'<div class="ebody" style="min-height:0">'
+      +'<h3>What it is</h3>'
+      +'Notes, links, to-dos and reminders in one place, on the understanding '
+      +'that they were never really four different things. A note can carry a '
+      +'link and a date at the same time, and the sidebar sorts rather than files.'
+      +'<br><br>'
+      +'<h3>Where your writing lives</h3>'
+      +'On this device first, so it opens instantly and works without a '
+      +'connection, and on a server so it reaches your other devices. '
+      +'<strong>Export</strong> in the settings gives you the whole library as '
+      +'a file you own outright, in a format anyone can read.'
+      +'<br><br>'
+      +'<h3>What is public</h3>'
+      +'Only what you publish, and only when you press the button. Everything '
+      +'else is yours: the database refuses to show one person another '
+      +'person&rsquo;s notes, and the page that shows posts has no way to reach them.'
+      +'<br><br>'
+      +'<h3>Made by</h3>'
+      +'Social Capital, in Athens. &copy; '+year+'.'
+      +'<br><br>'
+      +'<h3>This is Everything</h3>'
+      +'<em>An organizer for your digital life.</em>'
+    +'</div>'
+    +'<div class="sticky"><div class="erow">'
+      +'<button class="btn sec" id="ab-close">Close</button>'
+    +'</div></div>';
+  S.editing=null; editorApply=null;
+  scrim.classList.add("on");
+  var c=document.getElementById("ab-close");
+  if(c) c.addEventListener("click",function(){ scrim.classList.remove("on") });
+}
+(function(){
+  /* Guarded. A missing element used to throw here and take the entire
+     application down with it — the app would simply not start, which is a
+     spectacular price for a button. */
+  var ab=document.getElementById("aboutbtn");
+  if(ab) ab.addEventListener("click",showAbout);
+})();
+
 /* ---- sync controls ---- */
 function paintSync(){
   var b=document.getElementById("syncbtn");
@@ -6133,12 +6265,12 @@ function paintSync(){
      a minute, and a button that resizes each time reads as a fault. */
   var waiting=Object.keys(SYNC.queue).length;
   var label, cls="";
-  if(!SYNC.session){ label="☁ Sign in"; cls="out" }
-  else if(SYNC.status==="busy"){ label="☁ Syncing"; cls="busy" }
-  else if(SYNC.status==="offline"){ label="☁ Offline"; cls="err" }
-  else if(SYNC.status==="error"){ label="☁ Failed"; cls="err" }
-  else if(waiting){ label="☁ "+waiting+" to go"; cls="busy" }
-  else label="☁ Synced";
+  if(!SYNC.session){ label="● Sign in"; cls="out" }
+  else if(SYNC.status==="busy"){ label="◍ Syncing"; cls="busy" }
+  else if(SYNC.status==="offline"){ label="○ Offline"; cls="err" }
+  else if(SYNC.status==="error"){ label="○ Failed"; cls="err" }
+  else if(waiting){ label="◍ "+waiting+" to go"; cls="busy" }
+  else label="● Synced";
   b.textContent=label;
   b.className="ghost syncbtn"+(cls?" "+cls:"");
   b.title=SYNC.session
