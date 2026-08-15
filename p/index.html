@@ -65,6 +65,7 @@
   .text h3{font-size:1.2em;font-weight:600;line-height:1.3;letter-spacing:-.015em;
     margin:.8em 0 .3em;color:var(--ink)}
   .text h3:first-child{margin-top:0}
+  .text hr{border:0;border-top:1px solid var(--line-strong);margin:1.1em 0;height:0}
   .text a{color:var(--blue)}
   .text + .shots,.text + .card{margin-top:14px}
 
@@ -76,7 +77,8 @@
   .shots.n4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
   .shots figure{margin:0;min-width:0;background:var(--line)}
   .shots img{display:block;width:100%;height:100%;object-fit:cover}
-  .shots.n1 img{height:auto;max-height:560px}
+  .shots.n1 figure{max-height:none}
+  .shots.n1 img{height:100%;object-fit:cover}
   .shots.n2 img,.shots.n3 img,.shots.n4 img{height:190px}
   .shots + .card{margin-top:10px}
 
@@ -90,6 +92,17 @@
   .card .d{font-size:13px;color:var(--muted);margin-top:5px;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
   .card .s{font-size:12px;color:var(--faint);margin-top:7px}
+
+  /* Folded to roughly a square, opening on request. */
+  .fold{position:relative;max-height:min(600px,72vh);overflow:hidden}
+  .fold.open{max-height:none}
+  .fold::after{content:"";position:absolute;left:0;right:0;bottom:0;height:96px;
+    pointer-events:none;background:linear-gradient(transparent,var(--bg))}
+  .fold.open::after,.fold.short::after{display:none}
+  .more{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:8px;border:0;
+    background:none;font:inherit;font-size:13px;font-weight:600;color:var(--accent);
+    text-align:center;cursor:pointer}
+  .fold.open .more,.fold.short .more{display:none}
 
   .msg{padding:70px 0;text-align:center;color:var(--faint)}
   .msg .big{font-size:30px;margin-bottom:10px;opacity:.5}
@@ -148,7 +161,7 @@ function get(path){
    version of the app with a looser idea of what markup is. This page trusts
    none of that, because it is the one place the content becomes a live DOM
    in someone else's browser. */
-var OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,P:1,H3:1};
+var OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,P:1,H3:1,HR:1};
 // removed outright, contents and all — keeping the text of a <script> would
 // be pointless and keeping a <form>'s labels would be misleading
 var DROP={SCRIPT:1,STYLE:1,IFRAME:1,OBJECT:1,EMBED:1,SVG:1,MATH:1,LINK:1,
@@ -222,9 +235,12 @@ function postHTML(p){
                     +esc(when(p.created_at))+'</a>');
   return '<article>'
     +'<time>'+(link||esc(when(p.created_at)))+(p.edited_at?" · edited":"")+'</time>'
-    +'<div class="text">'+body(p.body)+'</div>'
-    + shotsHTML(p.photos)
-    + cardHTML(p.link)
+    +'<div class="fold">'
+      +'<div class="text">'+body(p.body)+'</div>'
+      + shotsHTML(p.photos)
+      + cardHTML(p.link)
+      +'<button class="more">More</button>'
+    +'</div>'
     +'</article>';
 }
 function message(t,sub){
@@ -262,6 +278,14 @@ if(!handle){
         stream.innerHTML=message(only?"That post is gone.":"Nothing here yet.");
       } else {
         stream.innerHTML=posts.map(postHTML).join("");
+        // only fold what is actually too tall to show whole
+        stream.querySelectorAll(".fold").forEach(function(f){
+          if(f.scrollHeight<=f.clientHeight+4) f.classList.add("short");
+        });
+        stream.addEventListener("click",function(e){
+          var m=e.target.closest(".more");
+          if(m) m.parentNode.classList.add("open");
+        });
       }
       foot.innerHTML=(only
         ? '<a class="back" href="?u='+encodeURIComponent(handle)+'">← all posts</a>'
