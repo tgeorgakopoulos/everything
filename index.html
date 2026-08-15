@@ -241,6 +241,18 @@
     flex-wrap:wrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .sidefooter{padding:11px 8px 4px;color:var(--faint);font-size:10px;
     line-height:1.5;letter-spacing:.01em;text-align:center}
+  .docrow{display:flex;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+  .docrow button{border:0;background:none;padding:0 7px;font:inherit;font-size:10.5px;
+    color:var(--faint);cursor:pointer;line-height:1.6}
+  .docrow button:first-child{padding-left:0}
+  .docrow button + button{border-left:1px solid var(--line)}
+  .docrow button:hover{color:var(--ink);text-decoration:underline}
+  .docbody h3:first-child{margin-top:0}
+  .docbody .fine{color:var(--muted);font-size:13.5px;line-height:1.55}
+  .docacts{display:flex;justify-content:flex-end}
+  /* The dot beside a tag in the sidebar, worn again by the page it opens. */
+  .tdot{display:inline-block;width:12px;height:12px;border-radius:50%;
+    margin-right:9px;vertical-align:-1px;flex:none}
   .sidefooter .tagline{font-style:italic;color:var(--muted);margin-top:2px;font-size:10.5px}
   .ghost{padding:5px 8px;border-radius:8px;color:var(--ui);font-size:11.5px;font-weight:540;
     border:1px solid transparent;transition:.12s}
@@ -922,10 +934,24 @@
   .pfold::after{content:"";position:absolute;left:0;right:0;bottom:0;height:96px;
     pointer-events:none;background:linear-gradient(transparent,var(--surface))}
   .pfold.open::after,.pfold.short::after{display:none}
-  .pmore{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:8px;
-    font-size:12.5px;font-weight:640;color:var(--accent);text-align:center}
+  /* More stands on its own ground rather than on top of whatever line of text
+     happened to end there. A word set over fading text is a word you have to
+     work to read, and the entire job of this one is to be easy to find. */
+  .pmore{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;
+    justify-content:center;padding:18px 0 2px;border:0;
+    background:linear-gradient(transparent,var(--surface) 44%);cursor:pointer}
+  .pmore::before{content:"More";padding:5px 16px;border-radius:99px;
+    border:1px solid var(--line);background:var(--surface);
+    font:inherit;font-size:12.5px;font-weight:640;color:var(--accent);
+    box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  .pmore:hover::before{border-color:var(--accent)}
   .pfold.open .pmore,.pfold.short .pmore{display:none}
   .postcard .ptext a{color:var(--blue)}
+  /* Drawn, so it takes its colour from the text around it and never depends on
+     a font happening to carry the character. */
+  .pico{width:1.05em;height:1.05em;fill:none;stroke:currentColor;stroke-width:1.9;
+    stroke-linecap:round;vertical-align:-.17em}
+  .facet .fi .pico{width:14px;height:14px;vertical-align:-2px}
 
   /* the strip at the top of the Posts page carrying your public address */
   .pubbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:620px;
@@ -1194,13 +1220,20 @@
           <button data-bk="asuser"><b>See it as a user does</b><span>Hide the tools only you have</span></button>
         </div>
       </div>
-      <button class="ghost" id="aboutbtn">? About</button>
       <button class="ghost syncbtn" id="syncbtn">● Sync</button>
       <div class="bkhint" id="bkhint"></div>
       <div class="bkhint warn" id="fonthint" style="display:none">
         Logo font missing — see fonts/fonts.css</div>
     </div>
     <div class="sidefooter">
+      <!-- Documents, not settings. Nothing here changes how the app behaves;
+           it is the small print, and small print belongs beside the copyright
+           line rather than among the controls. -->
+      <div class="docrow" id="docrow">
+        <button data-doc="about">About</button>
+        <button data-doc="privacy">Privacy</button>
+        <button data-doc="terms">Terms</button>
+      </div>
       <div id="copyline">© 2026 Social Capital</div>
       <div class="tagline" id="tagline">This is Everything</div>
     </div>
@@ -2190,7 +2223,16 @@ function hash32(s){
   return h>>>0;
 }
 function hslOf(c){ return "hsl("+c[0]+" "+c[1]+"% "+c[2]+"%)" }
+/* One mark for publishing, used everywhere.
+   The same arcs the sidebar uses for Posts: something leaving the device and
+   travelling outward. A character-set glyph would be at the mercy of whatever
+   font each machine decided to supply for it. This one is drawn. */
+var POST_ICO='<svg viewBox="0 0 24 24" class="pico" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><path d="M7.4 16.6a6.5 6.5 0 0 1 0-9.2"/><path d="M16.6 7.4a6.5 6.5 0 0 1 0 9.2"/><path d="M4.6 19.4a10.5 10.5 0 0 1 0-14.8"/><path d="M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg>';
 function tagColor(name){ return hslOf(TAGCOLS[hash32(name)%TAGCOLS.length]) }
+/* The live map, filled by paintSidebar. tagColor is the fallback for a tag the
+   sidebar has not drawn yet — a first paint, or a tag with nothing left in it. */
+var TAGCOL={};
+function tagHue(name){ return TAGCOL[name]||tagColor(name) }
 function tagColorMap(names){
   var taken={}, out={}, n=TAGCOLS.length;
   names.slice().sort().forEach(function(name){
@@ -2521,7 +2563,7 @@ function cardHTML(i){
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-addimg="'+i.id+'" title="Add images">⊞</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
-        +(i.postId?"Published — open the post":"Post this publicly")+'">◎</button>'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">'+POST_ICO+'</button>'
     +'</div>'
     +gallery+cover
     +'<div class="head">'+checkbox+'<div style="min-width:0;flex:1">'+title+srcline+'</div></div>'
@@ -2571,7 +2613,7 @@ function rowHTML(i){
       +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
-        +(i.postId?"Published — open the post":"Post this publicly")+'">◎</button>'
+        +(i.postId?"Published — open the post":"Post this publicly")+'">'+POST_ICO+'</button>'
     +'</div></div>';
 }
 
@@ -2635,7 +2677,7 @@ function render(){
     /* The dot beside a tag in the sidebar is the only colour in the chrome.
        Carrying it onto the page the tag opens costs nothing and makes the
        two obviously the same thing. */
-    vt.innerHTML='<span class="tdot" style="background:'+tagColor(S.tag)+'"></span>#'+esc(S.tag);
+    vt.innerHTML='<span class="tdot" style="background:'+tagHue(S.tag)+'"></span>#'+esc(S.tag);
   } else {
     vt.textContent = S.q?'"'+S.q+'"' : lens.title;
   }
@@ -2848,10 +2890,18 @@ function paintSidebar(){
   var autoRow=ncomp?('<button class="nav auto'+(S.view==="compiled"?" on":"")+'" data-view="compiled"'
       +' title="Applied automatically — can\'t be added or removed by hand">'
       +'<span class="lock">⇥</span>compiled<span class="n">'+ncomp+'</span></button>'):"";
-  // colours resolved against the whole set, so no two dots on screen match
-  var tcol=tagColorMap(Object.keys(counts));
+  /* Colours resolved against the whole set, so no two dots on screen match.
+     Kept where the rest of the app can read it: a tag's colour is a property
+     of the whole collection, not of the name, so anything working it out from
+     the name alone will quietly disagree with the sidebar. */
+  var tcol=TAGCOL=tagColorMap(Object.keys(counts));
+  /* Alphabetical, deliberately.
+     Ordering by how many notes carry a tag means the list rearranges itself
+     every time you write something — the thing you are reaching for moves
+     while you reach for it. A tag should be where it was yesterday, and
+     alphabetical is the only order a person can predict without looking. */
   document.getElementById("taglist").innerHTML=autoRow+Object.keys(counts)
-    .sort(function(a,b){ return counts[b]-counts[a] })
+    .sort(function(a,b){ return a.localeCompare(b,undefined,{sensitivity:"base"}) })
     .map(function(k){
       return '<button class="nav'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'"'
         +' title="Right-click to rename #'+esc(k)+' everywhere">'
@@ -3804,7 +3854,7 @@ function openEditor(id){
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
       +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
       +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
-      +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">◎</span>'
+      +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">'+POST_ICO+'</span>'
         +(i.postId?"Posted":"Post")+'</button>'
       +'<div class="swatches" id="e-tint" style="margin-left:auto">'
         +TINTS.map(function(t){ return '<div class="sw'+((i.tint||"")===t?" on":"")+'" data-tint="'+t+'" style="background:'+TINTHEX[t]+'"></div>' }).join("")
@@ -5355,12 +5405,17 @@ function postCardHTML(p){
       +'<button data-pedit="'+esc(p.id)+'">Edit</button>'
       +'<button class="rm" data-pdel="'+esc(p.id)+'">Unpublish</button>'
     +'</span></div>'
+    /* Only the words fold.
+       A photograph is not the tail of a post you can skip — it is often the
+       whole reason the post exists, and putting it behind More hides the one
+       part that would have made you press More. So the fold closes around the
+       text and stops there. Pictures and link cards always show. */
     +'<div class="pfold" data-fold="'+esc(p.id)+'">'
       +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
-      + photoGridHTML(p.photos||[],false)
-      + linkCardHTML(p.link,false)
-      +'<button class="pmore" data-more="'+esc(p.id)+'">More</button>'
+      +'<button class="pmore" data-more="'+esc(p.id)+'" aria-label="Show the rest"></button>'
     +'</div>'
+    + photoGridHTML(p.photos||[],false)
+    + linkCardHTML(p.link,false)
     +'</article>';
 }
 
@@ -5389,7 +5444,7 @@ function renderPosts(){
     return bar+'<div class="empty"><div class="big">◌</div>Loading your posts…</div>';
   if(!POSTS.list.length)
     return bar+'<div class="empty"><div class="big">◌</div>'
-      +'Nothing published yet. Write one here, or press ◎ on any note.</div>';
+      +'Nothing published yet. Write one here, or press '+POST_ICO+' on any note.</div>';
   setTimeout(unfoldShortPosts,0);
   return bar+POSTS.list.map(postCardHTML).join("");
 }
@@ -5639,7 +5694,7 @@ function addTutorial(){
       +"the field at its top. <strong>⌘J</strong> opens and closes it."
       +"<br><br>"
       +"<h3>Posts are public</h3>"
-      +"Press <strong>◎</strong> on any note to publish it to your own page, "
+      +"Press "+POST_ICO+" on any note to publish it to your own page, "
       +"which anyone with the address can read. Nothing else you write is "
       +"ever visible to anybody."
       +"<br><br>"
@@ -6209,52 +6264,134 @@ window.addEventListener("resize",fitBrand);
 // the logo used to cycle between two names; there is only one now, so it
 // does nothing but sit there being the logo
 
-/* About. A note you cannot edit, shown in the same sheet a note is shown in,
-   because it is the same kind of thing — and because a person who has been
-   reading notes all day already knows how to close one. */
-function showAbout(){
-  var year=new Date().getFullYear();
+/* The documents.
+
+   Each is a note you cannot edit, shown in the same sheet a note is shown in —
+   someone who has been reading notes all day already knows how to close one.
+   Adding a cookie policy or any other notice later means adding one entry to
+   this object and one button to the row in the footer. Nothing else needs to
+   know it exists. */
+var DOC_DATE="15 August 2026";
+var DOCS={};
+
+DOCS.about={ title:"About Everything", html:function(){ return ''
+  +'<h3>What it is</h3>'
+  +'Notes, links, to-dos and reminders in one place, on the understanding that '
+  +'they were never really four different things. A note can carry a link and a '
+  +'date at the same time, and the sidebar sorts rather than files.'
+  +'<br><br><h3>Where your writing lives</h3>'
+  +'On this device first, so it opens instantly and works without a connection, '
+  +'and on a server so it reaches your other devices. <strong>Export</strong> in '
+  +'the settings gives you the whole library as a file you own outright, in a '
+  +'format anyone can read.'
+  +'<br><br><h3>What is public</h3>'
+  +'Only what you publish, and only when you press the button. Everything else '
+  +'is yours: the database refuses to show one person another person&rsquo;s '
+  +'notes, and the page that shows posts has no way to reach them.'
+  +'<br><br><h3>Made by</h3>'
+  +'Social Capital, in Athens. &copy; '+new Date().getFullYear()+'.'
+  +'<br><br><h3>This is Everything</h3>'
+  +'<em>An organizer for your digital life.</em>';
+}};
+
+DOCS.privacy={ title:"Privacy", html:function(){ return '<div class="fine">'
+  +'<h3>The short version</h3>'
+  +'Your notes are yours. They are stored so that you can read them on your own '
+  +'devices, and for no other purpose. Nobody at Social Capital reads them, they '
+  +'are not sold, and they do not train anything.'
+  +'<br><br><h3>What is kept</h3>'
+  +'<strong>Your library</strong> &mdash; the text, links, dates and images you '
+  +'write &mdash; on this device and, if sync is on, in a database run for us by '
+  +'Supabase. <strong>Your account</strong> &mdash; an email address, a password '
+  +'stored only as a hash, a handle, and whatever you put in your profile. '
+  +'<strong>Your posts</strong> &mdash; only the ones you publish, which are '
+  +'public by definition.'
+  +'<br><br><h3>What is not kept</h3>'
+  +'No analytics, no advertising identifiers, no third-party trackers, and no '
+  +'record of what you read or when. The contents of your notes are not logged.'
+  +'<br><br><h3>Cookies</h3>'
+  +'Everything sets no advertising or analytics cookies. It keeps a sign-in '
+  +'token and your own settings in this browser&rsquo;s local storage, which is '
+  +'what makes the app open already signed in and already looking the way you '
+  +'left it. Clearing your browser data removes both and signs you out.'
+  +'<br><br><h3>Your rights under the GDPR</h3>'
+  +'You may see everything held about you, correct it, take it elsewhere, or '
+  +'have it erased. In practice: <strong>Export</strong> in the settings gives '
+  +'you a complete, portable copy of your library at any moment without asking '
+  +'anyone. To correct or delete your account, or to object to any of this, '
+  +'write to the address below; we will act within one month. The lawful basis '
+  +'for holding your library is the contract of providing you the service, and '
+  +'for posts it is your own act of publishing them.'
+  +'<br><br><h3>Where it is</h3>'
+  +'Data is held within the European Union. Supabase acts as our processor. If '
+  +'that ever changes you will be told before it does.'
+  +'<br><br><h3>Contact</h3>'
+  +'Social Capital, Athens, Greece &mdash; tgeorgakopoulos@gmail.com'
+  +'<br><br><em>Last updated '+DOC_DATE+'.</em>'
+  +'</div>';
+}};
+
+DOCS.terms={ title:"Terms of use", html:function(){ return '<div class="fine">'
+  +'<h3>The agreement</h3>'
+  +'Everything is provided by Social Capital, Athens. Using it means accepting '
+  +'what follows. If you do not, stop using it &mdash; and export your library '
+  +'first.'
+  +'<br><br><h3>Your account</h3>'
+  +'One person, one account, obtained by invitation. Keep your password to '
+  +'yourself; you are responsible for what is done with it.'
+  +'<br><br><h3>What you write</h3>'
+  +'Yours. You keep every right in it. You grant us only the narrow permission '
+  +'needed to store it and show it back to you, and &mdash; for posts you choose '
+  +'to publish &mdash; to serve it to whoever opens the address. Publishing '
+  +'makes a post readable by anyone holding the link. Unpublishing removes it '
+  +'from the page, though copies already taken by others are beyond anyone&rsquo;s '
+  +'reach.'
+  +'<br><br><h3>What you may not do</h3>'
+  +'Publish material that is unlawful, that infringes someone else&rsquo;s '
+  +'rights, or that harasses a person. Attempt to reach another user&rsquo;s '
+  +'private library. Use the service to distribute malware or spam.'
+  +'<br><br><h3>Keep your own copy</h3>'
+  +'This is not boilerplate. Everything is young software. Use <strong>Export'
+  +'</strong> regularly. We take backups and work hard to lose nothing, but the '
+  +'copy you hold yourself is the one nobody can take away from you.'
+  +'<br><br><h3>What we promise, and what we do not</h3>'
+  +'The service is provided as it is, without warranty. We do not guarantee it '
+  +'will be uninterrupted or free of faults. So far as the law allows, our '
+  +'liability is limited to what you have paid us. Nothing here limits liability '
+  +'that cannot lawfully be limited, and nothing here removes a right you hold '
+  +'as a consumer under Greek or European law.'
+  +'<br><br><h3>Ending it</h3>'
+  +'You may close your account whenever you like. We may suspend an account that '
+  +'breaks these terms, and will say why. If the service is ever discontinued '
+  +'you will be given clear notice and time to export.'
+  +'<br><br><h3>Law</h3>'
+  +'Greek law, courts of Athens.'
+  +'<br><br><em>Last updated '+DOC_DATE+'.</em>'
+  +'</div>';
+}};
+
+function showDoc(key){
+  var d=DOCS[key];
+  if(!d) return;                                 // an unknown name simply does nothing
   sheet.className="sheet";
   sheet.innerHTML=
-     '<div class="etitle">About Everything</div>'
-    +'<div class="ebody" style="min-height:0">'
-      +'<h3>What it is</h3>'
-      +'Notes, links, to-dos and reminders in one place, on the understanding '
-      +'that they were never really four different things. A note can carry a '
-      +'link and a date at the same time, and the sidebar sorts rather than files.'
-      +'<br><br>'
-      +'<h3>Where your writing lives</h3>'
-      +'On this device first, so it opens instantly and works without a '
-      +'connection, and on a server so it reaches your other devices. '
-      +'<strong>Export</strong> in the settings gives you the whole library as '
-      +'a file you own outright, in a format anyone can read.'
-      +'<br><br>'
-      +'<h3>What is public</h3>'
-      +'Only what you publish, and only when you press the button. Everything '
-      +'else is yours: the database refuses to show one person another '
-      +'person&rsquo;s notes, and the page that shows posts has no way to reach them.'
-      +'<br><br>'
-      +'<h3>Made by</h3>'
-      +'Social Capital, in Athens. &copy; '+year+'.'
-      +'<br><br>'
-      +'<h3>This is Everything</h3>'
-      +'<em>An organizer for your digital life.</em>'
-    +'</div>'
-    +'<div class="sticky"><div class="erow">'
-      +'<button class="btn sec" id="ab-close">Close</button>'
-    +'</div></div>';
+     '<div class="etitle">'+esc(d.title)+'</div>'
+    +'<div class="ebody docbody" style="min-height:0">'+d.html()+'</div>'
+    +'<div class="sticky docacts">'
+      +'<button class="btn sec" data-docclose="1">Close</button>'
+    +'</div>';
   S.editing=null; editorApply=null;
   scrim.classList.add("on");
-  var c=document.getElementById("ab-close");
-  if(c) c.addEventListener("click",function(){ scrim.classList.remove("on") });
 }
-(function(){
-  /* Guarded. A missing element used to throw here and take the entire
-     application down with it — the app would simply not start, which is a
-     spectacular price for a button. */
-  var ab=document.getElementById("aboutbtn");
-  if(ab) ab.addEventListener("click",showAbout);
-})();
+
+/* Delegated on the document, so a new entry above needs no matching line of
+   wiring here — and so a name that does not exist yet cannot stop the app
+   from booting, which is exactly how the last version of this broke. */
+document.addEventListener("click",function(e){
+  var b=e.target.closest("[data-doc]");
+  if(b){ showDoc(b.dataset.doc); return }
+  if(e.target.closest("[data-docclose]")) scrim.classList.remove("on");
+});
 
 /* ---- sync controls ---- */
 function paintSync(){
