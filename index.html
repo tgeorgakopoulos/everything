@@ -241,10 +241,14 @@
     flex-wrap:wrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .sidefooter{padding:11px 8px 4px;color:var(--faint);font-size:10px;
     line-height:1.5;letter-spacing:.01em;text-align:center}
-  .docrow{display:flex;flex-wrap:wrap;align-items:center;margin-bottom:6px}
+  /* Centred, to sit with the copyright line below it rather than beside the
+     controls above. The first button used to lose its left padding so the row
+     would start flush with the edge; centred, that asymmetry would push the
+     whole row a few pixels off true. */
+  .docrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;
+    margin-bottom:6px}
   .docrow button{border:0;background:none;padding:0 7px;font:inherit;font-size:10.5px;
     color:var(--faint);cursor:pointer;line-height:1.6}
-  .docrow button:first-child{padding-left:0}
   .docrow button + button{border-left:1px solid var(--line)}
   .docrow button:hover{color:var(--ink);text-decoration:underline}
   .docbody h3:first-child{margin-top:0}
