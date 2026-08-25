@@ -1011,6 +1011,50 @@
     color:var(--ink);font-family:var(--content);margin-bottom:4px;
     outline:none;white-space:pre-wrap;word-break:break-word}
   .ebody:empty:before{content:attr(data-ph);color:var(--faint)}
+
+  /* ---------- focus mode ----------------------------------------------
+
+     For writing something long rather than noting something short. The sheet
+     grows, the room behind it goes dark, and the type comes up to a size you
+     would choose on paper.
+
+     The measure — how many words land on a line — is the whole point, and it
+     is arithmetic rather than taste:
+
+       · an English word averages about 5.1 letters
+       · plus the space after it, about 6.1 characters per word
+       · twelve words is therefore about 73 characters
+       · `ch` is the width of the digit zero, roughly 0.55em in this face,
+         while the average letter is nearer 0.50em
+       · so 73 average characters ≈ 36.5em ≈ 66ch
+
+     64ch is set below, which lands a little under twelve — deliberately, since
+     a line that runs slightly short reads calmly and one that runs long does
+     not. Because the limit is in `ch` it is tied to the font size: raise the
+     type and the column widens to match, and the measure holds. That is why
+     the sheet may be much wider than the text it carries.
+     -------------------------------------------------------------------- */
+  .scrim.focus{background:rgba(12,11,10,.74);backdrop-filter:blur(11px)}
+  .sheet.focus{width:min(1100px,94vw);max-height:94vh;padding:52px 56px 0}
+  .sheet.focus .etitle,
+  .sheet.focus .ebody{max-width:64ch;margin-left:auto;margin-right:auto}
+  .sheet.focus .ebody{
+    /* grows with the screen, because this is a big-screen feature */
+    font-size:calc(clamp(17px,0.62vw + 10.5px,22px)*var(--tscale));
+    line-height:1.8;min-height:62vh}
+  .sheet.focus .etitle{font-size:calc(clamp(26px,1.1vw + 15px,34px)*var(--tscale));
+    margin-bottom:18px}
+  /* the controls stay exactly where they were — they are simply quieter, so
+     the eye goes to the words first */
+  .sheet.focus .facet,.sheet.focus .fmt{opacity:.62;transition:opacity .15s}
+  .sheet.focus .facet:hover,.sheet.focus .fmt:hover,
+  .sheet.focus .facet.on,.sheet.focus .sticky:hover .facet,
+  .sheet.focus .sticky:hover .fmt{opacity:1}
+  .sheet.focus .sticky{max-width:64ch;margin-left:auto;margin-right:auto}
+  @media (max-width:760px){
+    /* on a phone the sheet already fills the screen; only the type changes */
+    .sheet.focus{width:100%;padding:30px 22px 0}
+  }
   .ebody strong,.ebody b{font-weight:700}
   .ebody em,.ebody i{font-style:italic}
   .sheet ::placeholder{color:var(--faint)}
@@ -3867,12 +3911,21 @@ document.getElementById("capsave").addEventListener("click",commit);
 var scrim=document.getElementById("scrim"), sheet=document.getElementById("sheet");
 
 // the open note wears its own colour, so editing feels like the same object
-function applySheetTint(tint){ sheet.className="sheet"+(tint?" tint-"+tint:"") }
+/* Focus mode: on for as long as this note is open, and no longer.
+   Kept in a variable rather than only as a class, because applySheetTint
+   rewrites className wholesale — choosing a colour would otherwise drop you
+   out of focus without explanation. */
+var FOCUS=false;
+function applySheetTint(tint){
+  sheet.className="sheet"+(tint?" tint-"+tint:"")+(FOCUS?" focus":"");
+  scrim.classList.toggle("focus",FOCUS);
+}
 
 function openEditor(id){
   var i=S.items.filter(function(x){return x.id===id})[0]; if(!i) return;
   var d={url:i.url||"",actionable:hasAction(i),due:i.due,timed:!!i.timed,tint:i.tint||"",pin:!!i.pin};
 
+  FOCUS=false;      // fresh every time: every note opens in the ordinary editor
   S.editing=id;
   // Read-only context from the fetched page, so the window works for reading too
   var ctx="";
@@ -3912,6 +3965,8 @@ function openEditor(id){
       +'<button class="facet'+(d.url?" on":"")+'" id="f-link"><span class="fi">⚭</span>Link</button>'
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
       +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
+      +'<button class="facet'+(FOCUS?" on":"")+'" id="e-focus" title="Room to write — ⌘⇧F">'
+        +'<span class="fi">◫</span>Focus</button>'
       +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
       +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">'+POST_ICO+'</span>'
         +(i.postId?"Posted":"Post")+'</button>'
@@ -4367,6 +4422,27 @@ function openEditor(id){
         +'<button class="hput" data-ver="'+ix+'">Put this back</button></div>';
     }).join("");
   }
+  /* Focus is a toggle and nothing more. Escape still closes the note, as it
+     always has — you asked for that, and a key that sometimes closes and
+     sometimes half-closes is a key you stop trusting. */
+  function toggleFocus(){
+    FOCUS=!FOCUS;
+    applySheetTint(d.tint);
+    var btn=q("#e-focus");
+    if(btn) btn.classList.toggle("on",FOCUS);
+    var body=q(".ebody");
+    if(body) body.focus();
+  }
+  /* ⌘⇧F, so you can reach for more room without leaving the keyboard. It is
+     bound on the sheet rather than the window, so it exists only while a note
+     is open and cannot collide with anything on the board behind. */
+  sheet.addEventListener("keydown",function(e){
+    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&(e.key==="f"||e.key==="F")){
+      e.preventDefault(); toggleFocus();
+    }
+  });
+  q("#e-focus").addEventListener("click",toggleFocus);
+
   q("#e-hist").addEventListener("click",function(){
     var showing=!histBox.hasAttribute("hidden");
     if(showing){ histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on"); return }
