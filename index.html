@@ -941,9 +941,14 @@
   /* More stands on its own ground rather than on top of whatever line of text
      happened to end there. A word set over fading text is a word you have to
      work to read, and the entire job of this one is to be easy to find. */
+  /* Room beneath it. The fold ends where the words end, and a photograph
+     begins immediately after — so a button sitting flush on the bottom edge
+     was almost touching the picture below it. The padding belongs under the
+     pill, not around the whole strip. */
   .pmore{position:absolute;left:0;right:0;bottom:0;z-index:2;display:flex;
-    justify-content:center;padding:18px 0 2px;border:0;
+    justify-content:center;padding:18px 0 0;border:0;
     background:linear-gradient(transparent,var(--surface) 44%);cursor:pointer}
+  .pfold{padding-bottom:14px}
   .pmore::before{content:"More";padding:5px 16px;border-radius:99px;
     border:1px solid var(--line);background:var(--surface);
     font:inherit;font-size:12.5px;font-weight:640;color:var(--accent);
@@ -3139,6 +3144,29 @@ function stampChanges(){
 
   var missing=Object.keys(SYNC.shadow).filter(function(id){ return !seen[id] });
 
+  /* If we could not write the library down, we may not conclude that anything
+     was deleted.
+
+     A deletion is inferred from a gap: the shadow remembers a note, memory
+     does not hold it, so the user must have removed it. That reasoning is
+     only sound while the disk is keeping up. The moment a write fails, the
+     gap means something else entirely — that a note we received never got
+     saved — and inferring a deletion from it destroys the copy on the server,
+     which by then is the only one left.
+
+     This is the general form of the bug rather than one more special case.
+     Every previous guard here named a particular symptom: an empty library, a
+     suspiciously large disappearance. This one names the cause. */
+  if(SAVE_BROKEN&&missing.length){
+    SYNC.note="saving is failing — no deletions sent";
+    console.warn("Everything: refusing to delete "+missing.length
+      +" note(s); the last write to this browser's storage failed, so a note "
+      +"missing from memory is not evidence that anyone deleted it.");
+    keepSession();
+    paintSync();
+    return;
+  }
+
   /* An empty library beside a full record of one is not a deletion. It is a
      load that failed — storage full, storage cleared, a new address with an
      old bookkeeping file. This is exactly the state that emptied a library:
@@ -3417,7 +3445,28 @@ function applyIncoming(rows){
   SYNC.lastPull=safeUpto;
 
   if(changed){
-    try{ localStorage.setItem(KEY,JSON.stringify(S.items)) }catch(e){}
+    /* This write used to be `try{ … }catch(e){}` — the error thrown when the
+       disk is full was caught and dropped on the floor.
+
+       That is how a link saved from the extension could appear on screen and
+       then vanish on the next reload. The note arrived, went into memory, was
+       drawn, and was never written down. The bookkeeping beside it — the
+       shadow, the pull mark — is written separately and did get through. So
+       on the next open the library was short a note that the shadow still
+       remembered, and that difference reads as a deletion.
+
+       It is the same failure that emptied the library in August, in a
+       different function. The guards added afterwards all sat on save(); this
+       path had its own write and went round every one of them. Now it does
+       not: the failure is reported, and the alarm below refuses to let a
+       failed write become a deletion. */
+    try{
+      writeItems();          // slims the photographs out, unlike the old line
+      if(SAVE_BROKEN){ SAVE_BROKEN=false; paintDanger(); toast("Saving is working again") }
+    }catch(e){
+      SAVE_BROKEN=true; paintDanger();
+      console.warn("Everything: incoming changes could not be written to disk",e);
+    }
     render();
     toast(changed+" change"+(changed===1?"":"s")+" from another device");
   }
