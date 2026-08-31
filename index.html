@@ -1050,7 +1050,10 @@
   .sheet.focus .facet:hover,.sheet.focus .fmt:hover,
   .sheet.focus .facet.on,.sheet.focus .sticky:hover .facet,
   .sheet.focus .sticky:hover .fmt{opacity:1}
-  .sheet.focus .sticky{max-width:64ch;margin-left:auto;margin-right:auto}
+  /* The toolbars keep the width they have in an ordinary note. Narrowing them
+     to the measure squeezed Delete, Archive, Cancel and Done into the middle
+     of the sheet for no reason — the measure governs the writing, not the
+     furniture. */
   @media (max-width:760px){
     /* on a phone the sheet already fills the screen; only the type changes */
     .sheet.focus{width:100%;padding:30px 22px 0}
@@ -4123,13 +4126,33 @@ function openEditor(id){
     var r=sel.getRangeAt(0), n=r.startContainer;
     if(n.nodeType!==3) return;
     var at=r.startOffset;
-    if(at<2||n.data.slice(at-2,at)!=="--") return;
-    // only at the start of a line, so a range like 10--20 is left alone
-    if(at>2) return;
-    var prev=n.previousSibling;
-    if(prev&&prev.nodeName!=="BR") return;
+    /* What counts as "the start of a line".
+
+       This used to insist the caret sat at offset 2 of a text node whose
+       previous sibling was nothing or a <br>. That describes one shape a line
+       can have. Chrome builds several: press Return in the middle of a note
+       and it may wrap the new line in a <div>, or leave the dashes in a text
+       node that follows a <span> left over from an earlier edit. In any of
+       those the old test failed and the rule quietly did nothing — which is
+       why it worked when you tried it in an empty note and not while you were
+       actually writing.
+
+       So instead of guessing the shape, read the line: walk backwards from
+       the caret, gathering text, and stop at the first <br> or at the start
+       of the block. If everything on the line so far is the two dashes, it
+       is a divider. */
+    var head=n.data.slice(0,at), walk=n;
+    while(walk.previousSibling&&head.length<8){
+      walk=walk.previousSibling;
+      if(walk.nodeName==="BR"||walk.nodeName==="HR") break;
+      head=(walk.textContent||"")+head;
+    }
+    // an en or em dash too: some keyboards and macOS substitutions turn "--"
+    // into one character before we ever see the second keystroke
+    var mark=/^[ \t]*(--|–|—)$/.exec(head);
+    if(!mark) return;
     var kill=document.createRange();
-    kill.setStart(n,at-2); kill.setEnd(n,at);
+    kill.setStart(n,at-mark[1].length); kill.setEnd(n,at);
     sel.removeAllRanges(); sel.addRange(kill);
     try{ document.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
     countWords();
@@ -4924,11 +4947,32 @@ function paintSel(){
   document.body.classList.toggle("selecting",n>0);
   selcnt.textContent=n+" selected";
 }
+/* Selecting a card changes that card and nothing else.
+
+   This used to call render(), which rebuilds board.innerHTML from scratch —
+   every card on the page destroyed and made again so that one of them could
+   gain a tick. That is the flash you were seeing: not an animation, but the
+   whole board being thrown away and redrawn.
+
+   Nothing about the other cards changed, so nothing about them should be
+   touched. Flip the class on the one card, update the count, done. */
+function paintPicked(id){
+  var on=!!S.sel[id];
+  document.querySelectorAll('[data-id]').forEach(function(el){
+    if(el.dataset.id===id) el.classList.toggle("picked",on);
+  });
+}
 function togglePick(id){
   if(S.sel[id]) delete S.sel[id]; else S.sel[id]=1;
-  render();
+  paintPicked(id);
+  paintSel();
 }
-function clearSel(){ S.sel={}; render() }
+function clearSel(){
+  var was=selIds();
+  S.sel={};
+  was.forEach(paintPicked);       // un-tick what was ticked, and only that
+  paintSel();
+}
 
 selbar.addEventListener("click",function(e){
   var b=e.target.closest("[data-sel]"); if(!b) return;
@@ -4937,8 +4981,9 @@ selbar.addEventListener("click",function(e){
   var act=b.dataset.sel;
 
   if(act==="all"){
-    visible().forEach(function(x){ S.sel[x.id]=1 });
-    render(); return;
+    // same reasoning as togglePick: tick them, do not rebuild them
+    visible().forEach(function(x){ S.sel[x.id]=1; paintPicked(x.id) });
+    paintSel(); return;
   }
   if(act==="clear"){ clearSel(); return }
 
