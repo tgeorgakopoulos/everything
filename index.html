@@ -1648,6 +1648,74 @@ function hydratePhotos(){
     var used=photoKeysOf(S.items), orphans=Object.keys(store).filter(function(k){ return !used[k] });
     if(orphans.length) pdbDrop(orphans);
     return filled;
+  }).catch(function(){ return 0 })
+    .then(function(filled){
+      return fillFromServer().then(function(n){ return filled+n });
+    });
+}
+
+/* The photographs this browser has lost, fetched back from the server.
+
+   IndexedDB can be emptied without the notes knowing: a browser clearing site
+   data, a storage eviction, a new device that pulled the notes but never the
+   pictures. The note keeps the key and the dimensions and loses the image, and
+   from then on it draws as a grey rectangle.
+
+   Nothing healed that by itself, and could not have: sig() deliberately does
+   not hash image bytes — a photograph never changes once added, so hashing two
+   megabytes of base64 on every keystroke would be waste. The consequence is
+   that the server's full copy and our hollow one fingerprint identically, the
+   sync sees no difference, and the grey stays grey for ever.
+
+   So ask for them by name. Anything the server still holds is filed back into
+   IndexedDB on the way past, so this only has to happen once. */
+function fillFromServer(){
+  if(!SYNC.on||!SYNC.session) return Promise.resolve(0);
+  var wanted={};
+  S.items.forEach(function(i){
+    if((i.photos||[]).some(function(p){ return p&&p.k&&!p.src })) wanted[i.id]=1;
+  });
+  var ids=Object.keys(wanted);
+  if(!ids.length) return Promise.resolve(0);
+
+  /* In small batches. Each row can carry a megabyte or two of base64, and
+     asking for twenty-three of them in one breath is how a request times out
+     and the whole repair reports failure. */
+  var CHUNK=6, got=0, pairs=[];
+  function batch(n){
+    if(n>=ids.length) return Promise.resolve();
+    var slice=ids.slice(n,n+CHUNK);
+    return withFreshSession().then(function(){
+      return fetch(SUPA.url+"/rest/v1/items?select=id,data&id=in."
+        +"("+slice.map(encodeURIComponent).join(",")+")",
+        { headers:supaHeaders(true) });
+    }).then(function(r){ return r.ok?r.json():[] })
+      .then(function(rows){
+        var byId={}; S.items.forEach(function(i){ byId[i.id]=i });
+        rows.forEach(function(row){
+          var mine=byId[row.id], theirs=row.data&&row.data.photos;
+          if(!mine||!theirs) return;
+          (mine.photos||[]).forEach(function(p){
+            if(!p||!p.k||p.src) return;
+            for(var j=0;j<theirs.length;j++){
+              if(theirs[j]&&theirs[j].k===p.k&&theirs[j].src){
+                p.src=theirs[j].src; pairs.push([p.k,p.src]); got++; return;
+              }
+            }
+          });
+        });
+        return batch(n+CHUNK);
+      })
+      .catch(function(){ return batch(n+CHUNK) });   // one bad batch is not the end
+  }
+
+  return batch(0).then(function(){
+    if(!got) return 0;
+    return pdbPutMany(pairs).catch(function(){ return 0 }).then(function(){
+      render();
+      toast(got+" image"+(got===1?"":"s")+" restored from the server");
+      return got;
+    });
   }).catch(function(){ return 0 });
 }
 
@@ -3458,6 +3526,11 @@ function pullChanges(){
   }).then(function(rows){
     if(rows.length) applyIncoming(rows);   // which advances lastPull itself,
     SYNC.pulledOnce=true;                  // only as far as it actually got
+    /* The boot call to hydratePhotos ran before the session was restored, so
+       its server fallback could not have asked for anything. Now that we are
+       signed in, give any picture this browser is missing one more chance —
+       fillFromServer returns immediately if there are none. */
+    if(!SYNC.imagesChecked){ SYNC.imagesChecked=true; fillFromServer(); }
     SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
     return rows.length;
   }).catch(function(e){
