@@ -3315,11 +3315,42 @@ function pushChanges(){
       .then(function(v){ SYNC.rehydrated=false; return v },
             function(e){ SYNC.rehydrated=false; throw e });
   }
+  /* A note whose image bytes cannot be found is held back, because uploading
+     it hollow would overwrite the server's full copy with an empty frame.
+     That is right. What was wrong is that it was held back *for ever*: if the
+     bytes are not in this browser and never will be, the note sat in the queue
+     permanently and the counter read "1 to go" until the end of time. The text
+     you had written never reached the server either.
+
+     So: hold it, but send the words. The photographs field is left off the
+     upload entirely — PostgREST merges the row, so the server keeps whatever
+     photos it already has — and everything else about the note goes up. You
+     lose nothing and the queue drains. */
   var held=ids.filter(function(id){ return hollow(byId[id]) });
   ids=ids.filter(function(id){ return !hollow(byId[id]) });
+  var partial=[];
   if(held.length){
-    SYNC.note=held.length+" note"+(held.length===1?"":"s")+" waiting for images";
-    if(!ids.length){ paintSync(); return Promise.resolve() }
+    if(!SYNC.rehydrated){
+      // hydration has already had its turn above and did not find them
+      partial=held.map(function(id){
+        /* A round-trip clone, so the keys keep the order they had. sig()
+           stringifies, and a record whose fields serialise in a different
+           order fingerprints differently — which would put this note straight
+           back in the queue on the next tick and loop for ever. Assigning
+           photos to an existing key leaves its position alone. */
+        var copy=JSON.parse(JSON.stringify(byId[id]));
+        copy.photos=(byId[id].photos||[]).map(function(p){
+          // keys and dimensions, never an empty src that would erase the image
+          return p&&p.src?p:{k:p.k,w:p.w,h:p.h};
+        });
+        return copy;
+      });
+      SYNC.note=held.length+" note"+(held.length===1?"":"s")
+        +": text synced, image missing here";
+    } else {
+      SYNC.note=held.length+" note"+(held.length===1?"":"s")+" waiting for images";
+      if(!ids.length){ paintSync(); return Promise.resolve() }
+    }
   }
 
   /* Deletions are sent as a flag, not as a row.
@@ -3336,6 +3367,8 @@ function pushChanges(){
   var dels=ids.filter(function(id){ return SYNC.queue[id]==="del"||!byId[id] });
   var puts=ids.filter(function(id){ return dels.indexOf(id)<0 });
   var rows=puts.map(function(id){ return { id:id, data:byId[id], deleted:false } });
+  /* the words of any note whose picture we cannot find, so the queue drains */
+  partial.forEach(function(d){ rows.push({ id:d.id, data:d, deleted:false }) });
 
   SYNC.status="busy"; paintSync();
   return withFreshSession().then(function(){
@@ -3592,15 +3625,43 @@ function normalizeItem(o){
   };
 }
 
+var EXPORT_TRIED=false;
 function exportLibrary(){
-  /* If the bytes are still being read back, wait for them. An export that
-     quietly omits your photographs is worse than one that takes a moment. */
-  var missing=S.items.some(function(i){
-    return (i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
-  });
-  if(missing){
+  /* Wait for the photographs once — then export whatever is here.
+
+     This used to read `hydratePhotos().then(exportLibrary)` with no limit. It
+     assumed hydration always finds the bytes. It does not: a note can hold a
+     photo key whose bytes are not in this browser's IndexedDB at all — the
+     note arrived from another device carrying keys and dimensions but no
+     image, or the store was cleared underneath it. In that case hydration
+     fills nothing, `missing` is still true, and exportLibrary calls itself
+     again. Forever, on a loop, reading the whole photo store every time.
+     That is the "Collecting photographs…" that never finishes.
+
+     The old comment argued that an export omitting a photograph is worse than
+     one that takes a moment. That was wrong in a way worth naming: it weighed
+     a slow export against an incomplete one, when the real choice was between
+     an incomplete export and NO EXPORT AT ALL. Export is the last line of
+     defence for the whole library. It must never be blocked by one image. */
+  var stillMissing=function(){
+    return S.items.filter(function(i){
+      return (i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
+    });
+  };
+  if(stillMissing().length&&!EXPORT_TRIED){
+    EXPORT_TRIED=true;
     toast("Collecting photographs…");
-    return hydratePhotos().then(exportLibrary);
+    return hydratePhotos().then(exportLibrary,exportLibrary);
+  }
+  EXPORT_TRIED=false;
+  var short=stillMissing();
+  if(short.length){
+    /* Say so plainly rather than failing, and name them, so you know which
+       notes to check rather than wondering about all of them. */
+    console.warn("Everything: exporting without image bytes for "
+      +short.length+" note(s):",short.map(function(i){ return i.title||i.id }));
+    toast(short.length+" note"+(short.length===1?"'s image is":"s' images are")
+      +" missing from this browser — exporting the rest");
   }
   var payload={
     format:EXPORT_FORMAT,
