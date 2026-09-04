@@ -3328,25 +3328,38 @@ function pushChanges(){
      lose nothing and the queue drains. */
   var held=ids.filter(function(id){ return hollow(byId[id]) });
   ids=ids.filter(function(id){ return !hollow(byId[id]) });
-  var partial=[];
+  var partialFetch=[];
   if(held.length){
-    if(!SYNC.rehydrated){
-      // hydration has already had its turn above and did not find them
-      partial=held.map(function(id){
-        /* A round-trip clone, so the keys keep the order they had. sig()
-           stringifies, and a record whose fields serialise in a different
-           order fingerprints differently — which would put this note straight
-           back in the queue on the next tick and loop for ever. Assigning
-           photos to an existing key leaves its position alone. */
-        var copy=JSON.parse(JSON.stringify(byId[id]));
-        copy.photos=(byId[id].photos||[]).map(function(p){
-          // keys and dimensions, never an empty src that would erase the image
-          return p&&p.src?p:{k:p.k,w:p.w,h:p.h};
-        });
-        return copy;
-      });
+    /* SYNC.rehydrated is TRUE while we are inside the retry that follows a
+       hydration attempt. That is precisely when we know the bytes could not be
+       found, so that is when the text goes up without them.
+
+       I had this the wrong way round the first time — `!SYNC.rehydrated` — so
+       the partial upload only ran on a path that cannot reach it, and the
+       retry fell through to the old "waiting for images" dead end. The note
+       stayed in the queue and the counter stayed at one. The test did not
+       catch it because it searched the source for the new lines instead of
+       running the function; the lines were all present and never executed. */
+    if(SYNC.rehydrated){
+      /* Send the words, and give the note back the pictures the SERVER has.
+
+         My first attempt sent `{k,w,h}` — the key and the dimensions, no
+         image — on the belief that the upsert would merge the JSON and leave
+         the stored photographs alone. It does not. `resolution=merge-duplicates`
+         replaces the row's columns outright; `data` is overwritten whole. So
+         that upload would have stripped the image bytes off every one of
+         these notes on the server, which is the only place they still exist.
+
+         The existing test in test-photos.js said exactly this and I read it
+         as describing old behaviour to be replaced. It was describing a rule
+         that still holds.
+
+         So: ask the server what it is holding for these notes, and put those
+         photographs into the record we send. The text syncs, the images are
+         untouched, and nothing has to be found locally. */
+      partialFetch=held;
       SYNC.note=held.length+" note"+(held.length===1?"":"s")
-        +": text synced, image missing here";
+        +": text synced, image kept on the server";
     } else {
       SYNC.note=held.length+" note"+(held.length===1?"":"s")+" waiting for images";
       if(!ids.length){ paintSync(); return Promise.resolve() }
@@ -3367,11 +3380,38 @@ function pushChanges(){
   var dels=ids.filter(function(id){ return SYNC.queue[id]==="del"||!byId[id] });
   var puts=ids.filter(function(id){ return dels.indexOf(id)<0 });
   var rows=puts.map(function(id){ return { id:id, data:byId[id], deleted:false } });
-  /* the words of any note whose picture we cannot find, so the queue drains */
-  partial.forEach(function(d){ rows.push({ id:d.id, data:d, deleted:false }) });
 
   SYNC.status="busy"; paintSync();
   return withFreshSession().then(function(){
+    /* Notes whose picture is missing here: read the server's copy first and
+       carry its photographs into ours, so the words go up and the images stay
+       exactly as they are. If the read fails, the note simply waits — that is
+       the old behaviour, and it is the safe one. */
+    if(!partialFetch.length) return;
+    return fetch(SUPA.url+"/rest/v1/items?select=id,data&id=in."
+        +"("+partialFetch.map(encodeURIComponent).join(",")+")",
+        { headers:supaHeaders(true) })
+      .then(function(r){ return r.ok?r.json():[] })
+      .then(function(their){
+        var srv={};
+        their.forEach(function(r){ srv[r.id]=r.data&&r.data.photos });
+        partialFetch.forEach(function(id){
+          /* A round-trip clone keeps the field order. sig() stringifies, and a
+             record whose fields serialise in a different order fingerprints
+             differently — which would put the note straight back in the queue
+             on the next tick. Assigning to an existing key leaves its place. */
+          var copy=JSON.parse(JSON.stringify(byId[id]));
+          var theirs=srv[id];
+          copy.photos=(theirs&&theirs.length)
+            ? theirs                                   // the server's, intact
+            : (byId[id].photos||[]).map(function(p){    // nobody has the bytes
+                return p&&p.src?p:{k:p.k,w:p.w,h:p.h};
+              });
+          rows.push({ id:id, data:copy, deleted:false });
+        });
+      })
+      .catch(function(){ /* leave them queued; better late than damaged */ });
+  }).then(function(){
     var jobs=[];
     if(rows.length) jobs.push(
       fetch(SUPA.url+"/rest/v1/items?on_conflict=id",{
