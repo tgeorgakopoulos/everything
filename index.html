@@ -1613,8 +1613,28 @@ function slimPhotos(items){
   });
 }
 function writeItems(){
-  var payload=photosAllFiled()?slimPhotos(S.items):S.items;
-  localStorage.setItem(KEY,JSON.stringify(payload));
+  /* The full payload is written only while photographs are still on their way
+     into IndexedDB, so that a tab closed in that second does not take a new
+     image with it. That is worth doing — but it must never be the reason the
+     library cannot be saved at all.
+
+     Restoring twenty-three photographs from the server put roughly eleven
+     megabytes of base64 into memory at once. localStorage holds about five.
+     Every save then threw, the red banner came up, and it stayed up: the
+     writes kept failing for as long as the bytes sat unfiled.
+
+     So if the full write does not fit, write the slim one. The most that can
+     cost is an image added in the last moment before a crash, and that image
+     is recoverable from the server. A library that cannot be saved is not. */
+  try{
+    localStorage.setItem(KEY,
+      JSON.stringify(photosAllFiled()?slimPhotos(S.items):S.items));
+  }catch(e){
+    // no room for the bytes — the words are what matter
+    localStorage.setItem(KEY,JSON.stringify(slimPhotos(S.items)));
+    console.warn("Everything: wrote the library without image bytes; "
+      +"there was not room for them.",e&&e.name);
+  }
 }
 // file anything new, then write again now that the bytes are safe elsewhere
 function persistPhotos(){
@@ -1704,18 +1724,29 @@ function fillFromServer(){
             }
           });
         });
-        return batch(n+CHUNK);
+        /* File this batch's bytes before fetching the next.
+
+           They were all collected and written in one transaction at the end.
+           Twenty-three images in a single IndexedDB write is a transaction
+           large enough to fail — and when it failed, PKEYS was never marked,
+           so the app believed no photograph was safely stored and wrote the
+           whole eleven megabytes into localStorage on every save. That is
+           what put the red banner up.
+
+           Six at a time, filed as they arrive. A batch that fails costs that
+           batch and nothing else. */
+        var mine=pairs.splice(0,pairs.length);
+        return pdbPutMany(mine).catch(function(){ return 0 }).then(function(){
+          render();
+          return batch(n+CHUNK);
+        });
       })
       .catch(function(){ return batch(n+CHUNK) });   // one bad batch is not the end
   }
 
   return batch(0).then(function(){
-    if(!got) return 0;
-    return pdbPutMany(pairs).catch(function(){ return 0 }).then(function(){
-      render();
-      toast(got+" image"+(got===1?"":"s")+" restored from the server");
-      return got;
-    });
+    if(got) toast(got+" image"+(got===1?"":"s")+" restored from the server");
+    return got;
   }).catch(function(){ return 0 });
 }
 
