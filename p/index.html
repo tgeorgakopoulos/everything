@@ -56,6 +56,7 @@
   time{display:block;font-size:12.5px;color:var(--faint);margin-bottom:10px}
   time a{color:inherit;text-decoration:none}
   time a:hover{color:var(--muted);text-decoration:underline}
+  time .pin{color:var(--accent);font-weight:600}
   .text{font-size:16.5px;line-height:1.65;color:var(--ink);word-break:break-word}
   .text:empty{display:none}
   .text p{margin:0 0 .7em}
@@ -67,7 +68,7 @@
   .text h3:first-child{margin-top:0}
   .text hr{border:0;border-top:1px solid var(--line-strong);margin:1.1em 0;height:0}
   .text a{color:var(--blue)}
-  .fold + .shots,.fold + .card{margin-top:14px}
+  .fold + .shots,.fold + .card{margin-top:22px}
   .shots + .card{margin-top:10px}
 
   .shots{display:grid;gap:4px;border-radius:var(--r);overflow:hidden}
@@ -101,8 +102,9 @@
     pointer-events:none;background:linear-gradient(transparent,var(--bg))}
   .fold.open::after,.fold.short::after{display:none}
   .more{position:absolute;left:0;right:0;bottom:0;z-index:2;border:0;cursor:pointer;
-    display:flex;justify-content:center;padding:18px 0 2px;
+    display:flex;justify-content:center;padding:18px 0 0;
     background:linear-gradient(transparent,var(--bg) 44%)}
+
   .more::before{content:"More";padding:5px 16px;border-radius:99px;
     border:1px solid var(--line);background:var(--bg);
     font:inherit;font-size:12.5px;font-weight:640;color:var(--accent)}
@@ -239,7 +241,8 @@ function postHTML(p){
   var link=only?"":('<a href="?u='+encodeURIComponent(handle)+'&p='+encodeURIComponent(p.id)+'">'
                     +esc(when(p.created_at))+'</a>');
   return '<article>'
-    +'<time>'+(link||esc(when(p.created_at)))+(p.edited_at?" · edited":"")+'</time>'
+    +'<time>'+(p.pinned?'<b class="pin">Pinned</b> · ':"")
+      +(link||esc(when(p.created_at)))+(p.edited_at?" · edited":"")+'</time>'
     // only the words fold — a photograph is often the whole post
     +'<div class="fold">'
       +'<div class="text">'+body(p.body)+'</div>'
@@ -273,10 +276,10 @@ if(!handle){
            : '<div class="av">'+esc(name.slice(0,1).toUpperCase())+'</div>')
         +'<div><h1>'+esc(name)+'</h1><p class="at">@'+esc(me.handle)+'</p></div></div>'
         +(me.bio?'<p class="bio">'+esc(me.bio)+'</p>':"");
-      var q="/posts?select=id,body,photos,link,created_at,edited_at"
+      var q="/posts?select=id,body,photos,link,created_at,edited_at,pinned"
             +"&author=eq."+encodeURIComponent(me.user_id)
             +(only?"&id=eq."+encodeURIComponent(only):"")
-            +"&order=created_at.desc&limit=100";
+            +"&order=pinned.desc,created_at.desc&limit=100";
       return get(q);
     })
     .then(function(posts){
