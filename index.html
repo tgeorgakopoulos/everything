@@ -29,6 +29,7 @@
     --tscale:1;
     --line:rgba(22,26,25,.13); --line-strong:rgba(22,26,25,.26);
     --accent:#1F6B63; --accent-soft:rgba(31,107,99,.12);
+    --make:#3F7D1E; --make-soft:rgba(63,125,30,.12);
     --blue:#44579F; --green:#5F8442; --red:#B4443A;
     --shadow:0 1px 2px rgba(22,26,25,.04), 0 6px 20px -8px rgba(22,26,25,.10);
     --shadow-lg:0 10px 40px -12px rgba(22,26,25,.22);
@@ -93,6 +94,7 @@
     --ui:#B4BFBD;
     --line:rgba(232,237,236,.14); --line-strong:rgba(232,237,236,.28);
     --accent:#4FB3A6; --accent-soft:rgba(79,179,166,.16);
+    --make:#8FC85A; --make-soft:rgba(143,200,90,.16);
     --blue:#95A6E4; --green:#9BBA72; --red:#E0736A;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px -8px rgba(0,0,0,.5);
     --shadow-lg:0 10px 40px -12px rgba(0,0,0,.7);
@@ -271,7 +273,15 @@
   .compilewrap{position:relative}
   .compilebtn{height:34px;padding:0 12px;border:1px solid var(--line-strong);
     border-radius:10px;font-size:12.5px;background:var(--surface)}
-  .compilebtn.on{border-color:var(--accent);color:var(--accent)}
+  /* Compile earns its own colour. It is the only control on this bar that
+     makes a new thing rather than changing how the existing ones are shown,
+     and it is the end of the week's work — it should be findable at a glance
+     rather than read for. Green, which nothing else in the app uses. */
+  .compilebtn{border-color:var(--make);color:var(--make);font-weight:600}
+  .compilebtn:hover{background:var(--make-soft);border-color:var(--make);
+    color:var(--make)}
+  .compilebtn.on{border-color:var(--make);background:var(--make-soft);
+    color:var(--make)}
   .menu{position:absolute;top:40px;right:0;min-width:212px;z-index:45;
     background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;
     box-shadow:var(--shadow-lg);padding:5px;display:none}
@@ -684,6 +694,16 @@
   /* editor list */
   .cklist{display:flex;flex-direction:column;gap:3px;margin:6px 0 8px}
   .ckrow{display:flex;gap:9px;align-items:center}
+  /* The move handle. Present in the layout at all times so nothing shifts
+     sideways when it appears — only its opacity changes. */
+  .ckgrip{display:flex;flex-direction:column;width:14px;flex:none;
+    opacity:0;transition:opacity .12s}
+  .ckrow:hover .ckgrip,.ckgrip:focus-within{opacity:1}
+  .ckgrip button{height:11px;line-height:9px;border:0;background:none;padding:0;
+    font-size:8px;color:var(--faint);cursor:pointer;border-radius:3px}
+  .ckgrip button:hover:not(:disabled){color:var(--accent);background:var(--line)}
+  .ckgrip button:disabled{opacity:.25;cursor:default}
+  .ckgrip button:focus-visible{outline:1px solid var(--accent);opacity:1}
   .ckrow .cbox{width:17px;height:17px;font-size:10px;margin:0}
   .ckin{flex:1;border:0;border-bottom:1px solid transparent;background:none;outline:none;
     font-size:14px;padding:4px 2px;margin:0!important;color:var(--ink)}
@@ -962,6 +982,9 @@
   .pmore:hover::before{border-color:var(--accent)}
   .pfold.open .pmore,.pfold.short .pmore{display:none}
   .postcard .ptext a{color:var(--blue)}
+  .ppin.on{color:var(--accent);font-weight:640}
+  .ppinned{font-size:11.5px;font-weight:640;letter-spacing:.02em;
+    color:var(--accent);margin:-4px 0 10px}
   /* Drawn, so it takes its colour from the text around it and never depends on
      a font happening to carry the character. */
   .pico{width:1.05em;height:1.05em;fill:none;stroke:currentColor;stroke-width:1.9;
@@ -1327,7 +1350,7 @@
       </div>
       <div class="topright">
         <div class="compilewrap">
-          <button class="ghost compilebtn" id="compilebtn" title="Turn this page into one document">⇥ Compile</button>
+          <button class="ghost compilebtn" id="compilebtn" title="Gather everything on this page into one document">⇥ Compile</button>
           <div class="menu" id="compilemenu">
             <button data-comp="note"><b>As a new note</b><span>Editable here, links live</span></button>
             <button data-comp="doc"><b>Download .doc</b><span>Opens in Word or Pages</span></button>
@@ -2857,9 +2880,9 @@ function render(){
   document.querySelectorAll("#layoutseg button").forEach(function(b){
     b.classList.toggle("on", b.dataset.lay===lay);
   });
-  // compiling only means something where there are links to compile
-  var nlinks=list.filter(hasLink).length;
-  document.getElementById("compilebtn").style.display=nlinks?"":"none";
+  /* Shown whenever the page holds anything worth gathering — notes as well
+     as links, since a tag is a subject rather than a list of addresses. */
+  document.getElementById("compilebtn").style.display=compileList().length?"":"none";
   paintSel();
   paintBackupHint();
   paintSidebar();
@@ -3949,9 +3972,30 @@ function linkPhrase(html,phrase,url){
 }
 
 function compileEntry(i){
+  var body=sanitizeRich(i.body||"");
+
+  /* A note with no link is still part of the page.
+
+     Compile began as a way of turning a page of links into one document, so
+     it quietly skipped everything else. But a tag is a subject, not a list of
+     addresses: the notes filed under it are usually the thinking, and leaving
+     them out produced a document with the references and none of the argument.
+
+     So a note contributes its title as a heading, if it has one you wrote,
+     and its text underneath. */
+  if(!hasLink(i)){
+    var head=(i.title||"").trim();
+    var checks=(i.checks||[]).length
+      ? "<br>"+i.checks.map(function(c){
+          return (c.d?"☑ ":"☐ ")+esc(c.t||"");
+        }).join("<br>")
+      : "";
+    if(head&&!i.titleAuto) return "<h3>"+esc(head)+"</h3>"+body+checks;
+    return body+checks || esc(head);
+  }
+
   var label=(i.title||host(i.url)||i.url).trim();
   var anchor='<a href="'+esc(i.url)+'" target="_blank" rel="noopener noreferrer">'+esc(label)+'</a>';
-  var body=sanitizeRich(i.body||"");
   if(body){
     var inPlace=linkPhrase(body,label,i.url);
     if(inPlace) return inPlace;             // your sentence, with the link inside it
@@ -3960,8 +4004,15 @@ function compileEntry(i){
   return anchor+(i.desc?"<br>"+esc(i.desc):"");
 }
 
+/* Everything on the page that has something to say. An empty note contributes
+   nothing but a gap, so it is left out; a note with words or a list is in. */
 function compileList(){
-  return visible().filter(hasLink);
+  return visible().filter(function(i){
+    return hasLink(i)
+      || (i.body&&richToText(i.body).trim())
+      || (i.checks||[]).length
+      || (i.title&&!i.titleAuto);
+  });
 }
 function compileBody(list){
   return list.map(function(i){ return compileEntry(i) }).join("<br><br>");
@@ -3974,7 +4025,7 @@ function compileTitle(){
 
 function compileToNote(){
   var list=compileList();
-  if(!list.length) return toast("No links on this page");
+  if(!list.length) return toast("Nothing on this page to compile");
   var now=Date.now();
   var item={id:uid(),title:compileTitle(),body:sanitizeRich(compileBody(list)),
     url:"",image:"",desc:"",logo:"",site:"",metaState:null,titleAuto:false,
@@ -3983,13 +4034,13 @@ function compileToNote(){
   S.items.unshift(item);
   S.view="notes"; S.tag=null; S.q=""; document.getElementById("q").value="";
   save(); render();
-  toast(list.length+" links compiled into a note");
+  toast(list.length+" item"+(list.length===1?"":"s")+" compiled into a note");
   setTimeout(function(){ openEditor(item.id) },120);
 }
 
 function compileToDoc(){
   var list=compileList();
-  if(!list.length) return toast("No links on this page");
+  if(!list.length) return toast("Nothing on this page to compile");
   var title=compileTitle();
   var doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" '
     +'xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
@@ -4007,7 +4058,7 @@ function compileToDoc(){
     a.download=title.replace(/[\/\\:*?"<>|]/g,"-")+".doc";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href) },2000);
-    toast(list.length+" links exported");
+    toast(list.length+" item"+(list.length===1?"":"s")+" exported");
   }catch(e){ toast("Couldn't build the file") }
 }
 
@@ -4246,8 +4297,22 @@ function openEditor(id){
   function caretRect(){
     var sel=window.getSelection();
     if(!sel||!sel.rangeCount) return null;
-    var r=sel.getRangeAt(0).cloneRange();
-    r.collapse(true);
+    /* The moving end of the selection, not the start of it.
+
+       A Range always runs from the earlier point to the later one, whichever
+       way round you made it. Collapsing it to `true` therefore gives the TOP
+       of a selection — so holding shift and pressing Down scrolled the view to
+       where the selection began and left the end you were actually extending
+       off the bottom of the screen.
+
+       A Selection knows which end is moving: `focusNode`. Build the range
+       there instead and the view follows the cursor, in both directions. */
+    var r=document.createRange(), ok=false;
+    if(sel.focusNode){
+      try{ r.setStart(sel.focusNode,sel.focusOffset); r.collapse(true); ok=true }
+      catch(e){ ok=false }
+    }
+    if(!ok){ r=sel.getRangeAt(0).cloneRange(); r.collapse(true) }
     var rect=r.getClientRects()[0];
     if(rect&&rect.height) return rect;
     var node=r.startContainer;
@@ -4402,7 +4467,18 @@ function openEditor(id){
   var draftChecks=(i.checks||[]).map(function(c){ return {t:c.t,d:!!c.d} });
   function paintChecks(focusIx){
     q("#e-cklist").innerHTML=draftChecks.map(function(c,ix){
+      /* The grip sits on the left, opposite the ✕, and stays out of the way
+         until the row is under the cursor — the same manners as the delete
+         button. The dots are the conventional mark for "this can be moved";
+         the arrows appear inside them so the gesture needs no explaining and
+         no dragging. */
       return '<div class="ckrow'+(c.d?" done":"")+'">'
+        +'<span class="ckgrip" aria-hidden="true">'
+          +'<button data-ckup="'+ix+'" title="Move up"'
+            +(ix===0?' disabled':'')+'>▲</button>'
+          +'<button data-ckdn="'+ix+'" title="Move down"'
+            +(ix===draftChecks.length-1?' disabled':'')+'>▼</button>'
+        +'</span>'
         +'<span class="cbox'+(c.d?"":"")+'" data-tick="'+ix+'" '
           +'style="'+(c.d?"background:var(--accent);border-color:var(--accent);color:#fff":"")+'">✓</span>'
         +'<input class="ckin" data-ckin="'+ix+'" value="'+esc(c.t)+'" placeholder="List item">'
@@ -4427,7 +4503,24 @@ function openEditor(id){
     var t=e.target.closest("[data-tick]");
     if(t){ readChecks(); draftChecks[+t.dataset.tick].d=!draftChecks[+t.dataset.tick].d; paintChecks(); return }
     var del=e.target.closest("[data-ckdel]");
-    if(del){ readChecks(); draftChecks.splice(+del.dataset.ckdel,1); paintChecks(); }
+    if(del){ readChecks(); draftChecks.splice(+del.dataset.ckdel,1); paintChecks(); return }
+
+    /* Moving a row. The text is read out of the inputs first, or whatever you
+       had just typed and not yet blurred would be left behind at the old
+       position. The moved row keeps the focus, so several presses in a row
+       carry the same item up the list rather than walking through them. */
+    var up=e.target.closest("[data-ckup]"), dn=e.target.closest("[data-ckdn]");
+    if(up||dn){
+      readChecks();
+      var from=+(up?up.dataset.ckup:dn.dataset.ckdn);
+      var to=from+(up?-1:1);
+      if(to<0||to>=draftChecks.length) return;
+      var moved=draftChecks.splice(from,1)[0];
+      draftChecks.splice(to,0,moved);
+      paintChecks();
+      var btn=q('[data-ck'+(up?"up":"dn")+'="'+to+'"]');
+      if(btn&&!btn.disabled) btn.focus();
+    }
   });
   q("#e-cklist").addEventListener("keydown",function(e){
     var el=e.target.closest("[data-ckin]"); if(!el) return;
@@ -5344,8 +5437,8 @@ function loadPosts(force){
     if(!uid) throw { msg:"could not read your account id from the session" };
     return Promise.all([
       rest("/profiles?select=user_id,handle,display_name,bio,avatar,is_admin&user_id=eq."+uid),
-      rest("/posts?select=id,body,photos,link,created_at,edited_at&author=eq."+uid
-           +"&order=created_at.desc")
+      rest("/posts?select=id,body,photos,link,created_at,edited_at,pinned&author=eq."+uid
+           +"&order=pinned.desc,created_at.desc")
     ]);
   }).then(function(r){
     POSTS.profile=(r[0]||[])[0]||null;
@@ -5787,6 +5880,8 @@ function postCardHTML(p){
     +(p.edited_at?'<span>· edited</span>':"")
     +'<span class="sp">'
       +(publicUrl(p.id)?'<button data-plink="'+esc(p.id)+'">Copy link</button>':"")
+      +'<button class="ppin'+(p.pinned?" on":"")+'" data-ppin="'+esc(p.id)+'">'
+        +(p.pinned?"Unpin":"Pin")+'</button>'
       +'<button data-pedit="'+esc(p.id)+'">Edit</button>'
       +'<button class="rm" data-pdel="'+esc(p.id)+'">Unpublish</button>'
     +'</span></div>'
@@ -5795,6 +5890,7 @@ function postCardHTML(p){
        whole reason the post exists, and putting it behind More hides the one
        part that would have made you press More. So the fold closes around the
        text and stops there. Pictures and link cards always show. */
+    +(p.pinned?'<div class="ppinned" title="Pinned to the top">◆ Pinned</div>':"")
     +'<div class="pfold" data-fold="'+esc(p.id)+'">'
       +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
       +'<button class="pmore" data-more="'+esc(p.id)+'" aria-label="Show the rest"></button>'
@@ -5863,6 +5959,36 @@ board.addEventListener("click",function(e){
     if(p) openComposer(draftFromPost(p));
     return;
   }
+  /* Pinning. One flag, sent on its own — `edited_at` is deliberately left
+     alone, because moving a post to the top of the page is not editing it and
+     should not put "edited" under something you have not touched. */
+  var pp=e.target.closest("[data-ppin]");
+  if(pp){
+    e.stopPropagation();
+    var pid=pp.dataset.ppin;
+    var post=POSTS.list.filter(function(x){ return x.id===pid })[0];
+    if(!post) return;
+    var want=!post.pinned;
+    pp.disabled=true;
+    rest("/posts?id=eq."+pid,{ method:"PATCH", prefer:"return=representation",
+                               body:{ pinned:want } })
+      .then(function(){
+        post.pinned=want;
+        // the server orders by pinned first; keep the local list in step
+        POSTS.list.sort(function(a,b){
+          if(!!b.pinned!==!!a.pinned) return b.pinned?1:-1;
+          return String(b.created_at).localeCompare(String(a.created_at));
+        });
+        render();
+        toast(want?"Pinned to the top":"Unpinned");
+      })
+      .catch(function(err){
+        pp.disabled=false;
+        toast((err&&err.msg)||"could not pin that");
+      });
+    return;
+  }
+
   var dl=e.target.closest("[data-pdel]");
   if(dl){
     e.stopPropagation();
