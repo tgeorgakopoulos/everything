@@ -983,6 +983,11 @@
   .pfold.open .pmore,.pfold.short .pmore{display:none}
   .postcard .ptext a{color:var(--blue)}
   .ppin.on{color:var(--accent);font-weight:640}
+  /* Open in its own window: quieter here, with a mark saying where it went. */
+  .card.elsewhere,.row.elsewhere{opacity:.55}
+  .card.elsewhere::after,.row.elsewhere::after{content:"⇱ in its own window";
+    position:absolute;right:10px;bottom:8px;font-size:10.5px;font-weight:640;
+    letter-spacing:.02em;color:var(--accent)}
   .ppinned{font-size:11.5px;font-weight:640;letter-spacing:.02em;
     color:var(--accent);margin:-4px 0 10px}
   /* Drawn, so it takes its colour from the text around it and never depends on
@@ -2737,6 +2742,7 @@ function cardHTML(i){
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
 
   if(S.sel[i.id]) cls+=" picked";
+  if(poppedOut(i.id)) cls+=" elsewhere";
   return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
     +(i.pin?'<div class="pinned"></div>':"")
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
@@ -2782,6 +2788,7 @@ function rowHTML(i){
   var tags=(i.tags||[]).slice(0,3).map(function(t){ return '<span class="tag">#'+esc(t)+'</span>' }).join("");
 
   if(S.sel[i.id]) cls+=" picked";
+  if(poppedOut(i.id)) cls+=" elsewhere";
   return '<div class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
     +(i.pin?'<div class="pinned"></div>':"")
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
@@ -3630,7 +3637,9 @@ function applyIncoming(rows){
     /* Rows arrive oldest first. Once one is held back, nothing after it may
        be marked as seen either, or the next pull starts beyond a row we
        never applied. */
-    if(S.editing===row.id){
+    /* A note being written — in the sheet here, or in its own window — is
+       left alone until the writing stops. Held rows are applied on close. */
+    if(S.editing===row.id||poppedOut(row.id)){
       SYNC.pending[row.id]=row;
       deferred=true;
       return;
@@ -4182,6 +4191,10 @@ function applySheetTint(tint){
 
 function openEditor(id){
   var i=S.items.filter(function(x){return x.id===id})[0]; if(!i) return;
+  /* Already open in its own window. Two editors on one note is the shape of
+     every conflict we have had; bring that window forward instead. */
+  var out=poppedOut(id);
+  if(out){ out.focus(); toast("That note is open in its own window"); return }
   var d={url:i.url||"",actionable:hasAction(i),due:i.due,timed:!!i.timed,tint:i.tint||"",pin:!!i.pin};
 
   FOCUS=false;      // fresh every time: every note opens in the ordinary editor
@@ -4226,6 +4239,8 @@ function openEditor(id){
       +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
       +'<button class="facet'+(FOCUS?" on":"")+'" id="e-focus" title="Room to write — ⌘⇧F">'
         +'<span class="fi">◫</span>Focus</button>'
+      +'<button class="facet" id="e-pop" title="Open this note in its own window">'
+        +'<span class="fi">⇱</span>Pop out</button>'
       +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
       +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">'+POST_ICO+'</span>'
         +(i.postId?"Posted":"Post")+'</button>'
@@ -4763,6 +4778,14 @@ function openEditor(id){
     }
   });
   q("#e-focus").addEventListener("click",toggleFocus);
+  /* Commit first, then hand the note over. The popout reads the note from the
+     library, so anything still sitting in these fields has to be in the
+     library before it opens — otherwise popping out silently discards
+     whatever you had just typed. applyEdits saves and closes the sheet. */
+  q("#e-pop").addEventListener("click",function(){
+    applyEdits();
+    popOut(id);
+  });
 
   q("#e-hist").addEventListener("click",function(){
     var showing=!histBox.hasAttribute("hidden");
@@ -4812,6 +4835,172 @@ function close(){
   scrim.classList.remove("on"); S.editing=null; editorApply=null;
   flushPending();          // rows that arrived while this note was open
 }
+
+/* =========================================================================
+   POPPING A NOTE OUT
+   =========================================================================
+
+   A second window holding one note, so a source can sit in the first.
+
+   The rule that shapes everything here: THIS WINDOW REMAINS THE ONLY OWNER
+   OF THE LIBRARY. The popout is a writing surface and nothing more. It has
+   no copy of your notes, never touches localStorage, never speaks to the
+   server, and cannot sync. Every keystroke is handed back here and saved by
+   the same save() that the ordinary editor uses.
+
+   The alternative — opening the whole app in a second tab — would have given
+   two independent copies of the library writing to the same storage and the
+   same rows. After the last month I am not building that.
+
+   The popout is opened blank and written into from here, so it is the same
+   origin and we can reach its DOM directly. The cost of that is real and is
+   handled below: the handlers live in THIS window, so if this window closes
+   they die with it. The popout carries its own small script that watches for
+   exactly that and stops accepting words rather than pretending to save them.
+   ========================================================================= */
+var POPPED={};              // id -> the window holding it
+
+function poppedOut(id){
+  var w=POPPED[id];
+  if(w&&!w.closed) return w;
+  if(w) delete POPPED[id];
+  return null;
+}
+
+function popOut(id){
+  var open=poppedOut(id);
+  if(open){ open.focus(); return }
+  var i=S.items.filter(function(x){ return x.id===id })[0];
+  if(!i) return;
+
+  var w=window.open("","ev-note-"+id,
+    "width=820,height=900,menubar=no,toolbar=no,location=no,status=no");
+  if(!w){ toast("Your browser blocked the window"); return }
+  POPPED[id]=w;
+
+  /* Match whatever this window is wearing. The explicit theme wins; failing
+     that, the system's. matchMedia is reached through window and guarded —
+     it is absent in some environments, and a popout that throws on the way
+     open would take the note with it. */
+  var dark=document.documentElement.getAttribute("data-theme")==="dark"
+        || !!(window.matchMedia
+              && window.matchMedia("(prefers-color-scheme:dark)").matches);
+
+  w.document.open();
+  w.document.write(popoutHTML(i,dark));
+  w.document.close();
+
+  var doc=w.document;
+  var titleEl=doc.getElementById("t"), bodyEl=doc.getElementById("b"),
+      markEl=doc.getElementById("saved"), warnEl=doc.getElementById("gone");
+
+  var timer=null;
+  function commit(){
+    var it=S.items.filter(function(x){ return x.id===id })[0];
+    if(!it) return;
+    var nt=titleEl.value.trim(), nb=sanitizeRich(bodyEl.innerHTML);
+    if(it.title===nt&&it.body===nb) return;       // nothing moved
+    remember(it,"before your edit");
+    it.title=nt; it.body=nb; it.modified=Date.now();
+    save(); render();
+    markEl.textContent="Saved";
+    setTimeout(function(){ if(!w.closed) markEl.textContent="" },1400);
+  }
+  function later(){
+    markEl.textContent="…";
+    clearTimeout(timer); timer=setTimeout(commit,700);
+  }
+  titleEl.addEventListener("input",later);
+  bodyEl.addEventListener("input",function(){
+    later();
+    doc.getElementById("wc").textContent=wordsIn(bodyEl.innerText||"");
+  });
+  doc.getElementById("wc").textContent=wordsIn(bodyEl.innerText||"");
+
+  /* Closing the popout commits whatever is in it. Losing a paragraph because
+     a window was shut is the same loss as losing it any other way. */
+  w.addEventListener("beforeunload",function(){
+    clearTimeout(timer); commit();
+    delete POPPED[id]; setTimeout(render,0);
+  });
+
+  /* The popout's own script tells it when this window has gone. It cannot
+     save without us, so it says so plainly instead of swallowing the words. */
+  w.__orphaned=function(){
+    warnEl.hidden=false;
+    bodyEl.setAttribute("contenteditable","false");
+    titleEl.disabled=true;
+  };
+
+  render();                 // the card shows that it is open elsewhere
+  setTimeout(function(){ try{ bodyEl.focus() }catch(e){} },60);
+}
+
+function wordsIn(t){
+  var n=(t||"").trim().split(/\s+/).filter(Boolean).length;
+  return n+(n===1?" word":" words");
+}
+
+/* The document written into the new window. Self-contained: it borrows no
+   stylesheet from here, because it has to keep looking like itself even after
+   this window is gone. The measure is the same 64ch as focus mode. */
+function popoutHTML(i,dark){
+  return '<!doctype html><html lang="en"><meta charset="utf-8">'
+  +'<meta name="viewport" content="width=device-width,initial-scale=1">'
+  +'<title>'+esc(i.title||"Untitled")+' — Everything</title>'
+  +'<style>'
+  +':root{--bg:#F7F6F3;--ink:#1A1917;--muted:#6E6A62;--line:rgba(22,26,25,.14);'
+    +'--accent:#1F6B63;--warn:#A8501E}'
+  +(dark?':root{--bg:#131211;--ink:#EDEBE6;--muted:#ABA69C;'
+    +'--line:rgba(255,255,255,.15);--accent:#5FB3A6;--warn:#E2A06A}':"")
+  +'*{box-sizing:border-box}'
+  +'body{margin:0;background:var(--bg);color:var(--ink);padding:44px 40px 80px;'
+    +'font:19px/1.8 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;'
+    +'-webkit-font-smoothing:antialiased}'
+  +'.wrap{max-width:64ch;margin:0 auto}'
+  +'#t{width:100%;border:0;background:none;outline:none;color:var(--ink);'
+    +'font:650 30px/1.25 inherit;letter-spacing:-.02em;margin:0 0 18px;padding:0}'
+  +'#t::placeholder{color:var(--muted);opacity:.55}'
+  +'#b{outline:none;min-height:62vh;white-space:pre-wrap;word-break:break-word}'
+  +'#b:empty:before{content:"Write…";color:var(--muted);opacity:.55}'
+  +'#b a{color:var(--accent)}'
+  +'#b h3{font-size:1.2em;font-weight:600;margin:.9em 0 .3em}'
+  +'#b hr{border:0;border-top:1px solid var(--line);margin:1.2em 0}'
+  +'.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:14px;'
+    +'align-items:center;justify-content:center;padding:10px;'
+    +'background:var(--bg);border-top:1px solid var(--line);'
+    +'font-size:12.5px;color:var(--muted)}'
+  +'#saved{color:var(--accent);font-weight:600;min-width:46px;text-align:left}'
+  +'#gone{position:fixed;left:0;right:0;top:0;padding:12px 18px;'
+    +'background:var(--warn);color:#fff;font-size:14px;font-weight:600}'
+  +'</style>'
+  +'<div id="gone" hidden>The main Everything window has closed, so nothing here '
+    +'can be saved. Copy anything you need before closing this one.</div>'
+  +'<div class="wrap">'
+    +'<input id="t" value="'+esc(i.title||"")+'" placeholder="Title">'
+    +'<div id="b" contenteditable="true" spellcheck="true">'+sanitizeRich(i.body||"")+'</div>'
+  +'</div>'
+  +'<div class="bar"><span id="wc"></span><span id="saved"></span></div>'
+  +'<script>(function(){'
+    /* Its own realm, so this keeps running when ours does not. */
+    +'setInterval(function(){'
+      +'if(!window.opener||window.opener.closed){'
+        +'if(window.__orphaned) window.__orphaned();'
+        +'else{var g=document.getElementById("gone");if(g)g.hidden=false;'
+             +'var b=document.getElementById("b");if(b)b.contentEditable="false";}'
+      +'}'
+    +'},1500);'
+  +'})();<\/script></html>';
+}
+
+/* If this window goes, the popouts cannot save. Commit and shut them rather
+   than leaving windows open that quietly do nothing. */
+window.addEventListener("beforeunload",function(){
+  Object.keys(POPPED).forEach(function(id){
+    var w=POPPED[id];
+    if(w&&!w.closed){ try{ w.close() }catch(e){} }
+  });
+});
 
 /* Dismissing an open note SAVES it. Losing a page of writing because a
    selection drag ended outside the sheet, or because Escape felt like
