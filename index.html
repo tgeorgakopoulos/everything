@@ -4941,46 +4941,83 @@ function wordsIn(t){
   return n+(n===1?" word":" words");
 }
 
-/* The document written into the new window. Self-contained: it borrows no
-   stylesheet from here, because it has to keep looking like itself even after
-   this window is gone. The measure is the same 64ch as focus mode. */
+/* The document written into the new window.
+
+   It wears the app's own clothes, because a second window for writing in
+   should not look like a different program. The first version of this had a
+   stylesheet I typed out by hand — a guess at the app's colours and nothing
+   of its typeface, its text size or focus mode. There is no need to guess:
+   the styles are in this document and can be carried across whole.
+
+   So: every <style> block verbatim, every stylesheet link, and the three
+   things the app records on the <html> element — the theme, the chosen
+   typeface, and your A− / A+ setting. Then the same class names the editor
+   uses, so the same rules apply to the same parts.
+
+   The copied CSS is inlined text, so it keeps working after this window has
+   gone. Only the webfonts are external, and they were already. */
 function popoutHTML(i,dark){
-  return '<!doctype html><html lang="en"><meta charset="utf-8">'
+  var de=document.documentElement;
+
+  // every rule the app has, exactly as written
+  var css=[].map.call(document.querySelectorAll("style"),function(t){
+    return t.textContent;
+  }).join("\n");
+  // a closing tag inside the text would end the block early
+  css=css.replace(/<\/style/gi,"<\\/style");
+
+  var links=[].map.call(document.querySelectorAll('link[rel="stylesheet"]'),
+    function(l){ return '<link rel="stylesheet" href="'+esc(l.href)+'">' }).join("");
+
+  var theme=de.getAttribute("data-theme")||(dark?"dark":"");
+  var font=de.getAttribute("data-font")||"";
+  var tscale=de.style.getPropertyValue("--tscale")||"1";
+
+  /* The only rules written for this window rather than borrowed. The sheet was
+     drawn to sit in the middle of the app with a board behind it; here it is
+     the whole point, so it fills the window and loses the pieces that only
+     made sense as a dialogue. */
+  var fix=''
+    +'html,body{height:100%}'
+    +'body{margin:0;background:var(--bg)}'
+    +'.scrim{position:static;display:grid;place-items:start center;padding:0;'
+      +'min-height:100%;backdrop-filter:none}'
+    +'.sheet{max-height:none;min-height:100%;border-radius:0;box-shadow:none;'
+      +'animation:none}'
+    /* Written with two classes on purpose. `.sheet.focus` sets padding as a
+       shorthand, and a shorthand at higher specificity beats a longhand at
+       lower specificity whatever the order — so a plain `.sheet` rule here
+       would lose and the bottom bar would sit on top of the last line. */
+    +'.sheet,.sheet.focus{padding-bottom:64px}'
+    +'.etitle{width:100%}'
+    +'.popbar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:14px;'
+      +'align-items:center;justify-content:center;padding:9px;'
+      +'background:var(--surface);border-top:1px solid var(--line);'
+      +'font-size:12.5px;color:var(--muted);z-index:5}'
+    +'#saved{color:var(--accent);font-weight:640;min-width:44px;text-align:left}'
+    +'#gone{position:fixed;left:0;right:0;top:0;z-index:9;padding:12px 18px;'
+      +'background:#A8501E;color:#fff;font-size:14px;font-weight:600}';
+
+  return '<!doctype html><html lang="en"'
+    +(theme?' data-theme="'+esc(theme)+'"':"")
+    +(font?' data-font="'+esc(font)+'"':"")
+    +' style="--tscale:'+esc(tscale)+'">'
+  +'<meta charset="utf-8">'
   +'<meta name="viewport" content="width=device-width,initial-scale=1">'
   +'<title>'+esc(i.title||"Untitled")+' — Everything</title>'
-  +'<style>'
-  +':root{--bg:#F7F6F3;--ink:#1A1917;--muted:#6E6A62;--line:rgba(22,26,25,.14);'
-    +'--accent:#1F6B63;--warn:#A8501E}'
-  +(dark?':root{--bg:#131211;--ink:#EDEBE6;--muted:#ABA69C;'
-    +'--line:rgba(255,255,255,.15);--accent:#5FB3A6;--warn:#E2A06A}':"")
-  +'*{box-sizing:border-box}'
-  +'body{margin:0;background:var(--bg);color:var(--ink);padding:44px 40px 80px;'
-    +'font:19px/1.8 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;'
-    +'-webkit-font-smoothing:antialiased}'
-  +'.wrap{max-width:64ch;margin:0 auto}'
-  +'#t{width:100%;border:0;background:none;outline:none;color:var(--ink);'
-    +'font:650 30px/1.25 inherit;letter-spacing:-.02em;margin:0 0 18px;padding:0}'
-  +'#t::placeholder{color:var(--muted);opacity:.55}'
-  +'#b{outline:none;min-height:62vh;white-space:pre-wrap;word-break:break-word}'
-  +'#b:empty:before{content:"Write…";color:var(--muted);opacity:.55}'
-  +'#b a{color:var(--accent)}'
-  +'#b h3{font-size:1.2em;font-weight:600;margin:.9em 0 .3em}'
-  +'#b hr{border:0;border-top:1px solid var(--line);margin:1.2em 0}'
-  +'.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:14px;'
-    +'align-items:center;justify-content:center;padding:10px;'
-    +'background:var(--bg);border-top:1px solid var(--line);'
-    +'font-size:12.5px;color:var(--muted)}'
-  +'#saved{color:var(--accent);font-weight:600;min-width:46px;text-align:left}'
-  +'#gone{position:fixed;left:0;right:0;top:0;padding:12px 18px;'
-    +'background:var(--warn);color:#fff;font-size:14px;font-weight:600}'
-  +'</style>'
+  +links
+  +'<style>'+css+'</style>'
+  +'<style>'+fix+'</style>'
   +'<div id="gone" hidden>The main Everything window has closed, so nothing here '
     +'can be saved. Copy anything you need before closing this one.</div>'
-  +'<div class="wrap">'
-    +'<input id="t" value="'+esc(i.title||"")+'" placeholder="Title">'
-    +'<div id="b" contenteditable="true" spellcheck="true">'+sanitizeRich(i.body||"")+'</div>'
+  +'<div class="scrim on focus">'
+    +'<div class="sheet focus">'
+      +'<input class="etitle" id="t" placeholder="Title" value="'+esc(i.title||"")+'">'
+      +'<div class="ebody" id="b" contenteditable="true" spellcheck="true" '
+        +'data-ph="Write…">'+sanitizeRich(i.body||"")+'</div>'
+    +'</div>'
   +'</div>'
-  +'<div class="bar"><span id="wc"></span><span id="saved"></span></div>'
+  +'<div class="popbar"><span id="wc"></span><span id="saved"></span></div>'
   +'<script>(function(){'
     /* Its own realm, so this keeps running when ours does not. */
     +'setInterval(function(){'
