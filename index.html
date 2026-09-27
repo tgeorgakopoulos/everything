@@ -306,13 +306,26 @@
   .syncbtn.out{border-style:dashed}
 
   /* a small dialog for choices that need more than yes/no */
+  /* A dialogue you cannot answer is worse than no dialogue at all.
+     This box had no height limit and no scrolling. A long message — the
+     one that asks whether sixty-five notes were really deleted, say — grew
+     the box taller than a phone screen, and because the scrim centres its
+     contents, the buttons sat below the bottom edge with no way to reach
+     them. The app asked a question about destroying data and then ignored
+     the answer, because the answer could not be tapped.
+
+     So: never taller than the screen, scroll if it must, and the buttons
+     pinned to the bottom of the box where they cannot be pushed off. */
   .askbox{background:var(--surface);border-radius:16px;padding:22px 24px;
     width:min(430px,100%);box-shadow:var(--shadow-lg);
+    max-height:88vh;overflow:auto;-webkit-overflow-scrolling:touch;
     animation:pop .18s cubic-bezier(.2,.8,.3,1)}
   .askbox h3{font-size:16px;font-weight:650;letter-spacing:-.01em;margin-bottom:8px}
   .askbox p{font-size:13px;color:var(--read);line-height:1.6}
   .askbox p b{color:var(--ink)}
-  .askrow{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+  .askrow{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap;
+    position:sticky;bottom:-22px;background:var(--surface);
+    padding:10px 0 0;margin-bottom:-4px}
   .askchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
   .askin{width:100%;margin-top:12px;padding:10px 13px;border-radius:10px;
     border:1px solid var(--line-strong);background:var(--surface-2);color:var(--ink);
@@ -1252,7 +1265,14 @@
     .card{margin-bottom:10px}
     .quick{opacity:.5;transform:none}
     .search input{width:140px}.search input:focus{width:160px}
-    .scrim{padding:0}
+    /* Room around the box, so it reads as a dialogue rather than the page,
+       and so its edges are visibly on screen. */
+    .scrim{padding:14px}
+    .askbox{max-height:84vh;padding:20px 18px}
+    /* Thumb-sized, full width, one per line. Two small buttons side by side
+       at the bottom of a phone screen is how you tap the wrong one. */
+    .askrow{gap:10px;flex-direction:column-reverse;align-items:stretch}
+    .askrow .btn{width:100%;min-height:46px;font-size:15px}
     .sheet{padding:22px 18px 0;border-radius:16px;max-height:96vh;width:100%}
     .etitle{font-size:21px}
     .ebody{font-size:15.5px;min-height:32vh}
