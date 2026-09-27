@@ -6543,45 +6543,80 @@ function addTutorial(){
     title:"How Everything Works",
     titleAuto:false,
     body:
-       "<h3>One kind of thing</h3>"
-      +"Everything holds notes. A note can also carry a link, or a date, or "
-      +"both — those are not separate types of item, they are things a note "
-      +"can have. That is why the same note can be a link you are keeping "
-      +"<em>and</em> something you have to do by Friday."
+      /*TUTORIAL-START*/
+      "<h3>One kind of thing</h3>"
+      +"Everything holds notes. A note can also carry a link, or a date, "
+      +"or both — those are not separate types of item, they are things a "
+      +"note can have. That is why the same note can be a link you are "
+      +"keeping <em>and</em> something you have to do by Friday."
       +"<br><br>"
       +"<h3>The sidebar sorts, it does not file</h3>"
-      +"<strong>Notes</strong>, <strong>Links</strong> and <strong>Tasks</strong> "
-      +"are lenses, not folders. A note with a link and a date appears in all "
-      +"three. Nothing is ever in one place only."
+      +"<strong>Notes</strong>, <strong>Links</strong> and "
+      +"<strong>Tasks</strong> are lenses, not folders. A note with a "
+      +"link and a date appears in all three. Nothing is ever in one "
+      +"place only."
       +"<br><br>"
       +"<h3>Writing</h3>"
-      +"The box at the top takes anything. Paste a link and it fetches the "
-      +"title. Write <em>call Elena friday</em> and it becomes a task, dated. "
-      +"Add <em>#tags</em> anywhere in the text."
+      +"The box at the top takes anything. Paste a link and it fetches "
+      +"the title. Write <em>call Elena friday</em> and it becomes a "
+      +"task, dated. Add <em>#tags</em> anywhere in the text."
       +"<br><br>"
-      +"Inside a note, the bar at the bottom does bold, italic, links, lists "
-      +"and headings — the <strong>T</strong> turns a line into a heading, "
-      +"like the ones in this note."
+      +"Inside a note, the bar at the bottom does bold, italic, links, "
+      +"lists and headings — the <strong>T</strong> turns a line into a "
+      +"heading, like the ones in this note."
+      +"<br><br>"
+      +"<h3>Saving things you find</h3>"
+      +"Install the <strong>Everything</strong> extension for Chrome and "
+      +"the button in the toolbar keeps whatever page you are on — with "
+      +"its title, a note of your own, tags, and a reminder date if you "
+      +"want one. Right-click works too: on the page, on a link, or on "
+      +"text you have selected."
+      +"<br><br>"
+      +"It reads nothing until you press it. It is the difference between "
+      +"a library you keep meaning to fill and one that fills itself."
+      +"<br><br>"
+      +"<h3>On your phone</h3>"
+      +"Open <strong>thisiseverything.eu</strong> in the browser, then "
+      +"<strong>Share → Add to Home Screen</strong>. It gets an icon and "
+      +"opens like an app, signed in, with everything already there. The "
+      +"box at the top is the point: paste a link or jot a thought the "
+      +"moment you have it."
       +"<br><br>"
       +"<h3>Tasks live beside your work</h3>"
-      +"Click <strong>Tasks</strong> in the sidebar and a column opens next "
-      +"to whatever you are reading, rather than replacing it. Add one from "
-      +"the field at its top. <strong>⌘J</strong> opens and closes it."
+      +"Click <strong>Tasks</strong> in the sidebar and a column opens "
+      +"next to whatever you are reading, rather than replacing it. Add "
+      +"one from the field at its top. <strong>⌘J</strong> opens and "
+      +"closes it."
+      +"<br><br>"
+      +"<h3>Room to write</h3>"
+      +"Open a note and press <strong>⤢ Focus</strong> and it widens, the "
+      +"lines shorten to something readable, and the rest goes quiet. "
+      +"<strong>⧉ Pop out</strong> puts the note in a window of its own, "
+      +"so you can write in one window while reading a source in another."
       +"<br><br>"
       +"<h3>Posts are public</h3>"
-      +"Press "+POST_ICO+" on any note to publish it to your own page, "
-      +"which anyone with the address can read. Nothing else you write is "
-      +"ever visible to anybody."
+      +"Press "
+      +POST_ICO
+      +" on any note to publish it to your own page, which anyone with "
+      +"the address can read. Nothing else you write is ever visible to "
+      +"anybody."
       +"<br><br>"
       +"<h3>Nothing is lost</h3>"
-      +"Every version of a note is kept. Open one and press "
-      +"<strong>⟲ History</strong> to see earlier drafts and put one back. "
-      +"Your library syncs to every device you sign in on, and "
-      +"<strong>Export</strong> in settings gives you the whole thing as a "
-      +"file you own."
+      +"Every version of a note is kept. Open one and press <strong>⟲ "
+      +"History</strong> to see earlier drafts and put one back. Your "
+      +"library syncs to every device you sign in on, and "
+      +"<strong>Export</strong> in settings gives you the whole thing as "
+      +"a file you own."
+      +"<br><br>"
+      +"When you first open the app it may say <strong>Catching "
+      +"up</strong> for a second or two and hold a note read-only while "
+      +"it does. That is deliberate: it is making sure the version you "
+      +"are about to write in is the newest one, rather than something "
+      +"this device remembered from last week."
       +"<br><br>"
       +"<h3>Delete this note</h3>"
-      +"You will not need it twice.",
+      +"You will not need it twice."
+      /*TUTORIAL-END*/,
     url:"", image:"", desc:"", logo:"", site:"", metaState:null,
     actionable:false, due:null, timed:false, done:false, tint:"", compiled:false,
     tags:[], photos:[], checks:[], archived:false, pin:true, postId:"",
@@ -7146,7 +7181,7 @@ window.addEventListener("resize",fitBrand);
    Adding a cookie policy or any other notice later means adding one entry to
    this object and one button to the row in the footer. Nothing else needs to
    know it exists. */
-var DOC_DATE="15 August 2026";
+var DOC_DATE="27 September 2026";
 var DOCS={};
 
 DOCS.about={ title:"About Everything", html:function(){ return ''
@@ -7181,9 +7216,19 @@ DOCS.privacy={ title:"Privacy", html:function(){ return '<div class="fine">'
   +'stored only as a hash, a handle, and whatever you put in your profile. '
   +'<strong>Your posts</strong> &mdash; only the ones you publish, which are '
   +'public by definition.'
+  +'<br><br><h3>The browser extension</h3>'
+  +'The Chrome extension exists to save the page you are looking at. When you '
+  +'press it, it reads the address, title and description of <em>that one '
+  +'page</em>, plus any text you had selected, and sends them to your own '
+  +'library along with whatever note and tags you type. It reads nothing until '
+  +'you press it, it never reads a page you have not asked it to save, and it '
+  +'keeps no history of where you have been. The only thing it stores on your '
+  +'computer is your sign-in token and any save that could not be sent yet.'
   +'<br><br><h3>What is not kept</h3>'
   +'No analytics, no advertising identifiers, no third-party trackers, and no '
-  +'record of what you read or when. The contents of your notes are not logged.'
+  +'record of what you read or when. The contents of your notes are not logged. '
+  +'Nothing is ever sold or passed to anyone, and nothing is used to train any '
+  +'model.'
   +'<br><br><h3>Cookies</h3>'
   +'Everything sets no advertising or analytics cookies. It keeps a sign-in '
   +'token and your own settings in this browser&rsquo;s local storage, which is '

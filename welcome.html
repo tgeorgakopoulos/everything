@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Welcome to Everything</title>
+<meta name="description" content="How to start with Everything — an organizer for your digital life.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/icons/192.png">
+<style>
+  :root{ --bg:#FBFAF7; --card:#FFF; --ink:#1A1917; --muted:#5F5C56;
+    --line:rgba(22,26,25,.13); --accent:#1F6B63; --warn:#A8501E; }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#131211; --card:#1C1B19; --ink:#EDEBE6; --muted:#ABA69C;
+      --line:rgba(255,255,255,.14); --accent:#5FB3A6; --warn:#E2A06A; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);padding:0 22px 90px;
+    font:18px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",
+      system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:660px;margin:0 auto}
+  header{padding:60px 0 8px}
+  .kicker{font-size:14px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--accent);font-weight:640;margin:0 0 14px}
+  h1{font-size:36px;line-height:1.12;letter-spacing:-.025em;margin:0 0 14px}
+  .sub{font-size:19px;color:var(--muted);margin:0 0 6px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:26px 28px;margin:22px 0}
+  .step h2{display:flex;align-items:baseline;gap:14px;margin:0 0 14px;
+    font-size:22px;letter-spacing:-.015em;line-height:1.28}
+  .n{flex:none;width:34px;height:34px;border-radius:17px;background:var(--accent);
+    color:#fff;font-size:16px;font-weight:600;display:grid;place-items:center;
+    align-self:flex-start;margin-top:2px}
+  @media (prefers-color-scheme:dark){ .n{color:#10201D} }
+  p{margin:0 0 14px} .step p:last-child{margin-bottom:0}
+  ol,ul{margin:0 0 14px;padding-left:24px} li{margin:0 0 11px;padding-left:3px}
+  b{font-weight:640}
+  a{color:var(--accent)}
+  .go{display:inline-block;background:var(--accent);color:#fff;
+    text-decoration:none;font-weight:600;padding:13px 24px;border-radius:11px;
+    margin:4px 0 2px}
+  @media (prefers-color-scheme:dark){ .go{color:#10201D} }
+  .note{border-left:3px solid var(--accent);padding:2px 0 2px 16px;
+    margin:16px 0 0;color:var(--muted);font-size:16.5px}
+  .soon{border-left:3px solid var(--warn);padding:2px 0 2px 16px;
+    margin:14px 0 0;color:var(--muted);font-size:16.5px}
+  footer{margin:46px 0 0;padding-top:26px;border-top:1px solid var(--line);
+    color:var(--muted);font-size:16px}
+  footer a{color:var(--muted)}
+</style>
+
+<div class="wrap">
+<header>
+  <p class="kicker">This is Everything</p>
+  <h1>Welcome.</h1>
+  <p class="sub">An organizer for your digital life: notes, links, to-dos and
+  reminders in one place, on the understanding that they were never really
+  four different things.</p>
+  <p class="sub">Three steps, about five minutes.</p>
+</header>
+
+<div class="step">
+  <h2><span class="n">1</span>Make your account</h2>
+  <p>Everything is invitation-only, so the door asks for the email address the
+  invitation was sent to — that is the one to use.</p>
+  <p><a class="go" href="https://thisiseverything.eu/">Open Everything</a></p>
+  <ol>
+    <li>Click <b>I have an invitation</b>.</li>
+    <li>Type the email address your invitation came to, and press
+      <b>Continue</b>.</li>
+    <li>Choose a password and a handle. The handle is only used if you ever
+      publish something; it is the name on that page.</li>
+  </ol>
+  <p class="note">There is no confirmation email to wait for. You are in
+  straight away, and a note called <b>How Everything Works</b> is waiting —
+  it is the real tutorial, and it is written as a note so you can see the app
+  doing the things it describes.</p>
+</div>
+
+<div class="step">
+  <h2><span class="n">2</span>The Chrome button — shortly</h2>
+  <p>The extension is the part that makes the library fill itself: a button in
+  the Chrome toolbar that keeps the page you are on, with your own note and
+  tags, in one press.</p>
+  <p class="soon">It is in review at the Chrome Web Store and is not
+  installable yet. You do not need it to start — everything below works
+  without it, and saving a link by pasting it takes two seconds. You will get
+  the link as soon as it is approved.</p>
+</div>
+
+<div class="step">
+  <h2><span class="n">3</span>Put it on your phone</h2>
+  <p>There is nothing to install from an app store. The website becomes the
+  app.</p>
+  <p><b>iPhone or iPad</b> — open <b>thisiseverything.eu</b> in
+  Safari, press the <b>Share</b> button at the bottom, scroll down, choose
+  <b>Add to Home Screen</b>, press <b>Add</b>.</p>
+  <p><b>Android</b> — open it in Chrome, press the <b>⋮</b> menu at the top
+  right, choose <b>Add to Home screen</b>.</p>
+  <p>It gets an icon, opens without browser furniture, and stays signed in.
+  The box at the top is the whole point of having it there: paste a link or
+  write a thought the moment you have it, and it is on your computer by the
+  time you sit down.</p>
+</div>
+
+<div class="step">
+  <h2><span class="n">4</span>Two things worth knowing</h2>
+  <p><b>It opens saying “Catching up” for a second.</b> While it does, a note
+  you open is read-only. That is deliberate — it is checking that the version
+  you are about to write in is the newest one, rather than something the
+  device remembered from last week. It clears by itself.</p>
+  <p><b>Nothing you write is visible to anyone.</b> Not to other users, not to
+  us. The only exception is a note you deliberately publish, which goes to a
+  page of your own with its own address. Everything else stays yours —
+  <b>Export</b> in the settings hands you the whole library as a plain file at
+  any moment, no permission required.</p>
+</div>
+
+<footer>
+  <p>Everything is made by Social Capital, in Athens. If something is broken,
+  confusing, or missing, say so — at this stage that is the most useful thing
+  you can do with it.</p>
+  <p><a href="https://thisiseverything.eu/privacy.html">Privacy</a> ·
+     <a href="https://thisiseverything.eu/terms.html">Terms of use</a></p>
+</footer>
+</div>
+</html>

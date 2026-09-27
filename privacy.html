@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy — Everything</title>
+<meta name="description" content="Privacy for Everything, an organizer for your digital life.">
+<link rel="icon" href="/icons/192.png">
+<style>
+  :root{
+    --bg:#FBFAF7; --surface:#fff; --text:#1A1A18; --muted:#6B6B65;
+    --line:#E6E3DC; --line-strong:#D6D2C8; --accent:#1F6B63;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#16171A; --surface:#1D1F23; --text:#ECEAE4; --muted:#9A9890;
+           --line:#2A2D32; --line-strong:#3A3E45; --accent:#4FB3A6 }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:16px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",
+      Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:660px;margin:0 auto;padding:48px 22px 80px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+    padding-bottom:20px;margin-bottom:28px;border-bottom:1px solid var(--line)}
+  .brand{font-size:19px;font-weight:600;letter-spacing:-.2px;
+    color:var(--text);text-decoration:none}
+  .brand span{color:var(--accent)}
+  h1{font-size:27px;line-height:1.25;letter-spacing:-.4px;margin:0 0 26px}
+  h3{font-size:15px;letter-spacing:.02em;text-transform:uppercase;
+    color:var(--muted);margin:30px 0 8px;font-weight:600}
+  .fine{font-size:15.5px;line-height:1.7}
+  a{color:var(--accent)}
+  strong{font-weight:600}
+  nav{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
+    font-size:14px}
+  nav a{margin-right:18px;color:var(--muted)}
+  footer{margin-top:26px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <a class="brand" href="https://thisiseverything.eu/">This is <span>Everything</span></a>
+    </header>
+    <h1>Privacy</h1>
+    <div class="fine"><h3>The short version</h3>Your notes are yours. They are stored so that you can read them on your own devices, and for no other purpose. Nobody at Social Capital reads them, they are not sold, and they do not train anything.<br><br><h3>What is kept</h3><strong>Your library</strong> &mdash; the text, links, dates and images you write &mdash; on this device and, if sync is on, in a database run for us by Supabase. <strong>Your account</strong> &mdash; an email address, a password stored only as a hash, a handle, and whatever you put in your profile. <strong>Your posts</strong> &mdash; only the ones you publish, which are public by definition.<br><br><h3>The browser extension</h3>The Chrome extension exists to save the page you are looking at. When you press it, it reads the address, title and description of <em>that one page</em>, plus any text you had selected, and sends them to your own library along with whatever note and tags you type. It reads nothing until you press it, it never reads a page you have not asked it to save, and it keeps no history of where you have been. The only thing it stores on your computer is your sign-in token and any save that could not be sent yet.<br><br><h3>What is not kept</h3>No analytics, no advertising identifiers, no third-party trackers, and no record of what you read or when. The contents of your notes are not logged. Nothing is ever sold or passed to anyone, and nothing is used to train any model.<br><br><h3>Cookies</h3>Everything sets no advertising or analytics cookies. It keeps a sign-in token and your own settings in this browser&rsquo;s local storage, which is what makes the app open already signed in and already looking the way you left it. Clearing your browser data removes both and signs you out.<br><br><h3>Your rights under the GDPR</h3>You may see everything held about you, correct it, take it elsewhere, or have it erased. In practice: <strong>Export</strong> in the settings gives you a complete, portable copy of your library at any moment without asking anyone. To correct or delete your account, or to object to any of this, write to the address below; we will act within one month. The lawful basis for holding your library is the contract of providing you the service, and for posts it is your own act of publishing them.<br><br><h3>Where it is</h3>Data is held within the European Union. Supabase acts as our processor. If that ever changes you will be told before it does.<br><br><h3>Contact</h3>Social Capital, Athens, Greece &mdash; tgeorgakopoulos@gmail.com<br><br><em>Last updated 27 September 2026.</em></div>
+    <nav>
+      <a href="/terms.html">Terms of use</a>
+      <a href="/">Everything</a>
+    </nav>
+    <footer>Social Capital, Athens, Greece — tgeorgakopoulos@gmail.com</footer>
+  </div>
+</body>
+</html>
