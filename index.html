@@ -1106,6 +1106,16 @@
     border-left:2px solid var(--line-strong);background:var(--surface-2);
     border-radius:0 9px 9px 0;margin-bottom:14px}
   .readctx a{color:var(--blue);text-decoration:none}
+  /* The catching-up notice. Deliberately not red: nothing is wrong, the app
+     is simply waiting before it lets you type. Red here would read as loss. */
+  .cbar{font-size:13px;line-height:1.55;padding:10px 13px;margin-bottom:13px;
+    border-radius:9px;background:var(--accent-soft);color:var(--text);
+    border:1px solid var(--accent)}
+  .cbar.warn{background:var(--surface-2);border-color:var(--line-strong);
+    color:var(--muted)}
+  /* A read-only body should look read-only, or the first thing you do is
+     wonder why the keyboard is broken. */
+  .ebody[contenteditable="false"]{opacity:.68}
   .facetbar{display:flex;gap:7px;margin:16px 0 0;padding-top:15px;
     border-top:1px solid var(--line);flex-wrap:wrap;align-items:center}
   .facet{display:inline-flex;gap:7px;align-items:center;padding:6px 13px;border-radius:99px;
@@ -3179,6 +3189,7 @@ var SYNC={
   massOk:false,          // you confirmed a large deletion this session
   asking:false,
   pulledOnce:false,      // have we heard from the server at all this session?
+  pullFailed:false,      // ...and if not, was it because the attempt failed?
   status:"off",          // off | out | idle | busy | error | offline
   note:"",
   timer:null
@@ -3297,7 +3308,7 @@ function withFreshSession(){
 }
 function signOut(){
   SYNC.session=null; SYNC.shadow={}; SYNC.queue={}; SYNC.pending={};
-  SYNC.pulledOnce=false;
+  SYNC.pulledOnce=false; SYNC.pullFailed=false;
   GATE.email=SYNC.session&&SYNC.session.email||GATE.email;
   gateShow(true);
   POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; POSTS.err="";
@@ -3593,6 +3604,93 @@ function pushChanges(){
 }
 
 /* ---- pull ---- */
+/* ---- catching up ----
+
+   The September incident in one sentence: a tab that had been asleep since
+   August woke, showed the library as it was then, and pushed it.
+
+   pushChanges already refuses to upload before the first pull of a session,
+   and the database now refuses a write that is older than the one it holds.
+   Both of those protect the data. Neither protects the person. What you see
+   in the first seconds after opening the app is still the old library, and
+   if you start writing in it you are writing into a copy of a note whose
+   newer version is still in flight. The edit you make then carries a fresh
+   timestamp, so it is no longer stale, so nothing refuses it — and it is
+   built on text that is out of date.
+
+   So: until the first pull lands, notes that the server already has are
+   shown but cannot be typed into, and the app says why.
+
+   Two deliberate exceptions.
+
+   A note created in this session is not locked. The server has no copy of
+   it, so there is nothing it could be overwriting — and jotting something
+   down the moment the app opens is the thing this app is most used for.
+
+   A pull that FAILS unlocks everything, with a warning. On a train with no
+   signal the first pull never lands, and an app that will not let you write
+   until it does is simply broken. The stale-write guard in the database is
+   the backstop for that case, which is the whole reason it exists. */
+function catchingUp(){
+  return !!(SYNC.on&&SYNC.session&&!SYNC.pulledOnce&&!SYNC.pullFailed);
+}
+/* Locked only if the server is believed to hold a copy. The shadow is our
+   record of exactly that, and it is loaded from disk before the first pull,
+   so at this moment it describes the library as it was when we last spoke to
+   the server — which is precisely the set of notes at risk. */
+function lockedWhileCatchingUp(id){
+  return catchingUp()&&SYNC.shadow[id]!==undefined;
+}
+
+/* The banner and the two switches, in one place so unlocking cannot forget
+   half of what locking did. */
+function setEditorLock(on,why){
+  var body=document.getElementById("e-body"),
+      title=document.getElementById("e-title"),
+      bar=document.getElementById("e-catchup");
+  if(!body) return;
+  body.setAttribute("contenteditable",on?"false":"true");
+  if(title) title.disabled=!!on;
+  if(bar){ bar.hidden=!on; if(on&&why) bar.textContent=why }
+}
+
+/* Called when the first pull of the session finishes, either way. */
+function releaseCatchup(failed){
+  if(!document.getElementById("e-body")) { paintSync(); return }
+  if(!S.editing){ paintSync(); return }
+
+  /* A newer copy of the open note may have arrived during the pull and been
+     held back, because applyIncoming leaves an open note alone. Normally that
+     is right — you are typing in it. Here you demonstrably are not: the note
+     has been read-only since it opened. So take the newer copy and redraw,
+     rather than unlocking onto text we already know is superseded. */
+  var pending=SYNC.pending[S.editing];
+  if(!failed&&pending){
+    var id=S.editing;
+    /* S.editing has to be cleared FIRST. applyIncoming holds back any row
+       whose note is open, so flushing while the editor is still registered
+       puts the row straight back where it came from and the newer text never
+       lands. The test caught exactly that. */
+    S.editing=null;
+    flushPending();
+    if(byId(id)){ openEditor(id); toast("This note was newer on another device") }
+    else { close(); toast("That note was deleted on another device") }
+    return;
+  }
+  setEditorLock(false);
+  if(failed){
+    var bar=document.getElementById("e-catchup");
+    if(bar){
+      bar.hidden=false;
+      bar.textContent="Could not reach the server, so this may not be the "
+        +"latest version. You can write; it will sync when the connection "
+        +"comes back.";
+      bar.classList.add("warn");
+    }
+  }
+  paintSync();
+}
+
 function pullChanges(){
   if(!SYNC.on||!SYNC.session) return Promise.resolve();
   SYNC.status="busy"; paintSync();
@@ -3606,7 +3704,10 @@ function pullChanges(){
     return r.json();
   }).then(function(rows){
     if(rows.length) applyIncoming(rows);   // which advances lastPull itself,
+    var first=!SYNC.pulledOnce;
     SYNC.pulledOnce=true;                  // only as far as it actually got
+    SYNC.pullFailed=false;
+    if(first) releaseCatchup(false);
     /* The boot call to hydratePhotos ran before the session was restored, so
        its server fallback could not have asked for anything. Now that we are
        signed in, give any picture this browser is missing one more chance —
@@ -3617,6 +3718,10 @@ function pullChanges(){
   }).catch(function(e){
     SYNC.status=navigator.onLine?"error":"offline";
     SYNC.note=String(e&&e.message||e);
+    /* The attempt is over and it did not work. Keeping the editor locked now
+       would mean an app that cannot be written in whenever the network is
+       down, which is worse than the risk it is guarding against. */
+    if(!SYNC.pulledOnce&&!SYNC.pullFailed){ SYNC.pullFailed=true; releaseCatchup(true) }
     paintSync();
   });
 }
@@ -4227,7 +4332,8 @@ function openEditor(id){
   }
 
   sheet.innerHTML=
-    '<div class="egal" id="e-gal">'+photoGrid(i,true)+'</div>'
+    '<div class="cbar" id="e-catchup" hidden></div>'
+    +'<div class="egal" id="e-gal">'+photoGrid(i,true)+'</div>'
     +'<input class="etitle" id="e-title" placeholder="Title" value="'+esc(i.title)+'">'
     +ctx
     +'<div class="ebody" id="e-body" contenteditable="true" spellcheck="true" '
@@ -4803,6 +4909,12 @@ function openEditor(id){
      library before it opens — otherwise popping out silently discards
      whatever you had just typed. applyEdits saves and closes the sheet. */
   q("#e-pop").addEventListener("click",function(){
+    /* A popout has no banner and no lock of its own, and it saves on close.
+       Letting one open now would hand back the writable window the lock just
+       took away. */
+    if(lockedWhileCatchingUp(id)){
+      toast("Catching up — one moment"); return;
+    }
     applyEdits();
     popOut(id);
   });
@@ -4849,7 +4961,13 @@ function openEditor(id){
     applyEdits();
     toast(going?"Archived":"Back in view");
   });
-  setTimeout(function(){ q("#e-title").focus() },40);
+  /* Last, so that nothing wired above can quietly switch editing back on. */
+  if(lockedWhileCatchingUp(id)){
+    setEditorLock(true,"Catching up with your other devices — this note is "
+      +"read-only for a moment, so an older copy cannot overwrite a newer one.");
+  } else {
+    setTimeout(function(){ q("#e-title").focus() },40);
+  }
 }
 function close(){
   scrim.classList.remove("on"); S.editing=null; editorApply=null;
@@ -7160,6 +7278,7 @@ function paintSync(){
   var waiting=Object.keys(SYNC.queue).length;
   var label, cls="";
   if(!SYNC.session){ label="● Sign in"; cls="out" }
+  else if(catchingUp()){ label="◍ Catching up"; cls="busy" }
   else if(SYNC.status==="busy"){ label="◍ Syncing"; cls="busy" }
   else if(SYNC.status==="offline"){ label="○ Offline"; cls="err" }
   else if(SYNC.status==="error"){ label="○ Failed"; cls="err" }
