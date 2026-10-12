@@ -3897,13 +3897,38 @@ function settingsSnapshot(){
   return out;
 }
 
+/* Fields that belong to another program.
+
+   normalizeItem builds a fresh object from a fixed list, which is what makes
+   a partial or hand-edited record harmless — anything it does not know about
+   is simply not copied across. That is right for junk and wrong for a field
+   another client depends on.
+
+   The writing machine stamps its documents with origin:"writer" and syncs
+   only those. Without this list, the first time Everything pulled one of
+   those notes the stamp would be stripped, the next push would send it back
+   without one, and the document would drop out of the writing machine's
+   filter and never be seen by it again. Nothing would error. The note would
+   simply stop arriving, which is the worst way for anything to fail.
+
+   So: a short, explicit allowlist. Carried through untouched, coerced to
+   strings, and capped — a field we do not interpret must not become a way to
+   push arbitrary weight into every sync.
+
+     origin  which program made this          e.g. "writer"
+     source  the original markup it was written in, kept so a round trip
+             through Everything's narrower HTML is not lossy
+
+   Add to this list only for a real integration, never speculatively. */
+var CARRY = { origin: 64, source: 200000 };
+
 // Fill in anything an older or hand-edited file is missing, so a partial
 // record can never poison the app.
 function normalizeItem(o){
   if(!o||typeof o!=="object") return null;
   if(o.type&&o.actionable===undefined) o=migrate([o])[0];   // a v1-era record
   var now=Date.now();
-  return {
+  var out={
     id:String(o.id||uid()),
     title:String(o.title||""),
     body:toRich(o.body||""),
@@ -3924,6 +3949,11 @@ function normalizeItem(o){
     created:(typeof o.created==="number")?o.created:now,
     modified:(typeof o.modified==="number")?o.modified:(o.created||now)
   };
+  Object.keys(CARRY).forEach(function(k){
+    if(typeof o[k]!=="string"||!o[k]) return;   // absent or not ours to keep
+    out[k]=o[k].slice(0,CARRY[k]);
+  });
+  return out;
 }
 
 var EXPORT_TRIED=false;
