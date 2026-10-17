@@ -1106,6 +1106,44 @@
     border-left:2px solid var(--line-strong);background:var(--surface-2);
     border-radius:0 9px 9px 0;margin-bottom:14px}
   .readctx a{color:var(--blue);text-decoration:none}
+
+  /* ---------- Connect ------------------------------------------------
+     A page of people rather than a board of cards, so it is a column of
+     rows at the writing measure rather than the grid. Nothing here is
+     tinted or coloured: these are other people's names, and the only
+     colour in this app's chrome is a tag dot. */
+  .csec{font-size:12px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);font-weight:620;margin:26px 0 10px;
+    padding-top:16px;border-top:1px solid var(--line)}
+  .csec:first-child{border-top:0;padding-top:0;margin-top:6px}
+  .cnote{font-size:13.5px;color:var(--muted);margin:10px 0 2px}
+  .crow{display:flex;align-items:center;gap:12px;padding:12px 14px;
+    border:1px solid var(--line);border-radius:12px;background:var(--surface);
+    margin-bottom:8px;max-width:620px}
+  .crow.found{border-color:var(--accent);background:var(--accent-soft)}
+  .crow.waiting{opacity:.72}
+  .crow.note{cursor:pointer}
+  .crow.note:hover{border-color:var(--line-strong)}
+  .cwho{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+  .cwho b{font-size:14.5px;font-weight:620;letter-spacing:-.01em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chandle{font-size:12px;color:var(--faint)}
+  .cbio{font-size:12.5px;color:var(--muted);overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap}
+  .cread{font-size:11.5px;color:var(--faint);flex:none}
+  .cpost{border:1px solid var(--line);border-radius:14px;background:var(--surface);
+    padding:16px 18px;margin-bottom:10px;max-width:620px}
+  .cmeta{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .cmeta b{font-size:13.5px;font-weight:620}
+  .clink{display:inline-block;margin-top:10px;font-size:13px;color:var(--blue);
+    text-decoration:none}
+  /* one line per connection inside the editor's share panel */
+  .srow{display:flex;align-items:center;gap:11px;padding:9px 2px}
+  .srow.on .cbio{color:var(--accent)}
+  /* the sidebar count, when it is something you must answer rather than
+     something you can read at leisure */
+  .n.alert{background:var(--accent);color:var(--surface);border-radius:99px;
+    padding:1px 7px;font-weight:700}
   /* The catching-up notice. Deliberately not red: nothing is wrong, the app
      is simply waiting before it lets you type. Red here would read as loss. */
   .cbar{font-size:13px;line-height:1.55;padding:10px 13px;margin-bottom:13px;
@@ -1307,6 +1345,7 @@
     </button>
     <button class="nav" data-view="all"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></svg></span>All<span class="n" id="c-all"></span></button>
     <button class="nav" data-view="posts" id="nav-posts"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><path d="M7.4 16.6a6.5 6.5 0 0 1 0-9.2"/><path d="M16.6 7.4a6.5 6.5 0 0 1 0 9.2"/><path d="M4.6 19.4a10.5 10.5 0 0 1 0-14.8"/><path d="M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg></span>Posts<span class="n" id="c-posts"></span></button>
+    <button class="nav" data-view="connect" id="nav-connect"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8.4" cy="8.6" r="3.3"/><circle cx="16.4" cy="15.4" r="3.3"/><path d="M10.8 11.1l3.2 2.7"/></svg></span>Connect<span class="n" id="c-connect"></span></button>
     <button class="nav" data-view="notes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="4.5" y="3.5" width="15" height="17" rx="3.2"/><path d="M8.2 9h7.6M8.2 12.8h7.6M8.2 16.6h4.6"/></svg></span>Notes<span class="n" id="c-notes"></span></button>
     <button class="nav" data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links<span class="n" id="c-links"></span></button>
     <button class="nav" data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks<span class="n" id="c-tasks"></span>
@@ -2893,6 +2932,17 @@ function render(){
     return;
   }
 
+  /* Connect is the same shape: a different table, not a lens over yours. */
+  if(S.view==="connect"&&!S.q&&!S.tag){
+    document.getElementById("viewtitle").textContent="Connect";
+    document.getElementById("lensnote").textContent=
+      "People you have agreed to share with";
+    board.innerHTML=renderConnect();
+    paintSidebar();
+    paintTaskbar();
+    return;
+  }
+
   var vt=document.getElementById("viewtitle");
   if(S.tag&&!S.q){
     /* The dot beside a tag in the sidebar is the only colour in the chrome.
@@ -3152,6 +3202,17 @@ function paintSidebar(){
   var cp=document.getElementById("c-posts");
   if(cp) cp.textContent=POSTS.list.length||"";
   document.getElementById("nav-posts").style.display=SYNC.session?"":"none";
+
+  /* Connect shows the number that needs an answer from you, not the number
+     of people you know — a count you cannot act on is decoration. */
+  var cc=document.getElementById("c-connect");
+  if(cc){
+    var waiting=connIncoming().length;
+    cc.textContent=waiting||"";
+    cc.classList.toggle("alert",!!waiting);
+  }
+  var nc=document.getElementById("nav-connect");
+  if(nc) nc.style.display=SYNC.session?"":"none";
 }
 
 /* =========================================================================
@@ -4389,6 +4450,7 @@ function openEditor(id){
       +'<button class="addimg" id="e-addchk">☑ Checklist item</button>'
     +'</div>'
     +'<div class="histbox" id="e-histbox" hidden></div>'
+    +'<div class="histbox" id="e-sharebox" hidden></div>'
     +'<div class="facetbar">'
       +'<button class="facet'+(d.url?" on":"")+'" id="f-link"><span class="fi">⚭</span>Link</button>'
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
@@ -4398,6 +4460,7 @@ function openEditor(id){
       +'<button class="facet" id="e-pop" title="Open this note in its own window">'
         +'<span class="fi">⇱</span>Pop out</button>'
       +'<button class="facet" id="e-hist"><span class="fi">⟲</span>History</button>'
+      +'<button class="facet" id="e-share"><span class="fi">⇄</span>Share</button>'
       +'<button class="facet'+(i.postId?" on":"")+'" id="e-post"><span class="fi">'+POST_ICO+'</span>'
         +(i.postId?"Posted":"Post")+'</button>'
       +'<div class="swatches" id="e-tint" style="margin-left:auto">'
@@ -4873,7 +4936,11 @@ function openEditor(id){
   });
   /* Archiving from here writes your edits first, so you never lose a change
      by reaching for Archive instead of Done. */
-  function applyEdits(){
+  /* keepOpen: write the edits down but leave the sheet where it is. Sharing
+     saves first — handing over a note with unsaved text in front of you
+     would share the older version — and closing the editor underneath the
+     share panel would be a strange way to answer a button press. */
+  function applyEdits(keepOpen){
     var hadUrl=!!i.url;
     remember(i,"before your edit");
     i.title=q("#e-title").value.trim();
@@ -4889,7 +4956,9 @@ function openEditor(id){
     i.tags=q("#e-tags").value.split(",").map(function(s){ return s.trim().toLowerCase() }).filter(Boolean);
     i.tint=d.tint; i.pin=d.pin; i.modified=Date.now();
     if(!i.url){ i.image=""; i.desc=""; i.logo=""; i.site=""; i.metaState=null }
-    save(); close(); render();
+    save();
+    if(!keepOpen) close();
+    render();
     if(i.url&&!hadUrl) fetchMeta(i,true);
   }
   /* ---- history ----
@@ -4949,7 +5018,64 @@ function openEditor(id){
     popOut(id);
   });
 
+  /* Sharing, from inside the note it concerns. Deliberately not a list of
+     everybody with checkboxes you then have to Save — each line acts at
+     once, and says what it did, because "shared" and "not shared" is a
+     state you should be able to read off the screen without trusting a
+     form. */
+  var shareBox=q("#e-sharebox");
+  function paintShare(){
+    var acc=connAccepted();
+    if(!SYNC.session){
+      shareBox.innerHTML='<div class="hempty">Sign in to share a note.</div>';
+      return;
+    }
+    if(!acc.length){
+      shareBox.innerHTML='<div class="hempty">You are not connected to anybody '
+        +'yet. <b>Connect</b> in the sidebar.</div>';
+      return;
+    }
+    var have=sharedWith(id);
+    shareBox.innerHTML=acc.map(function(c){
+      var uid2=otherSide(c), on=have.indexOf(uid2)>=0;
+      return '<div class="srow'+(on?" on":"")+'">'
+        +avatarOf(c.who)
+        +'<div class="cwho"><b>'+esc(connName(c.who))+'</b>'
+        +'<span class="cbio">'+(on?"can read this note as you edit it"
+                                  :"cannot see this note")+'</span></div>'
+        +'<button class="btn'+(on?" quiet":"")+'" data-sh="'+esc(uid2)+'">'
+        +(on?"Stop sharing":"Share")+'</button></div>';
+    }).join("")
+     +'<div class="hempty">A shared note stays yours. They can read it and '
+     +'nothing else — not edit it, not delete it, not pass it on.</div>';
+  }
+  shareBox.addEventListener("click",function(e){
+    var b=e.target.closest("[data-sh]"); if(!b) return;
+    var uid2=b.dataset.sh, on=sharedWith(id).indexOf(uid2)>=0;
+    b.disabled=true;
+    /* Save first. Sharing a note that has unsaved edits in front of you
+       would hand over the older text, which is a confusing first
+       impression and an easy one to avoid. */
+    applyEdits(true);
+    (on?unshareNote(id,uid2):shareNote(id,uid2))
+      .then(function(){ paintShare(); toast(on?"No longer shared":"Shared") })
+      .catch(function(err){
+        b.disabled=false;
+        toast((err&&err.msg)||"that did not work");
+      });
+  });
+  q("#e-share").addEventListener("click",function(){
+    var showing=!shareBox.hasAttribute("hidden");
+    if(showing){ shareBox.setAttribute("hidden",""); q("#e-share").classList.remove("on"); return }
+    histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on");
+    paintShare();
+    shareBox.removeAttribute("hidden");
+    q("#e-share").classList.add("on");
+    if(!CONN.loaded) loadConnections().then(paintShare);
+  });
+
   q("#e-hist").addEventListener("click",function(){
+    shareBox.setAttribute("hidden",""); q("#e-share").classList.remove("on");
     var showing=!histBox.hasAttribute("hidden");
     if(showing){ histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on"); return }
     paintHistory();
@@ -5761,6 +5887,186 @@ var POSTS={
   pdraft:null       // …and what the profile sheet is holding. Only ever one
 };                  // of the two, which is how the overlay knows its mode
 
+/* =========================================================================
+   CONNECT
+
+   Two people agree to be connected. After that they see each other's posts
+   in one place, and either can hand the other a live, read-only view of a
+   single note.
+
+   Everything below is a thin layer over four tables, and the important part
+   is what it does NOT do. It never decides who may see what. Every rule —
+   you may only share a note you own, only with somebody who has accepted,
+   and only until one of you withdraws — is written as a policy in the
+   database and proven by the twelve checks in connect-setup.sql. What
+   follows can be wrong, and the worst it can produce is an error message.
+
+   That division is deliberate. A permission check written in a page is a
+   doorman; anyone who opens the developer console walks past it.
+   ========================================================================= */
+var CONN={
+  people:[],        // every connection row, with the other person's profile
+  feed:[],          // posts by people you have accepted
+  shared:[],        // notes other people have handed you
+  given:{},         // item id -> [viewer uid], what you have handed out
+  found:null,       // the result of a handle search
+  loaded:false, busy:false, err:"", note:""
+};
+
+/* The other person in a row, whichever side of it you are on. */
+function otherSide(row){
+  var me=myUid();
+  return row.requester===me?row.addressee:row.requester;
+}
+function connAccepted(){
+  return CONN.people.filter(function(c){ return c.status==="accepted" });
+}
+function connIncoming(){
+  var me=myUid();
+  return CONN.people.filter(function(c){
+    return c.status==="pending"&&c.addressee===me;
+  });
+}
+function connOutgoing(){
+  var me=myUid();
+  return CONN.people.filter(function(c){
+    return c.status==="pending"&&c.requester===me;
+  });
+}
+function connProfile(uid){
+  for(var i=0;i<CONN.people.length;i++){
+    if(CONN.people[i].who&&CONN.people[i].who.user_id===uid) return CONN.people[i].who;
+  }
+  return null;
+}
+function connName(p){
+  return (p&&(p.display_name||p.handle))||"someone";
+}
+
+/* One round trip for the connections, then one for the profiles behind them.
+   Not a join: PostgREST can only join across a declared foreign key, and
+   connections points at auth.users rather than at profiles — deliberately,
+   because a person exists before they have published anything. */
+function loadConnections(force){
+  if(!SYNC.session){ CONN.people=[]; CONN.feed=[]; CONN.shared=[];
+                     CONN.given={}; CONN.loaded=false; return Promise.resolve() }
+  if(CONN.loaded&&!force) return Promise.resolve();
+  CONN.busy=true; if(S.view==="connect") render();
+
+  var me=myUid();
+  return withFreshSession().then(function(){
+    return rest("/connections?select=requester,addressee,status,created_at,decided_at"
+                +"&order=created_at.desc");
+  }).then(function(rows){
+    CONN.people=(rows||[]).map(function(r){ r.who=null; return r });
+    var ids=CONN.people.map(otherSide).filter(Boolean);
+    if(!ids.length) return [];
+    return rest("/profiles?select=user_id,handle,display_name,bio,avatar"
+                +"&user_id=in.("+ids.join(",")+")");
+  }).then(function(profs){
+    var by={};
+    (profs||[]).forEach(function(p){ by[p.user_id]=p });
+    CONN.people.forEach(function(c){ c.who=by[otherSide(c)]||null });
+
+    var mates=connAccepted().map(otherSide);
+    return Promise.all([
+      mates.length
+        ? rest("/posts?select=id,author,body,photos,link,created_at,edited_at"
+               +"&author=in.("+mates.join(",")+")&order=created_at.desc&limit=60")
+        : [],
+      rest("/shares?select=item_id,owner,created_at&viewer=eq."+me),
+      rest("/shares?select=item_id,viewer&owner=eq."+me)
+    ]);
+  }).then(function(r){
+    CONN.feed=r[0]||[];
+    CONN.given={};
+    (r[2]||[]).forEach(function(s){
+      (CONN.given[s.item_id]=CONN.given[s.item_id]||[]).push(s.viewer);
+    });
+    var mine=r[1]||[];
+    if(!mine.length){ CONN.shared=[]; return }
+    /* The notes themselves. They arrive through the ordinary items endpoint
+       — there is no special route for a shared note, and there does not need
+       to be: the database already knows this person may read these rows and
+       nothing else. */
+    var ids=mine.map(function(s){ return '"'+s.item_id.replace(/"/g,'')+'"' });
+    return rest("/items?select=id,data,modified,deleted&id=in.("+ids.join(",")+")")
+      .then(function(items){
+        var by={};
+        (items||[]).forEach(function(it){ by[it.id]=it });
+        CONN.shared=mine.map(function(s){
+          var row=by[s.item_id];
+          return { item_id:s.item_id, owner:s.owner, created_at:s.created_at,
+                   note:(row&&!row.deleted&&row.data)?normalizeItem(row.data):null,
+                   modified:row&&row.modified };
+        }).filter(function(x){ return !!x.note });
+      });
+  }).then(function(){
+    CONN.loaded=true; CONN.err="";
+  }).catch(function(e){
+    CONN.err=(e&&e.msg)||"could not reach the server";
+  }).then(function(){
+    CONN.busy=false;
+    if(S.view==="connect") render();
+    paintSidebar();
+  });
+}
+
+function findByHandle(h){
+  h=String(h||"").trim().replace(/^@/,"").toLowerCase();
+  if(!h) return Promise.resolve(null);
+  if(POSTS.profile&&POSTS.profile.handle===h){
+    CONN.note="That is you."; CONN.found=null; return Promise.resolve(null);
+  }
+  return rest("/profiles?select=user_id,handle,display_name,bio,avatar&handle=eq."
+              +encodeURIComponent(h)+"&limit=1")
+    .then(function(r){
+      CONN.found=(r||[])[0]||null;
+      CONN.note=CONN.found?"":"Nobody here goes by @"+h+".";
+      return CONN.found;
+    });
+}
+
+function askToConnect(uid){
+  return rest("/connections",{ method:"POST",
+    body:{ requester:myUid(), addressee:uid, status:"pending" },
+    prefer:"return=minimal" })
+    .then(function(){ CONN.found=null; CONN.note=""; return loadConnections(true) });
+}
+function answerRequest(fromUid,yes){
+  var me=myUid();
+  var q="/connections?requester=eq."+fromUid+"&addressee=eq."+me;
+  return (yes
+    ? rest(q,{ method:"PATCH", prefer:"return=minimal",
+               body:{ status:"accepted", decided_at:new Date().toISOString() } })
+    : rest(q,{ method:"DELETE", prefer:"return=minimal" })
+  ).then(function(){ return loadConnections(true) });
+}
+/* Either side may walk away. Which row it is depends on who asked, so both
+   directions are removed rather than guessing. */
+function disconnect(uid){
+  var me=myUid();
+  return rest("/connections?and=(requester.eq."+me+",addressee.eq."+uid+")",
+              { method:"DELETE", prefer:"return=minimal" })
+    .then(function(){
+      return rest("/connections?and=(requester.eq."+uid+",addressee.eq."+me+")",
+                  { method:"DELETE", prefer:"return=minimal" });
+    })
+    .then(function(){ return loadConnections(true) });
+}
+
+function shareNote(itemId,viewer){
+  return rest("/shares",{ method:"POST", prefer:"return=minimal",
+    body:{ item_id:itemId, owner:myUid(), viewer:viewer } })
+    .then(function(){ return loadConnections(true) });
+}
+function unshareNote(itemId,viewer){
+  return rest("/shares?item_id=eq."+encodeURIComponent(itemId)
+              +"&viewer=eq."+viewer,{ method:"DELETE", prefer:"return=minimal" })
+    .then(function(){ return loadConnections(true) });
+}
+function sharedWith(itemId){ return CONN.given[itemId]||[] }
+
 /* The user id is in the access token, not in the session object we keep.
    Decoding without verifying is fine here: we're reading our own id to put
    in our own row, and the server checks it against auth.uid() regardless. */
@@ -6292,6 +6598,160 @@ function postCardHTML(p){
     + photoGridHTML(p.photos||[],false)
     + linkCardHTML(p.link,false)
     +'</article>';
+}
+
+/* ---- the Connect page ---------------------------------------------------
+   Four sections, in the order you need them: people waiting on an answer
+   from you, people you are connected to, notes they have handed you, and
+   then what they have been publishing. */
+function renderConnect(){
+  if(!SYNC.session)
+    return '<div class="empty"><div class="big">◌</div>Sign in to connect.</div>';
+  if(CONN.err)
+    return '<div class="empty"><div class="big">◌</div>'+esc(CONN.err)+'</div>';
+  if(CONN.busy&&!CONN.loaded)
+    return '<div class="empty"><div class="big">◌</div>Loading…</div>';
+
+  var h="";
+
+  // --- find somebody -----------------------------------------------------
+  h+='<div class="pubbar">'
+    +'<div style="flex:1;min-width:180px">'
+      +'<div class="lbl">Connect with someone</div>'
+      +'<input class="field" id="cfind" placeholder="their handle, e.g. elena" '
+        +'autocomplete="off" autocapitalize="none" spellcheck="false">'
+    +'</div>'
+    +'<button class="go" id="cfindgo">Find</button>'
+    +'</div>';
+
+  if(CONN.note) h+='<div class="cnote">'+esc(CONN.note)+'</div>';
+
+  if(CONN.found){
+    h+='<div class="crow found">'+avatarOf(CONN.found)
+      +'<div class="cwho"><b>'+esc(connName(CONN.found))+'</b>'
+      +'<span class="chandle">@'+esc(CONN.found.handle)+'</span>'
+      +(CONN.found.bio?'<span class="cbio">'+esc(CONN.found.bio)+'</span>':"")
+      +'</div>'
+      +'<button class="btn" data-cask="'+esc(CONN.found.user_id)+'">Ask to connect</button>'
+      +'</div>';
+  }
+
+  // --- waiting on you ----------------------------------------------------
+  var inc=connIncoming();
+  if(inc.length){
+    h+='<div class="csec">Waiting for your answer</div>';
+    inc.forEach(function(c){
+      h+='<div class="crow">'+avatarOf(c.who)
+        +'<div class="cwho"><b>'+esc(connName(c.who))+'</b>'
+        +(c.who?'<span class="chandle">@'+esc(c.who.handle)+'</span>':"")
+        +'<span class="cbio">wants to connect</span></div>'
+        +'<button class="btn sec" data-cno="'+esc(c.requester)+'">Decline</button>'
+        +'<button class="btn" data-cyes="'+esc(c.requester)+'">Accept</button>'
+        +'</div>';
+    });
+  }
+
+  // --- connected ---------------------------------------------------------
+  var acc=connAccepted(), out=connOutgoing();
+  h+='<div class="csec">Connected'+(acc.length?' · '+acc.length:"")+'</div>';
+  if(!acc.length&&!out.length){
+    h+='<div class="empty"><div class="big">◌</div>'
+      +'Nobody yet. Find someone by their handle above.</div>';
+  }
+  acc.forEach(function(c){
+    var uid=otherSide(c);
+    h+='<div class="crow">'+avatarOf(c.who)
+      +'<div class="cwho"><b>'+esc(connName(c.who))+'</b>'
+      +(c.who?'<span class="chandle">@'+esc(c.who.handle)+'</span>':"")
+      +'</div>'
+      +'<button class="btn quiet" data-cdrop="'+esc(uid)+'">Disconnect</button>'
+      +'</div>';
+  });
+  out.forEach(function(c){
+    h+='<div class="crow waiting">'+avatarOf(c.who)
+      +'<div class="cwho"><b>'+esc(connName(c.who))+'</b>'
+      +'<span class="cbio">asked — waiting for them</span></div>'
+      +'<button class="btn quiet" data-cdrop="'+esc(c.addressee)+'">Withdraw</button>'
+      +'</div>';
+  });
+
+  // --- notes handed to you -----------------------------------------------
+  if(CONN.shared.length){
+    h+='<div class="csec">Shared with you · '+CONN.shared.length+'</div>';
+    CONN.shared.forEach(function(s){
+      var p=connProfile(s.owner), n=s.note;
+      h+='<div class="crow note" data-copen="'+esc(s.item_id)+'">'
+        +'<div class="cwho"><b>'+esc(n.title||"Untitled")+'</b>'
+        +'<span class="cbio">'+esc(richToText(n.body).slice(0,120))+'</span>'
+        +'<span class="chandle">from '+esc(connName(p))+'</span></div>'
+        +'<span class="cread">read only</span>'
+        +'</div>';
+    });
+  }
+
+  // --- their posts --------------------------------------------------------
+  if(CONN.feed.length){
+    h+='<div class="csec">What they have published</div>';
+    CONN.feed.forEach(function(p){
+      var who=connProfile(p.author);
+      h+='<div class="cpost">'
+        +'<div class="cmeta">'+avatarOf(who)
+          +'<b>'+esc(connName(who))+'</b>'
+          +'<span class="chandle">'+esc(agoText(new Date(p.created_at).getTime()))+'</span>'
+        +'</div>'
+        +'<div class="ptext">'+sanitizeRich(p.body||"")+'</div>'
+        +(p.link&&p.link.url
+          ? '<a class="clink" href="'+esc(p.link.url)+'" target="_blank" rel="noopener">'
+            +esc(p.link.title||p.link.url)+' ↗</a>' : "")
+        +'</div>';
+    });
+  } else if(acc.length){
+    h+='<div class="csec">What they have published</div>'
+      +'<div class="empty"><div class="big">◌</div>Nothing yet.</div>';
+  }
+
+  return h;
+}
+
+function avatarOf(p){
+  return '<div class="pav sm">'
+    +(p&&p.avatar?'<img src="'+esc(p.avatar)+'" alt="">'
+      :esc(((p&&(p.display_name||p.handle))||"?").slice(0,1).toUpperCase()))
+    +'</div>';
+}
+
+/* A note somebody else owns. No editor, no formatting bar, no Done — the
+   database would refuse a write anyway, and offering a control that cannot
+   work is worse than not offering it. */
+function openShared(itemId){
+  var s=null;
+  CONN.shared.forEach(function(x){ if(x.item_id===itemId) s=x });
+  if(!s) return;
+  var p=connProfile(s.owner), n=s.note;
+  FOCUS=false;
+  sheet.innerHTML=
+    '<div class="cbar" id="c-from">Shared with you by '+esc(connName(p))
+      +' — read only. It updates as they edit it, and disappears if they '
+      +'withdraw it or you disconnect.</div>'
+    +'<div class="etitle" style="opacity:.92">'+esc(n.title||"Untitled")+'</div>'
+    +'<div class="ebody" id="c-body">'+sanitizeRich(n.body)+'</div>'
+    +'<div class="row sticky" style="justify-content:flex-end">'
+      +'<button class="btn quiet" id="c-copy">Keep a copy</button>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn" id="c-close">Close</button></div>';
+  scrim.classList.add("on");
+  applySheetTint("");
+  sheet.querySelector("#c-close").addEventListener("click",function(){ close() });
+  sheet.querySelector("#c-copy").addEventListener("click",function(){
+    /* Their note stays theirs. This makes one of yours, with the text as it
+       stands now, which is then an ordinary note you own outright. */
+    var copy=normalizeItem({
+      id:uid(), title:n.title, body:n.body, tags:(n.tags||[]).slice(),
+      created:Date.now(), modified:Date.now()
+    });
+    S.items.unshift(copy); rebuildIndex(); save(); close(); render();
+    toast("Copied into your library");
+  });
 }
 
 function renderPosts(){
@@ -7018,10 +7478,60 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
     S.view=v.dataset.view; S.tag=null; S.q=""; S.sel={};
     document.getElementById("q").value="";
     if(S.view==="posts") loadPosts();
+    if(S.view==="connect") loadConnections();
     render();
   }
   if(t){ S.tag=(S.tag===t.dataset.tag?null:t.dataset.tag); S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
 });
+/* Everything on the Connect page, by delegation rather than by wiring each
+   button as it is drawn. The page is rebuilt on every change, so handlers
+   attached to its contents would have to be reattached every time — and the
+   About button taught us what one missing element costs. */
+board.addEventListener("click",function(e){
+  if(S.view!=="connect") return;
+  var b;
+  function busy(p){
+    CONN.busy=true; render();
+    return p.catch(function(err){
+      CONN.note=(err&&err.msg)||"that did not work";
+    }).then(function(){ CONN.busy=false; render() });
+  }
+
+  if(e.target.closest("#cfindgo")){
+    var el=document.getElementById("cfind");
+    busy(findByHandle(el?el.value:""));
+    return;
+  }
+  if((b=e.target.closest("[data-cask]"))){
+    busy(askToConnect(b.dataset.cask).then(function(){ toast("Asked") })); return;
+  }
+  if((b=e.target.closest("[data-cyes]"))){
+    busy(answerRequest(b.dataset.cyes,true).then(function(){ toast("Connected") })); return;
+  }
+  if((b=e.target.closest("[data-cno]"))){
+    busy(answerRequest(b.dataset.cno,false)); return;
+  }
+  if((b=e.target.closest("[data-cdrop]"))){
+    var uid2=b.dataset.cdrop, who=connName(connProfile(uid2));
+    askChoice("Disconnect from "+who+"?",
+      "Any note you have shared with them, and any they have shared with you, "
+      +"stops being visible to the other at once. Nothing is deleted — you "
+      +"each keep your own.",
+      [{label:"Cancel",value:false,kind:"sec"},
+       {label:"Disconnect",value:true,kind:"dan"}],
+      function(yes){ if(yes) busy(disconnect(uid2)) });
+    return;
+  }
+  if((b=e.target.closest("[data-copen]"))){ openShared(b.dataset.copen); return }
+});
+board.addEventListener("keydown",function(e){
+  if(S.view!=="connect") return;
+  if(e.key==="Enter"&&e.target.id==="cfind"){
+    e.preventDefault();
+    var go=document.getElementById("cfindgo"); if(go) go.click();
+  }
+});
+
 /* Renaming a tag. The obvious place is the tag's own page, so there's a
    Rename button in the header whenever you're looking at one. Right-clicking
    it in the sidebar does the same thing, for when you already know. */
