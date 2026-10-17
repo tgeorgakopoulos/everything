@@ -1137,6 +1137,23 @@
   .cmeta b{font-size:13.5px;font-weight:620}
   .clink{display:inline-block;margin-top:10px;font-size:13px;color:var(--blue);
     text-decoration:none}
+  /* ---------- keys for other devices ---------- */
+  .klead{font-size:13.5px;line-height:1.6;color:var(--muted);margin-bottom:14px}
+  .krows{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .krow{display:flex;align-items:center;gap:12px;padding:12px 14px;
+    border-bottom:1px solid var(--line)}
+  .krow:last-child{border-bottom:0}
+  .krow code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px}
+  .krw{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;
+    color:var(--ui);white-space:nowrap}
+  /* The key itself, the one time it is ever on screen. Big enough to read
+     off and retype, and selectable rather than clever. */
+  .keyout{display:block;margin-top:4px;padding:12px 14px;border-radius:10px;
+    background:var(--surface-2);border:1px solid var(--line-strong);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px;
+    line-height:1.5;word-break:break-all;user-select:all;color:var(--ink)}
+
   /* one line per connection inside the editor's share panel */
   .srow{display:flex;align-items:center;gap:11px;padding:9px 2px}
   .srow.on .cbio{color:var(--accent)}
@@ -1375,6 +1392,7 @@
           <button data-bk="export"><b>Export everything</b><span>One .json file you own</span></button>
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
           <button data-bk="storage"><b>Storage…</b><span>What this browser is holding, and how full it is</span></button>
+          <button data-bk="keys"><b>Keys for other devices…</b><span>Let a machine reach your library without your password</span></button>
           <button data-bk="compare"><b>Check against the server…</b><span>Name anything the two disagree about</span></button>
           <button data-bk="asuser"><b>See it as a user does</b><span>Hide the tools only you have</span></button>
         </div>
@@ -7246,6 +7264,7 @@ backupMenu.addEventListener("click",function(e){
   closeBackup();
   if(b.dataset.bk==="export") exportLibrary();
   else if(b.dataset.bk==="storage") showStorage();
+  else if(b.dataset.bk==="keys") showKeys();
   else if(b.dataset.bk==="compare") showCompare();
   else if(b.dataset.bk==="asuser"){
     ASUSER=!ASUSER; paintAdminBits();
@@ -7257,6 +7276,162 @@ document.getElementById("danger").addEventListener("click",function(e){
   if(e.target.id==="dngexp") exportLibrary();
   if(e.target.id==="dngwhy") showStorage();
 });
+
+/* =========================================================================
+   KEYS FOR OTHER DEVICES
+
+   A key stands in for your password on a machine you would rather not give
+   your password to. The writing netbook. An iPhone Shortcut. Anything that
+   needs to reach your library without being able to *be* you.
+
+   The whole security of this rests on one decision: the key is made here,
+   in this browser, and only its SHA-256 hash is ever sent anywhere. The
+   server cannot show you a key, because it does not have one. Neither can
+   I. That is why it is displayed once, loudly, with a Copy button — and why
+   losing it means making another rather than looking it up.
+
+   The alphabet below has no 0/O or 1/l/I in it. A key gets read off a
+   screen and typed into a netbook by hand at least once, and a character
+   you cannot tell from another is a support request waiting to happen.
+   ========================================================================= */
+var KEY_ALPHABET="abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function makeKeyString(){
+  var out="ev_", n=32;
+  var bytes=new Uint8Array(n);
+  (window.crypto||window.msCrypto).getRandomValues(bytes);
+  for(var i=0;i<n;i++) out+=KEY_ALPHABET[bytes[i]%KEY_ALPHABET.length];
+  return out;
+}
+/* crypto.subtle needs a secure context. The app is served over https, so
+   this is fine — but it is null on a plain file:// page, and a key whose
+   hash could not be computed must not be offered rather than stored
+   wrongly. */
+function sha256Hex(s){
+  if(!(window.crypto&&crypto.subtle))
+    return Promise.reject({ msg:"This browser cannot hash the key here. "
+      +"Open the app over https rather than from a file." });
+  return crypto.subtle.digest("SHA-256",new TextEncoder().encode(s))
+    .then(function(buf){
+      return Array.prototype.map.call(new Uint8Array(buf),function(b){
+        return ("0"+b.toString(16)).slice(-2);
+      }).join("");
+    });
+}
+
+var KEYS={ list:[], busy:false, err:"" };
+
+function loadKeys(){
+  return rest("/api_keys?select=id,name,prefix,can_write,created_at,last_used_at"
+              +"&order=created_at.desc")
+    .then(function(r){ KEYS.list=r||[]; KEYS.err=""; })
+    .catch(function(e){ KEYS.err=(e&&e.msg)||"could not reach the server" });
+}
+
+function showKeys(){
+  if(!SYNC.session){
+    askChoice("Keys","Sign in first — a key belongs to an account.",
+      [{label:"Close",value:null}],function(){});
+    return;
+  }
+  KEYS.busy=true;
+  paintKeys();
+  scrim.classList.add("on");
+  loadKeys().then(function(){ KEYS.busy=false; paintKeys() });
+}
+
+function paintKeys(){
+  var rows;
+  if(KEYS.busy&&!KEYS.list.length) rows='<div class="hempty">Loading…</div>';
+  else if(KEYS.err) rows='<div class="hempty">'+esc(KEYS.err)+'</div>';
+  else if(!KEYS.list.length)
+    rows='<div class="hempty">No keys yet. Nothing but this browser can '
+      +'reach your library.</div>';
+  else rows=KEYS.list.map(function(k){
+    return '<div class="krow">'
+      +'<div class="cwho"><b>'+esc(k.name||"unnamed")+'</b>'
+      +'<span class="chandle"><code>'+esc(k.prefix)+'…</code> · made '
+        +esc(agoText(new Date(k.created_at).getTime()))
+        +(k.last_used_at?' · last used '+esc(agoText(new Date(k.last_used_at).getTime()))
+                        :' · never used')
+        +(k.can_write?"":" · read only")+'</span></div>'
+      +'<button class="btn quiet" data-krev="'+esc(k.id)+'">Revoke</button>'
+      +'</div>';
+  }).join("");
+
+  sheet.innerHTML=
+    '<h3 style="margin-bottom:6px">Keys for other devices</h3>'
+    +'<p class="klead">A key lets one machine reach this library without your '
+    +'password. It cannot change your account, it cannot change itself, and '
+    +'you can switch it off here on its own.</p>'
+    +'<div class="krows" id="k-rows">'+rows+'</div>'
+    +'<div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">'
+      +'<input class="field" id="k-name" style="flex:1;min-width:170px" '
+        +'placeholder="what is it for? e.g. the netbook" maxlength="60">'
+      +'<label class="krw"><input type="checkbox" id="k-write" checked> '
+        +'may write</label>'
+      +'<button class="btn" id="k-make">Make a key</button>'
+    +'</div>'
+    +'<div class="row sticky" style="justify-content:flex-end">'
+      +'<button class="btn sec" id="k-close">Close</button></div>';
+
+  sheet.querySelector("#k-close").addEventListener("click",function(){ close() });
+  sheet.querySelector("#k-make").addEventListener("click",makeKey);
+  sheet.querySelector("#k-rows").addEventListener("click",function(e){
+    var b=e.target.closest("[data-krev]"); if(!b) return;
+    var k=KEYS.list.filter(function(x){ return x.id===b.dataset.krev })[0];
+    askChoice("Revoke "+((k&&k.name)||"this key")+"?",
+      "Whatever is using it stops working at once. Nothing else is affected, "
+      +"and your other keys keep working. This cannot be undone — if you need "
+      +"it again you make a new one.",
+      [{label:"Cancel",value:false,kind:"sec"},
+       {label:"Revoke",value:true,kind:"dan"}],
+      function(yes){
+        if(!yes) return;
+        rest("/api_keys?id=eq."+b.dataset.krev,
+             { method:"DELETE", prefer:"return=minimal" })
+          .then(loadKeys).then(paintKeys)
+          .then(function(){ toast("Revoked") })
+          .catch(function(e){ toast((e&&e.msg)||"could not revoke it") });
+      });
+  });
+}
+
+function makeKey(){
+  var nameEl=document.getElementById("k-name");
+  var name=(nameEl&&nameEl.value||"").trim();
+  if(!name) return toast("Give it a name, so you know what to revoke later");
+  var writeEl=document.getElementById("k-write");
+  var canWrite=!writeEl||writeEl.checked;
+  var key=makeKeyString();
+  var btn=document.getElementById("k-make");
+  if(btn) btn.disabled=true;
+
+  sha256Hex(key).then(function(hash){
+    return rest("/api_keys",{ method:"POST", prefer:"return=minimal",
+      body:{ owner:myUid(), name:name, prefix:key.slice(0,8),
+             hash:hash, can_write:canWrite } });
+  }).then(function(){
+    return loadKeys();
+  }).then(function(){
+    /* Shown once, and said plainly. The alternative — a quiet line of text
+       you might scroll past — is how somebody closes the window and loses
+       the only copy of something that cannot be recovered. */
+    askChoice("Copy this now",
+      "<b>This is the only time it will ever be shown.</b> It is not stored "
+      +"anywhere — the server keeps only a fingerprint of it, so neither it "
+      +"nor I can show it to you again.<br><br>"
+      +'<code class="keyout">'+esc(key)+'</code>',
+      [{label:"Copy",value:"copy"},{label:"I have it",value:null,kind:"sec"}],
+      function(v){
+        if(v==="copy"){ copyText(key); toast("Copied — paste it somewhere safe now") }
+        paintKeys();
+      });
+  }).catch(function(e){
+    if(btn) btn.disabled=false;
+    toast((e&&e.msg)||"could not make a key");
+  });
+}
 
 /* =========================================================================
    WHAT IS ACTUALLY IN THIS BROWSER
