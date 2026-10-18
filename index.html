@@ -260,6 +260,9 @@
   .tdot{display:inline-block;width:12px;height:12px;border-radius:50%;
     margin-right:9px;vertical-align:-1px;flex:none}
   .sidefooter .tagline{font-style:italic;color:var(--muted);margin-top:2px;font-size:10.5px}
+  /* Quieter than the copyright line, because it is for me rather than
+     for you — until the day it is the first thing either of us asks. */
+  .buildline{color:var(--faint);font-size:10px;margin-top:3px;letter-spacing:.03em}
   .ghost{padding:5px 8px;border-radius:8px;color:var(--ui);font-size:11.5px;font-weight:540;
     border:1px solid transparent;transition:.12s}
   .ghost:hover{background:var(--line);color:var(--ink);border-color:var(--line-strong)}
@@ -819,6 +822,11 @@
   .selbar button:hover{background:rgba(255,255,255,.26)}
   .selbar button.dan{color:#FF9A90}
   .selbar button.dan:hover{background:rgba(255,120,110,.28)}
+  /* Compile is the one constructive action on this bar — everything else
+     files, hides or destroys. It carries the same green it has in the
+     header so the two read as the same thing. */
+  .selbar button.make{color:#B6E08A}
+  .selbar button.make:hover{background:rgba(143,200,90,.26)}
   .refetch{font-size:10.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px}
   .refetch:hover{color:var(--accent)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);
@@ -1439,6 +1447,7 @@
       </div>
       <div id="copyline">© 2026 Social Capital</div>
       <div class="tagline" id="tagline">This is Everything</div>
+      <div class="buildline" id="buildline"></div>
     </div>
   </aside>
 
@@ -1554,6 +1563,7 @@
   <button data-sel="tag">＋ Tag</button>
   <button data-sel="untag">－ Tag</button>
   <button data-sel="arch">▣ Archive</button>
+  <button data-sel="comp" class="make">⇥ Compile</button>
   <button data-sel="del" class="dan">Delete</button>
   <button data-sel="clear">Done</button>
 </div>
@@ -3088,7 +3098,15 @@ function render(){
   });
   /* Shown whenever the page holds anything worth gathering — notes as well
      as links, since a tag is a subject rather than a list of addresses. */
-  document.getElementById("compilebtn").style.display=compileList().length?"":"none";
+  var cb=document.getElementById("compilebtn"), ncomp=compileList().length;
+  cb.style.display=ncomp?"":"none";
+  /* Say how many, when it is a selection. "⇥ Compile" over a page of
+     ninety notes with four ticked tells you nothing about which four it
+     means — and the answer changed today. */
+  cb.textContent=compilingSelection()?("⇥ Compile "+ncomp):"⇥ Compile";
+  cb.title=compilingSelection()
+    ? "Gather the "+ncomp+" selected item"+(ncomp===1?"":"s")+" into one document"
+    : "Gather everything on this page into one document";
   paintSel();
   paintBackupHint();
   paintSidebar();
@@ -4351,13 +4369,29 @@ function compileEntry(i){
 
 /* Everything on the page that has something to say. An empty note contributes
    nothing but a gap, so it is left out; a note with words or a list is in. */
+/* What Compile will gather.
+
+   The selection, when there is one; otherwise the whole page. Compiling
+   the entire tag while seven cards sat ticked on screen was the app
+   ignoring the most explicit statement of intent a person can make —
+   they had just told it, one card at a time, exactly which things they
+   meant.
+
+   Order comes from visible() either way, so the compiled document reads
+   in the order the page reads, not the order things happened to be
+   ticked. */
 function compileList(){
+  var sel=S.sel&&Object.keys(S.sel).length?S.sel:null;
   return visible().filter(function(i){
+    if(sel&&!sel[i.id]) return false;
     return hasLink(i)
       || (i.body&&richToText(i.body).trim())
       || (i.checks||[]).length
       || (i.title&&!i.titleAuto);
   });
+}
+function compilingSelection(){
+  return !!(S.sel&&Object.keys(S.sel).length);
 }
 function compileBody(list){
   return list.map(function(i){ return compileEntry(i) }).join("<br><br>");
@@ -4365,7 +4399,16 @@ function compileBody(list){
 function compileTitle(){
   var lens=(LENS[S.view]||LENS.all).title;
   var scope=S.q?'"'+S.q+'"':(S.tag?"#"+S.tag:lens);
-  return scope+" — "+new Date().toLocaleDateString([], {day:"numeric",month:"long",year:"numeric"});
+  var when=new Date().toLocaleDateString([], {day:"numeric",month:"long",year:"numeric"});
+  /* A compiled selection says so. "#greek — 18 October" on a document
+     made from four of the ninety notes in #greek would be a quiet lie,
+     and the title is the only place that distinction survives once the
+     selection is cleared. */
+  if(compilingSelection()){
+    var n=compileList().length;
+    return n+" from "+scope+" — "+when;
+  }
+  return scope+" — "+when;
 }
 
 function compileToNote(){
@@ -4377,6 +4420,11 @@ function compileToNote(){
     actionable:false,due:null,done:false,tint:"doc",compiled:true,tags:[],photos:[],
     checks:[],archived:false,pin:false,created:now,modified:now};
   S.items.unshift(item);
+  /* The selection has been used, so it is over. Leaving it ticked while
+     the view changes to Notes means a set of cards selected on a page you
+     are no longer looking at, which is how the next Archive or Delete
+     goes somewhere you did not expect. */
+  S.sel={};
   S.view="notes"; S.tag=null; S.q=""; document.getElementById("q").value="";
   save(); render();
   toast(list.length+" item"+(list.length===1?"":"s")+" compiled into a note");
@@ -5924,6 +5972,15 @@ selbar.addEventListener("click",function(e){
     paintSel(); return;
   }
   if(act==="clear"){ clearSel(); return }
+
+  if(act==="comp"){
+    /* Straight to a note. The menu in the header offers .doc as well,
+       but from here you have already said what you want gathered — one
+       more menu between the intent and the result is a menu too many.
+       compileToNote clears the selection itself. */
+    compileToNote();
+    return;
+  }
 
   if(act==="arch"){
     // if everything picked is already archived, put it all back instead
@@ -8042,6 +8099,8 @@ function setBrand(name){
   // the tagline follows whichever name is in use
   document.getElementById("tagline").textContent="This is "+n;
   document.getElementById("copyline").textContent="© "+new Date().getFullYear()+" Social Capital";
+  var bl=document.getElementById("buildline");
+  if(bl) bl.textContent=(BUILD==="dev")?"working copy":("version "+BUILD);
   fitBrand();
   try{ localStorage.setItem("trove.brand",n) }catch(e){}
 }
@@ -8068,6 +8127,16 @@ window.addEventListener("resize",fitBrand);
    Adding a cookie policy or any other notice later means adding one entry to
    this object and one button to the row in the footer. Nothing else needs to
    know it exists. */
+/* Which build this is.
+
+   "dev" in the master file; build-web.py replaces it with a number when
+   it writes everything-web/index.html, and bumps the number each time.
+   So the copy you open from disk never claims to be a release, and the
+   copy on the web always says exactly which one it is — which matters
+   the moment somebody says "it does X" and the answer depends on
+   whether they have the build where X was fixed. */
+var BUILD="3";
+
 var DOC_DATE="27 September 2026";
 var DOCS={};
 
