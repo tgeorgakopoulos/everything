@@ -7357,6 +7357,31 @@ function showKeys(){
 }
 
 function paintKeys(){
+  /* What you had typed, and where the cursor was.
+
+     This panel is drawn twice: once immediately, and again when the list
+     of keys comes back from the server. The second draw replaces
+     sheet.innerHTML wholesale — which destroys the field you are typing
+     into, takes the focus with it, and throws away the name you had got
+     halfway through. If you opened the panel and started typing at once,
+     which is the only sensible thing to do, the characters went nowhere
+     and the field read as dead.
+
+     So the panel now carries its own state across a redraw. */
+  var keep=null, el0=document.getElementById("k-name");
+  if(el0) keep={ value:el0.value, start:el0.selectionStart,
+                 end:el0.selectionEnd,
+                 /* WHICH control had the cursor, recorded now. Reading
+                    document.activeElement after the redraw is useless:
+                    replacing innerHTML destroys the focused element, and
+                    focus falls back to <body>. Ask afterwards and the
+                    answer is always "nothing in the panel", so the panel
+                    always grabs the cursor back — even if you had
+                    deliberately tabbed to the checkbox. */
+                 focusedId:(sheet.contains(document.activeElement)
+                            &&document.activeElement.id)||"",
+                 write:(document.getElementById("k-write")||{}).checked };
+
   var rows;
   if(KEYS.busy&&!KEYS.list.length) rows='<div class="hempty">Loading…</div>';
   else if(KEYS.err) rows='<div class="hempty">'+esc(KEYS.err)+'</div>';
@@ -7391,6 +7416,34 @@ function paintKeys(){
     +'<div class="row sticky" style="justify-content:flex-end">'
       +'<button class="btn sec" id="k-close">Close</button></div>';
 
+  var nameEl=sheet.querySelector("#k-name");
+  if(keep&&nameEl){
+    nameEl.value=keep.value;
+    var wEl=sheet.querySelector("#k-write");
+    if(wEl&&keep.write!==undefined) wEl.checked=keep.write;
+    if(keep.focusedId==="k-name"){
+      nameEl.focus();
+      try{ nameEl.setSelectionRange(keep.start,keep.end) }catch(e){}
+    } else if(keep.focusedId){
+      var back=sheet.querySelector("#"+keep.focusedId);
+      if(back) try{ back.focus() }catch(e){}
+    }
+  }
+  /* Put the cursor in the field unless it is already somewhere in this
+     panel. It is the only thing here you type into, and a click that has
+     to land in the right place is a click that can miss.
+
+     The guard matters more than it looks. The panel paints twice, and
+     the second paint used to see "nothing was focused yet" — because the
+     first paint's focus was on a timer that had not fired — and conclude
+     it should leave well alone. The result was a panel nobody had the
+     cursor in, with a pending timer aimed at a field that no longer
+     existed. Asking where the focus IS, rather than where it was, has no
+     such race in it. */
+  if(nameEl&&!(keep&&keep.focusedId)&&!sheet.contains(document.activeElement)){
+    try{ nameEl.focus() }catch(e){}
+  }
+
   sheet.querySelector("#k-close").addEventListener("click",function(){ close() });
   sheet.querySelector("#k-make").addEventListener("click",makeKey);
   sheet.querySelector("#k-rows").addEventListener("click",function(e){
@@ -7415,8 +7468,13 @@ function paintKeys(){
 
 function makeKey(){
   var nameEl=document.getElementById("k-name");
-  var name=(nameEl&&nameEl.value||"").trim();
-  if(!name) return toast("Give it a name, so you know what to revoke later");
+  /* A name helps you know what to revoke later, so the field asks for
+     one — but refusing to make a key without it is the wrong trade. A
+     key you cannot make is worse than a key called "key made Sunday",
+     and there is no way to rename one afterwards: the table has no
+     UPDATE policy, deliberately. So: a default rather than a refusal. */
+  var name=(nameEl&&nameEl.value||"").trim()
+    || ("key made "+new Date().toLocaleDateString([], {day:"numeric",month:"long"}));
   var writeEl=document.getElementById("k-write");
   var canWrite=!writeEl||writeEl.checked;
   var key=makeKeyString();
