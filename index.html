@@ -274,6 +274,14 @@
   /* The foot of a page that has more below it. It is mostly there to be
      scrolled towards, which is what asks for the next lot. */
   .moresent{text-align:center;color:var(--faint);font-size:12px;padding:26px 0 10px}
+  /* The diagnostic panel. Plain on purpose: it is read once and copied. */
+  #diagp{position:fixed;left:8px;right:8px;bottom:calc(76px + env(safe-area-inset-bottom));
+    z-index:200;background:rgba(10,12,12,.92);color:#b8f0c0;border-radius:12px;
+    padding:10px 12px;box-shadow:var(--shadow-lg)}
+  #diagp pre{font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;
+    max-height:40vh;overflow:auto;margin:0 0 8px}
+  #diagp button{background:rgba(255,255,255,.14);color:#fff;border-radius:8px;
+    padding:6px 12px;font-size:12px;margin-right:6px}
   /* The order pill uses .lay's look. One thing it needs that .lay never
      did: [hidden] must still hide it. .lay sets display:flex, which
      outranks the browser's own [hidden] rule, so without this the pill
@@ -1370,10 +1378,26 @@
        full width, the rest beneath it. In one row it ran off the side of
        the screen. */
     .topbar{flex-wrap:wrap;row-gap:10px}
-    .topright{width:100%;margin-left:0;flex-wrap:wrap;gap:8px}
-    .search{order:-1;flex:1 1 100%}
+    /* Two rows of equal shape, so the tools take two lines rather than
+       half the screen:
+
+           [ search ............ ] [ Compile ]
+           [ Newest Oldest ... ]   [ ☰ ▦ ⊞  ]
+
+       The right-hand column is one fixed width for both, so Compile and
+       the view pill line up. Every piece is placed by position, not by
+       order, so a hidden Compile or a hidden sort pill leaves its own
+       cell empty instead of letting its neighbour slide into it. */
+    .topright{width:100%;margin-left:0;display:grid;
+      grid-template-columns:minmax(0,1fr) 112px;gap:8px;align-items:center}
+    .search{grid-row:1;grid-column:1;min-width:0}
     .search input,.search input:focus{width:100%}
-    .sortseg button{padding:0 8px}
+    .compilewrap{grid-row:1;grid-column:2}
+    .compilebtn{width:100%;justify-content:center}
+    .sortseg{grid-row:2;grid-column:1;min-width:0}
+    .sortseg button{flex:1;justify-content:center;padding:0 4px}
+    #layoutseg{grid-row:2;grid-column:2;width:112px}
+    #layoutseg button{flex:1;justify-content:center;padding:0}
     /* Room around the box, so it reads as a dialogue rather than the page,
        and so its edges are visibly on screen. */
     .scrim{padding:14px}
@@ -1384,7 +1408,17 @@
     .askrow .btn{width:100%;min-height:46px;font-size:15px}
     .sheet{padding:22px 18px 0;border-radius:16px;max-height:96vh;width:100%}
     .etitle{font-size:21px}
-    .ebody{font-size:15.5px;min-height:32vh}
+    /* iOS Safari zooms the whole page in when you tap a field whose text
+       is smaller than 16px, and leaves it zoomed — which is the zoom you
+       saw on "Jot a note", and the sideways scrolling after it. The
+       capture box was 14.5px. Every field you can type in on a phone is
+       now at least 16px, which is the threshold, not a style choice. */
+    .ebody{font-size:max(16px,calc(15.5px*var(--tscale)));min-height:32vh}
+    .cap textarea{font-size:max(16px,calc(14.5px*var(--tscale)))}
+    input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px!important}
+    /* An app shell never scrolls sideways. If something is too wide it
+       should be fixed, but it must not move the whole screen meanwhile. */
+    html,body{overflow-x:clip}
     .imgstrip .t,.addimg{width:70px;height:70px}
     .facetbar .swatches{margin-left:0!important;width:100%;margin-top:4px}
     .mobtabs{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);
@@ -1835,7 +1869,8 @@ function hydratePhotos(){
         if(p&&p.k&&!p.src&&store[p.k]){ p.src=store[p.k]; filled++ }
       });
     });
-    if(filled) render();
+    diagLog("photo store read: "+filled+" filled");
+    if(filled) renderSoon();
     var used=photoKeysOf(S.items), orphans=Object.keys(store).filter(function(k){ return !used[k] });
     if(orphans.length) pdbDrop(orphans);
     return filled;
@@ -1862,9 +1897,21 @@ function hydratePhotos(){
    IndexedDB on the way past, so this only has to happen once. */
 function fillFromServer(){
   if(!SYNC.on||!SYNC.session) return Promise.resolve(0);
+  /* A note is fetched for its photographs only if some photo it lacks is
+     one the server has not recently said it does not have.
+
+     Without this, a note whose server copy is itself missing one picture
+     was downloaded whole — all its other pictures included, megabytes for
+     a photo-heavy note — on every single start-up, for ever, because the
+     missing one never arrived. Asking again once a day is enough to pick
+     it up when another device finally uploads it. */
+  var miss={}, day=86400000, now=Date.now();
+  try{ miss=JSON.parse(localStorage.getItem("trove.photomiss")||"{}")||{} }catch(e){}
   var wanted={};
   S.items.forEach(function(i){
-    if((i.photos||[]).some(function(p){ return p&&p.k&&!p.src })) wanted[i.id]=1;
+    if((i.photos||[]).some(function(p){
+      return p&&p.k&&!p.src&&!(miss[p.k]&&now-miss[p.k]<day);
+    })) wanted[i.id]=1;
   });
   var ids=Object.keys(wanted);
   if(!ids.length) return Promise.resolve(0);
@@ -1906,16 +1953,26 @@ function fillFromServer(){
 
            Six at a time, filed as they arrive. A batch that fails costs that
            batch and nothing else. */
+        // whatever this batch asked for and still has no bytes: the server
+        // does not have it either, so stop asking for a day
+        slice.forEach(function(id){
+          var it=byId[id];
+          (it&&it.photos||[]).forEach(function(p){ if(p&&p.k&&!p.src) miss[p.k]=now });
+        });
+        try{ localStorage.setItem("trove.photomiss",JSON.stringify(miss)) }catch(e){}
+        DIAG.photoRows+=rows.length;
         var mine=pairs.splice(0,pairs.length);
-        return pdbPutMany(mine).catch(function(){ return 0 }).then(function(){
-          render();
+        return pdbPutMany(mine).catch(function(){ DIAG.idbFail++; return 0 }).then(function(){
+          renderSoon();
           return batch(n+CHUNK);
         });
       })
       .catch(function(){ return batch(n+CHUNK) });   // one bad batch is not the end
   }
 
+  diagLog("fetching photos for "+ids.length+" notes from the server");
   return batch(0).then(function(){
+    diagLog("photos from server done: "+got+" restored");
     if(got) toast(got+" image"+(got===1?"":"s")+" restored from the server");
     return got;
   }).catch(function(){ return 0 });
@@ -2324,7 +2381,7 @@ function fetchMeta(item,force){
 }
 function pump(){ while(mactive<2&&mqueue.length){ mactive++; runFetch(mqueue.shift()) } }
 function runFetch(item){
-  item.metaState="loading"; render();
+  item.metaState="loading"; renderSoon();
 
   // Free wins that need no network round-trip and can't be refused.
   var yt=ytId(item.url);
@@ -2350,7 +2407,7 @@ function runFetch(item){
   function finish(){
     // partial success still counts: a thumbnail and an icon beat a dead card
     item.metaState=(item.image||item.desc||!item.titleAuto)?"ok":"fail";
-    mactive--; save(); render(); pump();
+    mactive--; save(); renderSoon(); pump();
   }
   attempt();
 }
@@ -3066,6 +3123,24 @@ function block(list){
    bottom: sorting first there ran the pinned items down the left-hand edge
    instead of across the top. Giving them a container of their own makes the
    masonry balance them across the width in every layout. */
+/* ---- redraws that nobody asked for -----------------------------------
+
+   Work that happens on its own — a preview arriving, a batch of photos
+   arriving from the server, the photo store being read — used to redraw
+   the entire board every time it finished something. On a phone with a
+   few dozen photo notes that was dozens of complete redraws in the first
+   minutes, each one throwing away every picture on screen and fetching it
+   again: the cards that "flash, reload by themselves, and lose the photos".
+
+   That work now asks for a redraw soon rather than now, and any number of
+   such requests within the window collapse into one. Anything you do
+   yourself still redraws immediately. */
+var renderTimer=null;
+function renderSoon(){
+  if(renderTimer) return;
+  renderTimer=setTimeout(function(){ renderTimer=null; render() },700);
+}
+
 /* ---- drawing the rest as you scroll ---------------------------------- */
 var PAGE_SIZE=48;
 var SHOWN={ sig:"", n:PAGE_SIZE };
@@ -3165,6 +3240,8 @@ function render(){
     vt.textContent = S.q?'"'+S.q+'"' : lens.title;
   }
   document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
+
+  if(renderTimer){ clearTimeout(renderTimer); renderTimer=null }
 
   /* A page at a time. Drawing all 350 cards on every redraw, each with
      its pictures, is what a phone could not keep up with. The first
@@ -4000,6 +4077,7 @@ function pullChanges(){
     if(!r.ok) throw new Error("HTTP "+r.status);
     return r.json();
   }).then(function(rows){
+    diagLog("sync pulled "+rows.length+" changes");
     if(rows.length) applyIncoming(rows);   // which advances lastPull itself,
     var first=!SYNC.pulledOnce;
     SYNC.pulledOnce=true;                  // only as far as it actually got
@@ -8233,7 +8311,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="4";
+var BUILD="5";
 
 var DOC_DATE="27 September 2026";
 var DOCS={};
@@ -8428,6 +8506,118 @@ function toast(msg){
   clearTimeout(tTimer); tTimer=setTimeout(function(){ tEl.classList.remove("on") },1700);
 }
 
+/* ============ the phone's own account of where its time goes ============
+
+   Off unless asked for. Switched on by opening the app with ?diag on the
+   end of the address, or by tapping the version line at the foot of the
+   sidebar five times — the second way exists because the Home Screen app
+   on an iPhone keeps its own storage, separate from Safari's, and it is
+   the Home Screen app that is slow.
+
+   It records rather than guesses: every redraw and how long it took,
+   every network request by kind with its size and duration, photographs
+   still missing their bytes, the preview queue, and failed writes to the
+   photo store. Shown in a small panel with a Copy button, so a phone that
+   cannot be debugged can at least be read. */
+var DIAG={ on:false, t0:Date.now(), renders:0, renderMs:0, renderMax:0,
+           net:{}, idbFail:0, photoRows:0, events:[] };
+try{
+  DIAG.on=/[?#&]diag\b/.test(location.href)
+    ||localStorage.getItem("trove.diag")==="1";
+}catch(e){}
+function diagLog(m){
+  if(!DIAG.on) return;
+  DIAG.events.push(((Date.now()-DIAG.t0)/1000).toFixed(1)+"s "+m);
+  if(DIAG.events.length>14) DIAG.events.shift();
+}
+if(DIAG.on){
+  (function(){
+    var r0=render;
+    render=function(){
+      var t=Date.now(); var out=r0.apply(this,arguments);
+      var ms=Date.now()-t;
+      DIAG.renders++; DIAG.renderMs+=ms; if(ms>DIAG.renderMax) DIAG.renderMax=ms;
+      if(DIAG.renders<=3) diagLog("redraw "+DIAG.renders+" took "+ms+"ms");
+      return out;
+    };
+    var f0=window.fetch;
+    function kind(u){
+      if(/\/rest\/v1\/items\?select=id,data,modified/.test(u)) return "sync";
+      if(/\/rest\/v1\/items\?select=id,data&id=in/.test(u)) return "photos";
+      if(/\/rest\/v1\/items/.test(u)) return "items";
+      if(/\/rest\/v1\/(posts|profiles)/.test(u)) return "posts";
+      if(/\/rest\/v1\/(connections|shares)/.test(u)) return "connect";
+      if(/\/auth\/v1\//.test(u)) return "auth";
+      if(/\/functions\/v1\//.test(u)) return "functions";
+      if(/supabase\.co/.test(u)) return "other db";
+      return "previews";
+    }
+    if(f0) window.fetch=function(u,o){
+      var k=kind(String(u&&u.url||u)), t=Date.now();
+      var e=DIAG.net[k]=DIAG.net[k]||{n:0,kb:0,ms:0,fail:0};
+      e.n++;
+      return f0.apply(this,arguments).then(function(r){
+        e.ms+=Date.now()-t;
+        var len=+(r.headers&&r.headers.get&&r.headers.get("content-length"))||0;
+        if(len) e.kb+=len/1024;
+        else if(r.clone) r.clone().blob().then(function(b){ e.kb+=b.size/1024 },function(){});
+        return r;
+      },function(err){ e.ms+=Date.now()-t; e.fail++; throw err });
+    };
+  })();
+}
+function diagReport(){
+  var photos=0, bare=0;
+  S.items.forEach(function(i){ (i.photos||[]).forEach(function(p){
+    photos++; if(p&&p.k&&!p.src) bare++; }) });
+  var L=[];
+  L.push("Everything "+(BUILD==="dev"?"working copy":"v"+BUILD)+" · "
+    +((Date.now()-DIAG.t0)/1000).toFixed(0)+"s since start");
+  L.push("library: "+S.items.length+" notes, "+photos+" photos, "+bare+" without bytes");
+  L.push("redraws: "+DIAG.renders+" · "+DIAG.renderMs+"ms total · slowest "+DIAG.renderMax+"ms");
+  L.push("previews: "+mqueue.length+" waiting, "+mactive+" in flight");
+  L.push("photo rows fetched: "+DIAG.photoRows+" · photo store failures: "+DIAG.idbFail);
+  Object.keys(DIAG.net).sort().forEach(function(k){
+    var e=DIAG.net[k];
+    L.push("net "+k+": "+e.n+" requests, "+Math.round(e.kb)+" KB, "
+      +(e.ms/1000).toFixed(1)+"s"+(e.fail?", "+e.fail+" failed":""));
+  });
+  L.push("—");
+  return L.concat(DIAG.events).join("\n");
+}
+function diagPanel(){
+  if(!DIAG.on||document.getElementById("diagp")) return;
+  var d=document.createElement("div");
+  d.id="diagp";
+  d.innerHTML='<pre id="diagt"></pre><button id="diagc">Copy</button>'
+    +'<button id="diagx">Close</button>';
+  document.body.appendChild(d);
+  setInterval(function(){
+    var t=document.getElementById("diagt"); if(t) t.textContent=diagReport();
+  },1000);
+  document.getElementById("diagc").addEventListener("click",function(){
+    copyText(diagReport()); toast("Copied — paste it to Claude");
+  });
+  document.getElementById("diagx").addEventListener("click",function(){
+    try{ localStorage.removeItem("trove.diag") }catch(e){}
+    d.remove(); DIAG.on=false;
+  });
+}
+/* Five taps on the version line, within three seconds, toggles it. */
+(function(){
+  var taps=[];
+  var bl=document.getElementById("buildline");
+  if(bl) bl.addEventListener("click",function(){
+    var now=Date.now(); taps=taps.filter(function(t){ return now-t<3000 }); taps.push(now);
+    if(taps.length<5) return;
+    taps=[];
+    var on=!DIAG.on;
+    try{ on?localStorage.setItem("trove.diag","1"):localStorage.removeItem("trove.diag") }catch(e){}
+    toast(on?"Diagnostics on — reloading":"Diagnostics off");
+    setTimeout(function(){ location.reload() },700);
+  });
+})();
+
 /* ============ boot ============ */
 function backfill(){
   S.items.forEach(function(i){ if(i.url&&!i.image&&i.metaState!=="fail") fetchMeta(i) });
@@ -8487,6 +8677,7 @@ save(); render(); refreshCap();
 if(window.requestAnimationFrame) requestAnimationFrame(function(){ paintSidebar() });
 else setTimeout(paintSidebar,0);
 BOOTED=true;   // from here on, a save means a person did something
+if(DIAG.on){ diagPanel(); diagLog("first screen drawn, "+S.items.length+" notes") }
 // the column is a per-screen preference, so it stays on this device
 try{ if(localStorage.getItem(TBKEY)) setTaskbar(true) }catch(e){}
 // tasks are not a page any more; a stored one would show a board nothing points at
