@@ -268,6 +268,16 @@
   .topbar{display:flex;align-items:flex-start;gap:12px;padding:16px 26px 0}
   .title{font-size:22px;font-weight:660;letter-spacing:-.02em}
   .lensnote{color:var(--faint);font-size:12px;margin-top:2px}
+  /* The order this page is in. Deliberately quiet — it answers a question
+     you ask once a week, so it sits at the weight of the lens note rather
+     than competing with the title. */
+  .sortrow{display:flex;gap:2px;margin-top:6px;flex-wrap:wrap}
+  .sortrow button{font-size:11.5px;font-weight:560;color:var(--faint);
+    padding:2px 8px;border-radius:99px;background:none;border:1px solid transparent;
+    transition:.14s}
+  .sortrow button:hover{color:var(--ink)}
+  .sortrow button.on{color:var(--accent);border-color:var(--line-strong);
+    background:var(--accent-soft)}
   /* the toggle and the search field share a row and a baseline */
   .topright{margin-left:auto;display:flex;gap:10px;align-items:center;flex:none}
   .compilewrap{position:relative}
@@ -1455,6 +1465,15 @@
           <button class="ghost tagedit" id="tagedit" style="display:none">✎ Rename tag</button>
         </div>
         <div class="lensnote" id="lensnote"></div>
+        <!-- What order this page is in, said out loud. Before this the
+             answer was "the order things happened to enter this browser",
+             which is not something anybody could be expected to guess. -->
+        <div class="sortrow" id="sortrow" hidden>
+          <button data-sort="new">Newest</button>
+          <button data-sort="old">Oldest</button>
+          <button data-sort="touched">Changed</button>
+          <button data-sort="mine" title="Your own arrangement — drag cards to set it">Mine</button>
+        </div>
       </div>
       <div class="topright">
         <div class="compilewrap">
@@ -2445,25 +2464,91 @@ function visible(){
     if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && !i.done;
     return (LENS[S.view]||LENS.all).test(i);
   });
-  // Array order IS the order. Sort is stable, so returning 0 for ties keeps
-  // whatever arrangement you dragged things into. Date-driven lenses override.
+  /* Pinned first, always. Then: the task lenses are ordered by when
+     something is due, because that is the only order a to-do list can
+     sensibly have. Everywhere else it is whatever the header says.
+
+     "mine" returns 0, and the sort is stable, so the array order — the
+     order you dragged things into — survives untouched. */
   var byDate=!!{today:1,overdue:1,upcoming:1,someday:1,tasks:1}[S.view];
+  var how=byDate?"due":sortNow();
+  function made(i){ return i.created||i.modified||0 }
+  function touched(i){ return i.modified||i.created||0 }
   list.sort(function(a,b){
     var p=(!!b.pin)-(!!a.pin);
     if(p) return p;
-    if(byDate){
+    if(how==="due"){
       if(a.due!=null&&b.due!=null) return a.due-b.due;
       if(a.due!=null) return -1;
       if(b.due!=null) return 1;
+      return 0;
     }
-    return 0;
+    if(how==="new")     return made(b)-made(a);
+    if(how==="old")     return made(a)-made(b);
+    if(how==="touched") return touched(b)-touched(a);
+    return 0;                       // "mine" — leave the arrangement alone
   });
   return list;
 }
 
 // Manual arrangement only makes sense where nothing else is claiming the order.
+/* ---- what order a page is in -------------------------------------------
+
+   Until now the answer was "the order of the array", which is to say the
+   order things happened to enter this browser: new notes at the front,
+   anything arriving from another device also at the front, and whatever
+   you had dragged in between. That is defensible — it makes dragging
+   work — but it is not something a person can state, and when three
+   links appeared at the top one morning there was no way to tell whether
+   they had moved or merely arrived.
+
+   So the order is now a choice, shown in the header, remembered per
+   page. "Mine" is the old behaviour, kept whole, and dragging is
+   available only there — rearranging a list that is about to re-sort
+   itself is a promise the app cannot keep. */
+var SORTS={ "new":1, old:1, touched:1, mine:1 };
+var SORTKEY="trove.sort";
+var SORTBY={};
+try{ SORTBY=JSON.parse(localStorage.getItem(SORTKEY)||"{}")||{} }catch(e){ SORTBY={} }
+
+/* Tag pages share one setting rather than accumulating one per tag: a
+   preference you have to set again for every tag you ever make is not a
+   preference, it is a chore. */
+function sortScope(){ return S.tag?"tag":S.view }
+function sortNow(){
+  var v=SORTBY[sortScope()];
+  return SORTS[v]?v:"new";
+}
+function setSort(v){
+  if(!SORTS[v]) return;
+  SORTBY[sortScope()]=v;
+  try{ localStorage.setItem(SORTKEY,JSON.stringify(SORTBY)) }catch(e){}
+  render();
+}
+
+/* The control is offered only where it means something. On the task
+   lenses the order is the due date and nothing else; on Posts and
+   Connect there is no list of your notes to order; and a search result
+   is already ordered by the thing you searched for. */
+function sortApplies(){
+  return !S.q && !!(S.tag || {all:1,notes:1,links:1,done:1,archived:1,
+                              compiled:1}[S.view]);
+}
+function paintSortRow(){
+  var row=document.getElementById("sortrow");
+  if(!row) return;
+  var on=sortApplies();
+  row.hidden=!on;
+  if(!on) return;
+  var now=sortNow();
+  [].forEach.call(row.querySelectorAll("[data-sort]"),function(b){
+    b.classList.toggle("on",b.dataset.sort===now);
+  });
+}
+
 function canReorder(){
-  return !S.q && (!!S.tag || !!{all:1,notes:1,links:1,done:1}[S.view]);
+  return !S.q && sortNow()==="mine"
+    && (!!S.tag || !!{all:1,notes:1,links:1,done:1}[S.view]);
 }
 
 /* =========================================================================
@@ -3188,6 +3273,7 @@ function paintSidebar(){
 
   // the tag page gets a rename control; nothing else does
   document.getElementById("tagedit").style.display=S.tag?"":"none";
+  paintSortRow();
 
   var counts={};
   all.forEach(function(i){ if(!i.done)(i.tags||[]).forEach(function(x){ counts[x]=(counts[x]||0)+1 }) });
@@ -6783,7 +6869,14 @@ function openShared(itemId){
       id:uid(), title:n.title, body:n.body, tags:(n.tags||[]).slice(),
       created:Date.now(), modified:Date.now()
     });
-    S.items.unshift(copy); rebuildIndex(); save(); close(); render();
+    /* No rebuildIndex() here. That is a local helper inside applyIncoming,
+       maintaining a lookup table that exists only for the length of one
+       merge; the global byId is a function that searches the array, so
+       there is no index out here to rebuild. Calling it threw a
+       ReferenceError — after the note had been added but before the sheet
+       closed, so the copy appeared and the window stayed open looking
+       broken. Caught by a test written for something else entirely. */
+    S.items.unshift(copy); save(); close(); render();
     toast("Copied into your library");
   });
 }
@@ -7779,6 +7872,11 @@ board.addEventListener("keydown",function(e){
     e.preventDefault();
     var go=document.getElementById("cfindgo"); if(go) go.click();
   }
+});
+
+document.getElementById("sortrow").addEventListener("click",function(e){
+  var b=e.target.closest("[data-sort]"); if(!b) return;
+  setSort(b.dataset.sort);
 });
 
 /* Renaming a tag. The obvious place is the tag's own page, so there's a
