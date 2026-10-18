@@ -271,16 +271,15 @@
   .topbar{display:flex;align-items:flex-start;gap:12px;padding:16px 26px 0}
   .title{font-size:22px;font-weight:660;letter-spacing:-.02em}
   .lensnote{color:var(--faint);font-size:12px;margin-top:2px}
-  /* The order this page is in. Deliberately quiet — it answers a question
-     you ask once a week, so it sits at the weight of the lens note rather
-     than competing with the title. */
-  .sortrow{display:flex;gap:2px;margin-top:6px;flex-wrap:wrap}
-  .sortrow button{font-size:11.5px;font-weight:560;color:var(--faint);
-    padding:2px 8px;border-radius:99px;background:none;border:1px solid transparent;
-    transition:.14s}
-  .sortrow button:hover{color:var(--ink)}
-  .sortrow button.on{color:var(--accent);border-color:var(--line-strong);
-    background:var(--accent-soft)}
+  /* The foot of a page that has more below it. It is mostly there to be
+     scrolled towards, which is what asks for the next lot. */
+  .moresent{text-align:center;color:var(--faint);font-size:12px;padding:26px 0 10px}
+  /* The order pill uses .lay's look. One thing it needs that .lay never
+     did: [hidden] must still hide it. .lay sets display:flex, which
+     outranks the browser's own [hidden] rule, so without this the pill
+     would sit there on Posts and Tasks claiming to order them. */
+  .lay[hidden]{display:none}
+  .sortseg button{font-size:12px;font-weight:560}
   /* the toggle and the search field share a row and a baseline */
   .topright{margin-left:auto;display:flex;gap:10px;align-items:center;flex:none}
   .compilewrap{position:relative}
@@ -1362,8 +1361,19 @@
     .lay{margin-left:0!important}
     .grid.cards{--cardh:322px}
     .card{margin-bottom:10px}
-    .quick{opacity:.5;transform:none}
-    .search input{width:140px}.search input:focus{width:160px}
+    /* No hover on a phone, so these were shown permanently, half-faded,
+       on top of every card's title and picture. Everything they do is in
+       the note itself — pin, task, pictures, post — so on a phone they
+       go, and a tap opens the note. */
+    .quick{display:none}
+    /* The toolbar takes its own line under the title, search first and
+       full width, the rest beneath it. In one row it ran off the side of
+       the screen. */
+    .topbar{flex-wrap:wrap;row-gap:10px}
+    .topright{width:100%;margin-left:0;flex-wrap:wrap;gap:8px}
+    .search{order:-1;flex:1 1 100%}
+    .search input,.search input:focus{width:100%}
+    .sortseg button{padding:0 8px}
     /* Room around the box, so it reads as a dialogue rather than the page,
        and so its edges are visibly on screen. */
     .scrim{padding:14px}
@@ -1474,15 +1484,7 @@
           <button class="ghost tagedit" id="tagedit" style="display:none">✎ Rename tag</button>
         </div>
         <div class="lensnote" id="lensnote"></div>
-        <!-- What order this page is in, said out loud. Before this the
-             answer was "the order things happened to enter this browser",
-             which is not something anybody could be expected to guess. -->
-        <div class="sortrow" id="sortrow" hidden>
-          <button data-sort="new">Newest</button>
-          <button data-sort="old">Oldest</button>
-          <button data-sort="touched">Changed</button>
-          <button data-sort="mine" title="Your own arrangement — drag cards to set it">Mine</button>
-        </div>
+
       </div>
       <div class="topright">
         <div class="compilewrap">
@@ -1491,6 +1493,15 @@
             <button data-comp="note"><b>As a new note</b><span>Editable here, links live</span></button>
             <button data-comp="doc"><b>Download .doc</b><span>Opens in Word or Pages</span></button>
           </div>
+        </div>
+        <!-- What order this page is in, said out loud, next to how it is
+             laid out — the two are the same kind of choice. Before this the
+             answer was "the order things happened to enter this browser". -->
+        <div class="lay sortseg" id="sortrow" hidden>
+          <button data-sort="new" title="Newest first, by when it was made">Newest</button>
+          <button data-sort="old" title="Oldest first, by when it was made">Oldest</button>
+          <button data-sort="touched" title="Most recently changed first">Changed</button>
+          <button data-sort="mine" title="Your own arrangement — drag cards to set it">Mine</button>
         </div>
         <div class="lay" id="layoutseg">
           <button data-lay="list" title="List">☰</button>
@@ -2848,6 +2859,42 @@ function md(s){
 function words(s){ return (s||"").trim().split(/\s+/).filter(Boolean).length }
 
 /* One photo-grid renderer, used by both cards and the editor. */
+/* ---- photographs on screen -------------------------------------------
+
+   A photograph is stored as a data: URL — the whole JPEG, base64, inside a
+   string. That is right for storage and sync and export. It was wrong for
+   display: every card's photos were pasted into the page as text, so one
+   redraw of a library this size handed the browser about fourteen
+   megabytes of HTML to parse, and every redraw did it again.
+
+   On a phone that was the slowness, and worse: iOS Safari gives a tab a
+   fixed amount of memory for images, and when it runs out it simply
+   stops painting. "Loads a couple of scrolls and then white" is exactly
+   that.
+
+   So the bytes are handed over once, as a Blob, and the page gets a short
+   blob: address instead. Same picture, same quality; a fiftieth of the
+   text. If a browser cannot do Blobs, it falls back to the old way. */
+var PURL={};
+function photoUrl(p){
+  if(!p||!p.src) return "";
+  var src=p.src;
+  if(src.slice(0,5)!=="data:") return src;          // already an address
+  var comma=src.indexOf(","), head=src.slice(5,comma);
+  if(comma<0||head.indexOf(";base64")<0) return src;
+  var k=p.k||("_"+src.length+src.slice(-24));
+  var hit=PURL[k];
+  if(hit&&hit.len===src.length) return hit.url;
+  try{
+    var bin=atob(src.slice(comma+1)), a=new Uint8Array(bin.length);
+    for(var j=0;j<bin.length;j++) a[j]=bin.charCodeAt(j);
+    var url=URL.createObjectURL(new Blob([a],{type:head.split(";")[0]||"image/jpeg"}));
+    if(hit) try{ URL.revokeObjectURL(hit.url) }catch(e){}
+    PURL[k]={url:url,len:src.length};
+    return url;
+  }catch(e){ return src }
+}
+
 function photoGrid(item,editable){
   var ps=item.photos||[], n=ps.length;
   if(!n) return "";
@@ -2863,7 +2910,7 @@ function photoGrid(item,editable){
     if(n===1&&p.w&&p.h) cell+=' style="aspect-ratio:'+Math.min(2.4,Math.max(.5,p.w/p.h)).toFixed(3)+'"';
     cell+=' data-photo="'+item.id+'" data-idx="'+ix+'">';
     return cell+(p.src
-        ? '<img draggable="false" src="'+esc(p.src)+'" alt="" loading="lazy">'
+        ? '<img draggable="false" src="'+esc(photoUrl(p))+'" alt="" loading="lazy" decoding="async">'
         : '<div class="phwait" aria-label="loading"></div>')
       +(editable?'<button class="rm" data-rmimg="'+ix+'" title="Remove">✕</button>':"")+'</div>';
   }).join("")+'</div>';
@@ -2895,7 +2942,7 @@ function cardHTML(i){
   if(L&&!hasPhotos(i)){
     var g="linear-gradient(135deg,hsl("+hu+" 46% 80%),hsl("+((hu+45)%360)+" 42% 90%))";
     cover='<div class="thumb'+(i.image?" tall":"")+'" style="background:'+g+'">'
-      +(i.image?'<img draggable="false" src="'+esc(i.image)+'" loading="lazy" alt="" onload="this.classList.add(\'in\')" onerror="this.remove()">':"")
+      +(i.image?'<img draggable="false" src="'+esc(i.image)+'" loading="lazy" decoding="async" alt="" onload="this.classList.add(\'in\')" onerror="this.remove()">':"")
       +(i.metaState==="loading"?'<div class="skel"></div>':"")+'</div>';
   }
 
@@ -2970,7 +3017,7 @@ function rowHTML(i){
   var h=host(i.url), hu=hue(h);
 
   var thumb="";
-  if(P) thumb='<div class="rthumb"><img draggable="false" src="'+esc(i.photos[0].src)+'" alt="" loading="lazy"></div>';
+  if(P) thumb='<div class="rthumb"><img draggable="false" src="'+esc(photoUrl(i.photos[0]))+'" alt="" loading="lazy" decoding="async"></div>';
   else if(L) thumb='<div class="rthumb" style="background:linear-gradient(135deg,hsl('+hu+' 46% 78%),hsl('+((hu+45)%360)+' 42% 88%))">'
     +(i.image?'<img draggable="false" src="'+esc(i.image)+'" alt="" loading="lazy" onerror="this.remove()">':"")+'</div>';
 
@@ -3019,6 +3066,42 @@ function block(list){
    bottom: sorting first there ran the pinned items down the left-hand edge
    instead of across the top. Giving them a container of their own makes the
    masonry balance them across the width in every layout. */
+/* ---- drawing the rest as you scroll ---------------------------------- */
+var PAGE_SIZE=48;
+var SHOWN={ sig:"", n:PAGE_SIZE };
+var moreObs=null;
+function watchMore(){
+  if(!window.IntersectionObserver) return;
+  if(!moreObs) moreObs=new IntersectionObserver(function(es){
+    if(es.some(function(e){ return e.isIntersecting })) showMore();
+  },{ rootMargin:"1600px 0px" });
+  moreObs.disconnect();
+  var s=document.getElementById("moresent");
+  if(s) moreObs.observe(s);
+}
+/* Append the next page to what is already there rather than redrawing the
+   lot — a redraw would throw away and re-create every picture above you,
+   which is the cost this exists to avoid. */
+function showMore(){
+  var list=visible(), from=SHOWN.n, to=Math.min(list.length, from+PAGE_SIZE);
+  if(from>=to) return;
+  SHOWN.n=to;
+  /* Pinned notes come first and get their own group. If this page still
+     reaches into them, or the board has no group yet, the grouping is
+     about to change shape — redraw it properly rather than guess. */
+  var pins=list.filter(function(i){ return i.pin }).length;
+  var groups=board.querySelectorAll(".grid,.list");
+  var last=groups[groups.length-1];
+  if((pins&&pins>=from)||!last){ render(); return }
+  var lay=layoutFor();
+  last.insertAdjacentHTML("beforeend",
+    list.slice(from,to).map(lay==="list"?rowHTML:cardHTML).join(""));
+  var sent=document.getElementById("moresent");
+  if(to>=list.length){ if(sent) sent.remove() }
+  else if(sent){ sent.textContent=(list.length-to)+" more"; board.appendChild(sent) }
+  watchMore();
+}
+
 function pinSplit(list,restLabel){
   var pins=list.filter(function(i){ return i.pin }),
       rest=list.filter(function(i){ return !i.pin });
@@ -3083,14 +3166,29 @@ function render(){
   }
   document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
 
+  /* A page at a time. Drawing all 350 cards on every redraw, each with
+     its pictures, is what a phone could not keep up with. The first
+     screenful or two is drawn now and the rest as you scroll towards it.
+     Navigating somewhere else starts again from the top; a redraw on the
+     same page (a sync arriving, a pin) keeps however far you had got. */
+  var sig=[S.view,S.tag||"",S.q,sortNow(),layoutFor()].join("|");
+  if(sig!==SHOWN.sig){ SHOWN.sig=sig; SHOWN.n=PAGE_SIZE }
+  if(!window.IntersectionObserver) SHOWN.n=Infinity;   // cannot watch: draw it all
+  var shown=list.slice(0,SHOWN.n);
+
   if(!list.length){
     board.innerHTML='<div class="empty"><div class="big">◌</div>'
       +(S.q?"Nothing matches that.":"Nothing here yet — capture something above.")+'</div>';
   } else if(S.view==="all"&&!S.q&&!S.tag){
-    board.innerHTML=pinSplit(list,"Recent");
+    board.innerHTML=pinSplit(shown,"Recent");
   } else {
-    board.innerHTML=pinSplit(list, S.q?"Results":S.tag?"#"+S.tag:lens.title);
+    board.innerHTML=pinSplit(shown, S.q?"Results":S.tag?"#"+S.tag:lens.title);
   }
+  if(list.length>shown.length){
+    board.insertAdjacentHTML("beforeend",
+      '<div class="moresent" id="moresent">'+(list.length-shown.length)+' more</div>');
+  }
+  watchMore();
 
   var lay=layoutFor();
   document.querySelectorAll("#layoutseg button").forEach(function(b){
@@ -5808,7 +5906,7 @@ function openLight(id,ix){
   lightSet=it.photos; lightIx=ix||0; light.classList.add("on"); paintLight();
 }
 function paintLight(){
-  lightimg.src=lightSet[lightIx].src;
+  lightimg.src=photoUrl(lightSet[lightIx])||lightSet[lightIx].src;
   lightnav.innerHTML = lightSet.length>1
     ? '<button data-step="-1">‹</button><span>'+(lightIx+1)+' / '+lightSet.length
       +'</span><button data-step="1">›</button>' : "";
@@ -8135,7 +8233,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="3";
+var BUILD="4";
 
 var DOC_DATE="27 September 2026";
 var DOCS={};
