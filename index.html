@@ -1374,6 +1374,10 @@
        the note itself — pin, task, pictures, post — so on a phone they
        go, and a tap opens the note. */
     .quick{display:none}
+    /* Ask the browser not to lay out and paint cards that are off screen.
+       It remembers each card's real size once it has seen it, so the
+       scroll bar does not jump about. */
+    .card,.row-item{content-visibility:auto;contain-intrinsic-size:auto 330px}
     /* The toolbar takes its own line under the title, search first and
        full width, the rest beneath it. In one row it ran off the side of
        the screen. */
@@ -1858,11 +1862,24 @@ function persistPhotos(){
 
 /* On start the records carry keys and no bytes. Put the bytes back, then
    throw away anything no note refers to any more. */
+/* The phone's own photo store must be read BEFORE anyone decides which
+   photographs are missing.
+
+   Two start-up jobs used to race. Reading the store on an iPhone took
+   about four and a half seconds; the first successful sync, which also
+   asks the server for any missing photos, landed a tenth of a second
+   earlier. At that moment every photograph looked missing, so the app
+   downloaded all thirty-one photo notes — 25 MB, thirty-six seconds — and
+   then found it already had every one of them. "0 restored." On every
+   start. The diagnostic caught it in one run. */
+var PHOTOS_READ=null, photosReadDone=false, FILLING=null;
+
 function hydratePhotos(){
   var need=S.items.some(function(i){
     return (i.photos||[]).some(function(p){ return p&&p.k&&!p.src });
   });
-  return pdbReadAll().then(function(store){
+  photosReadDone=false;           // a new read: nobody may treat it as finished
+  return (PHOTOS_READ=pdbReadAll().then(function(store){
     var filled=0;
     S.items.forEach(function(i){
       (i.photos||[]).forEach(function(p){
@@ -1875,6 +1892,7 @@ function hydratePhotos(){
     if(orphans.length) pdbDrop(orphans);
     return filled;
   }).catch(function(){ return 0 })
+    .then(function(filled){ photosReadDone=true; return filled }))
     .then(function(filled){
       return fillFromServer().then(function(n){ return filled+n });
     });
@@ -1897,6 +1915,15 @@ function hydratePhotos(){
    IndexedDB on the way past, so this only has to happen once. */
 function fillFromServer(){
   if(!SYNC.on||!SYNC.session) return Promise.resolve(0);
+  // not until this device has looked in its own store first
+  if(PHOTOS_READ&&!photosReadDone) return PHOTOS_READ.then(fillFromServer);
+  // and only one of these at a time; a second caller gets the first's answer
+  if(FILLING) return FILLING;
+  FILLING=fillFromServerNow().then(function(n){ FILLING=null; return n },
+                                   function(){ FILLING=null; return 0 });
+  return FILLING;
+}
+function fillFromServerNow(){
   /* A note is fetched for its photographs only if some photo it lacks is
      one the server has not recently said it does not have.
 
@@ -8311,9 +8338,9 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="5";
+var BUILD="6";
 
-var DOC_DATE="27 September 2026";
+var DOC_DATE="19 October 2026";
 var DOCS={};
 
 DOCS.about={ title:"About Everything", html:function(){ return ''
@@ -8359,8 +8386,16 @@ DOCS.privacy={ title:"Privacy", html:function(){ return '<div class="fine">'
   +'<br><br><h3>What is not kept</h3>'
   +'No analytics, no advertising identifiers, no third-party trackers, and no '
   +'record of what you read or when. The contents of your notes are not logged. '
-  +'Nothing is ever sold or passed to anyone, and nothing is used to train any '
-  +'model.'
+  +'Nothing is ever sold, and nothing is used to train any model.'
+  +'<br><br><h3>Previews of the links you save</h3>'
+  +'To show a link with its title, description and picture, the address of the '
+  +'page has to be read by something. In the browser that is one of four '
+  +'services, tried in turn: Microlink, AllOrigins, corsproxy.io and Jina. A link '
+  +'saved from your phone is read by our own server function instead. What they '
+  +'receive is the address of the page you saved and nothing else: not your '
+  +'notes, your name, or your account. The preview pictures themselves load from '
+  +'the website they belong to, as they would if you visited it.'
+
   +'<br><br><h3>Cookies</h3>'
   +'Everything sets no advertising or analytics cookies. It keeps a sign-in '
   +'token and your own settings in this browser&rsquo;s local storage, which is '
@@ -8582,6 +8617,22 @@ function diagReport(){
     L.push("net "+k+": "+e.n+" requests, "+Math.round(e.kb)+" KB, "
       +(e.ms/1000).toFixed(1)+"s"+(e.fail?", "+e.fail+" failed":""));
   });
+  /* Preview images on links are loaded by the browser straight from each
+     website, so they never pass through fetch and the network lines above
+     cannot see them. What can be measured is what they cost once here:
+     every decoded picture takes width × height × 4 bytes of memory, which
+     on a phone is the budget that runs out. */
+  var imgs=[].slice.call(document.querySelectorAll("#board img"))
+    .filter(function(im){ return im.complete&&im.naturalWidth });
+  var px=0, big=null;
+  imgs.forEach(function(im){
+    var a=im.naturalWidth*im.naturalHeight; px+=a;
+    if(!big||a>big.a) big={a:a,w:im.naturalWidth,h:im.naturalHeight};
+  });
+  L.push("pictures on the board: "+imgs.length+" loaded, "
+    +Math.round(px*4/1048576)+" MB decoded"
+    +(big?", largest "+big.w+"×"+big.h:""));
+  L.push("cards drawn: "+document.querySelectorAll("#board [data-id]").length);
   L.push("—");
   return L.concat(DIAG.events).join("\n");
 }
