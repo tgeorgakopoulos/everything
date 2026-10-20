@@ -1172,6 +1172,9 @@
     text-decoration:none}
   /* ---------- keys for other devices ---------- */
   .klead{font-size:13.5px;line-height:1.6;color:var(--muted);margin-bottom:14px}
+  .ilist{width:100%!important;resize:vertical;min-height:72px;line-height:1.5}
+  .iresult{margin-top:12px;font-size:13px;line-height:1.5;color:var(--ink);
+    padding:9px 12px;border-radius:10px;background:var(--accent-soft)}
   .krows{border:1px solid var(--line);border-radius:12px;overflow:hidden}
   .krow{display:flex;align-items:center;gap:12px;padding:12px 14px;
     border-bottom:1px solid var(--line)}
@@ -1434,6 +1437,17 @@
     html,body{overflow-x:clip}
     .imgstrip .t,.addimg{width:70px;height:70px}
     .facetbar .swatches{margin-left:0!important;width:100%;margin-top:4px}
+    /* On a phone the capture box went: it took a band of the screen that
+       belonged to your notes, all the time, to do something you do a few
+       times a day. The + in the bottom bar does the same job and costs
+       nothing until you press it. */
+    .capwrap{display:none}
+    .mobtabs .mobnew{flex:none;width:54px;height:54px;border-radius:50%;
+      background:var(--make);color:#fff;display:grid;place-items:center;
+      margin:-22px 6px 0;box-shadow:0 6px 18px -6px rgba(0,0,0,.45);padding:0}
+    .mobtabs .mobnew svg{width:26px;height:26px;stroke:currentColor;
+      stroke-width:2.4;fill:none;stroke-linecap:round}
+    .mobtabs .mobnew:active{transform:scale(.94)}
     .mobtabs{display:flex;position:fixed;bottom:0;left:0;right:0;background:var(--surface);
       border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:40}
     .mobtabs button{flex:1;display:grid;gap:2px;justify-items:center;color:var(--faint);
@@ -1483,6 +1497,7 @@
           <button data-bk="export"><b>Export everything</b><span>One .json file you own</span></button>
           <button data-bk="import"><b>Import from a file…</b><span>Merge, or replace what's here</span></button>
           <button data-bk="storage"><b>Storage…</b><span>What this browser is holding, and how full it is</span></button>
+          <button data-bk="invites"><b>Invitations…</b><span>Who may join, and who has</span></button>
           <button data-bk="keys"><b>Keys for other devices…</b><span>Let a machine reach your library without your password</span></button>
           <button data-bk="compare"><b>Check against the server…</b><span>Name anything the two disagree about</span></button>
           <button data-bk="asuser"><b>See it as a user does</b><span>Hide the tools only you have</span></button>
@@ -1582,6 +1597,7 @@
 <nav class="mobtabs">
   <button data-view="all" class="on"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></svg></span>All</button>
   <button data-view="today"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.1 1.9"/></svg></span>Today</button>
+  <button class="mobnew" id="mobnew" aria-label="New note" title="New note"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
   <button data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links</button>
   <button data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks</button>
 </nav>
@@ -1830,6 +1846,45 @@ function slimPhotos(items){
     return c;
   });
 }
+/* ---- the + button --------------------------------------------------
+
+   Opens the editor on a new, empty note. While it is empty it is not a
+   note: it is not written to disk, not sent to the server, and if you
+   close it without writing anything it simply goes, so the button can be
+   pressed by mistake for free.
+
+   And a single line with no title behaves exactly as the old capture box
+   did: paste a link and it becomes a link, write "call Elena friday" and
+   it becomes a task with a date, #tags anywhere are pulled out. Anything
+   longer is a note, exactly as written. */
+var FRESH={};
+function isBlank(i){
+  return !i.title&&!richToText(i.body||"").trim()&&!i.url
+    &&!(i.photos||[]).length&&!(i.checks||[]).length;
+}
+function newNote(){
+  var now=Date.now();
+  var item=normalizeItem({ id:uid(), title:"", body:"", created:now, modified:now });
+  S.items.unshift(item);
+  FRESH[item.id]=1;
+  openEditor(item.id);
+  // the body, not the title: the + is for jotting, and a jot has no title
+  setTimeout(function(){
+    var b=document.getElementById("e-body"); if(b) try{ b.focus() }catch(e){}
+  },80);
+}
+function quickJot(i,text){
+  var p=parse(text), act=p.actionable, shape=shapeCapture(p,act);
+  i.title=shape.title;
+  i.body=toRich(shape.body||"");
+  if(shape.checks&&shape.checks.length) i.checks=shape.checks;
+  if(p.url){ i.url=p.url; i.titleAuto=p.titleAuto; i.metaState=null }
+  (p.tags||[]).forEach(function(t){ if(i.tags.indexOf(t)<0) i.tags.push(t) });
+  if(act){ i.actionable=true; i.due=p.due; i.timed=!!p.timed }
+}
+
+// what is written to disk: everything except a note still being started
+function kept(){ return S.items.filter(function(i){ return !FRESH[i.id] }) }
 function writeItems(){
   /* The full payload is written only while photographs are still on their way
      into IndexedDB, so that a tab closed in that second does not take a new
@@ -1846,10 +1901,10 @@ function writeItems(){
      is recoverable from the server. A library that cannot be saved is not. */
   try{
     localStorage.setItem(KEY,
-      JSON.stringify(photosAllFiled()?slimPhotos(S.items):S.items));
+      JSON.stringify(photosAllFiled()?slimPhotos(kept()):kept()));
   }catch(e){
     // no room for the bytes — the words are what matter
-    localStorage.setItem(KEY,JSON.stringify(slimPhotos(S.items)));
+    localStorage.setItem(KEY,JSON.stringify(slimPhotos(kept())));
     console.warn("Everything: wrote the library without image bytes; "
       +"there was not room for them.",e&&e.name);
   }
@@ -3384,7 +3439,7 @@ var ASUSER=false;                       // an admin pretending not to be one
 function isAdmin(){ return !!(POSTS.profile&&POSTS.profile.is_admin)&&!ASUSER }
 function paintAdminBits(){
   var on=isAdmin();
-  ["storage","compare","asuser"].forEach(function(k){
+  ["storage","compare","asuser","invites"].forEach(function(k){
     var b=document.querySelector('[data-bk="'+k+'"]');
     if(b) b.style.display=on||(k==="asuser"&&ASUSER)?"":"none";
   });
@@ -3801,6 +3856,7 @@ function stampChanges(){
   var seen={};
   S.items.forEach(function(i){
     seen[i.id]=1;
+    if(FRESH[i.id]) return;            // being written for the first time
     if(SYNC.shadow[i.id]!==sig(i)) SYNC.queue[i.id]="put";
   });
 
@@ -5374,6 +5430,10 @@ function openEditor(id){
       .map(function(c){ return {t:c.t.trim(),d:!!c.d} });
     i.tags=q("#e-tags").value.split(",").map(function(s){ return s.trim().toLowerCase() }).filter(Boolean);
     i.tint=d.tint; i.pin=d.pin; i.modified=Date.now();
+    if(FRESH[i.id]&&!i.title&&!i.url){
+      var jot=richToText(i.body||"").trim();
+      if(jot&&jot.indexOf("\n")<0) quickJot(i,jot);
+    }
     if(!i.url){ i.image=""; i.desc=""; i.logo=""; i.site=""; i.metaState=null }
     save();
     if(!keepOpen) close();
@@ -5545,6 +5605,15 @@ function openEditor(id){
   }
 }
 function close(){
+  var fid=S.editing;
+  if(fid&&FRESH[fid]){
+    delete FRESH[fid];
+    var fi=byId(fid);
+    if(fi&&isBlank(fi)){
+      S.items=S.items.filter(function(x){ return x.id!==fid });
+      setTimeout(render,0);
+    } else if(fi){ save() }   // now it is a note: on disk, and on its way up
+  }
   scrim.classList.remove("on"); S.editing=null; editorApply=null;
   flushPending();          // rows that arrived while this note was open
 }
@@ -7681,6 +7750,7 @@ backupMenu.addEventListener("click",function(e){
   closeBackup();
   if(b.dataset.bk==="export") exportLibrary();
   else if(b.dataset.bk==="storage") showStorage();
+  else if(b.dataset.bk==="invites") showInvites();
   else if(b.dataset.bk==="keys") showKeys();
   else if(b.dataset.bk==="compare") showCompare();
   else if(b.dataset.bk==="asuser"){
@@ -7693,6 +7763,130 @@ document.getElementById("danger").addEventListener("click",function(e){
   if(e.target.id==="dngexp") exportLibrary();
   if(e.target.id==="dngwhy") showStorage();
 });
+
+/* =========================================================================
+   INVITATIONS
+
+   The guest list, from inside the app, for an admin. The browser cannot
+   read the list directly — it has no permissions at all, by design — so
+   every action goes through the invite-admin function, which checks the
+   session with Supabase and is_admin with the database before touching it.
+   The menu item is only shown to admins, but that is tidiness: the
+   function is what actually says no.
+   ========================================================================= */
+var INV={ list:[], busy:false, err:"", result:"" };
+var WELCOME_URL="https://thisiseverything.eu/welcome.html";
+
+function callInviteAdmin(payload){
+  return withFreshSession().then(function(){
+    return fetch(fnUrl("invite-admin"),{ method:"POST",
+      headers:{ "Content-Type":"application/json", apikey:SUPA.key,
+                Authorization:"Bearer "+SYNC.session.access_token },
+      body:JSON.stringify(payload) });
+  }).then(function(r){
+    return r.json().catch(function(){ return {} }).then(function(j){
+      if(!r.ok) throw { msg:(j&&j.error)||("HTTP "+r.status) };
+      return j;
+    });
+  });
+}
+function loadInvites(){
+  return callInviteAdmin({ action:"list" })
+    .then(function(j){ INV.list=j.invites||[]; INV.err="" })
+    .catch(function(e){ INV.err=(e&&e.msg)||"could not reach the server" });
+}
+function showInvites(){
+  if(!SYNC.session) return;
+  INV.busy=true; INV.result="";
+  paintInvites(); scrim.classList.add("on");
+  loadInvites().then(function(){ INV.busy=false; paintInvites() });
+}
+function paintInvites(){
+  /* Carried across a redraw, the same way the key panel learned to: the
+     list arrives after the panel opens, and a redraw that wiped half a
+     pasted list of addresses would be a nasty surprise. */
+  var keep=null, a0=document.getElementById("i-emails");
+  if(a0) keep={ emails:a0.value, note:(document.getElementById("i-note")||{}).value||"",
+                focus:document.activeElement&&document.activeElement.id };
+
+  var rows;
+  if(INV.busy&&!INV.list.length) rows='<div class="hempty">Loading…</div>';
+  else if(INV.err) rows='<div class="hempty">'+esc(INV.err)+'</div>';
+  else if(!INV.list.length) rows='<div class="hempty">Nobody invited yet.</div>';
+  else rows=INV.list.map(function(v){
+    var joined=!!v.used_at;
+    return '<div class="krow">'
+      +'<div class="cwho"><b>'+esc(v.email)+'</b>'
+      +'<span class="chandle">'+(joined
+        ? "joined "+esc(agoText(new Date(v.used_at).getTime()))
+        : "invited "+esc(agoText(new Date(v.invited_at).getTime()))+" · not joined yet")
+      +(v.note?" · "+esc(v.note):"")+'</span></div>'
+      +(joined?'<span class="cread">joined</span>'
+              :'<button class="btn quiet" data-irm="'+esc(v.email)+'">Remove</button>')
+      +'</div>';
+  }).join("");
+
+  sheet.innerHTML=
+    '<h3 style="margin-bottom:6px">Invitations</h3>'
+    +'<p class="klead">Paste one address or a whole list — one per line, commas, '
+    +'or straight out of an email with the names still on. Each person can then '
+    +'make an account at the welcome page.</p>'
+    +'<textarea class="field ilist" id="i-emails" rows="3" '
+      +'placeholder="elena@example.com, kostas@example.gr"></textarea>'
+    +'<div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">'
+      +'<input class="field" id="i-note" style="flex:1;min-width:150px" '
+        +'placeholder="a note for yourself, e.g. the studio" maxlength="200">'
+      +'<button class="btn" id="i-add">Invite</button>'
+    +'</div>'
+    +(INV.result?'<div class="iresult">'+INV.result+'</div>':"")
+    +'<div class="krows" id="i-rows" style="margin-top:14px">'+rows+'</div>'
+    +'<div class="row sticky" style="justify-content:flex-end">'
+      +'<button class="btn quiet" id="i-copy">Copy the welcome link</button>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn sec" id="i-close">Close</button></div>';
+
+  var ta=sheet.querySelector("#i-emails"), nt=sheet.querySelector("#i-note");
+  if(keep){
+    ta.value=keep.emails; nt.value=keep.note;
+    var f=keep.focus&&sheet.querySelector("#"+keep.focus); if(f) try{ f.focus() }catch(e){}
+  }
+  sheet.querySelector("#i-close").addEventListener("click",function(){ close() });
+  sheet.querySelector("#i-copy").addEventListener("click",function(){
+    copyText(WELCOME_URL); toast("Copied — send it to them");
+  });
+  sheet.querySelector("#i-add").addEventListener("click",function(){
+    var raw=ta.value.trim(); if(!raw) return toast("Paste an address first");
+    var b=this; b.disabled=true;
+    callInviteAdmin({ action:"add", emails:raw, note:nt.value.trim() })
+      .then(function(j){
+        var bits=[];
+        if(j.added&&j.added.length) bits.push("<b>"+j.added.length+" invited</b>");
+        if(j.already&&j.already.length) bits.push(j.already.length+" already on the list");
+        if(j.invalid&&j.invalid.length) bits.push("not addresses: "+j.invalid.map(esc).join(", "));
+        INV.result=(bits.join(" · ")||"No addresses found in that.")
+          +(j.added&&j.added.length?" Send them the welcome link below.":"");
+        ta.value="";
+        return loadInvites();
+      })
+      .catch(function(e){ toast((e&&e.msg)||"could not invite") })
+      .then(function(){ paintInvites() });
+  });
+  sheet.querySelector("#i-rows").addEventListener("click",function(e){
+    var b=e.target.closest("[data-irm]"); if(!b) return;
+    var who=b.dataset.irm;
+    askChoice("Remove the invitation for "+who+"?",
+      "They will no longer be able to make an account with this address. "
+      +"Nothing else changes.",
+      [{label:"Cancel",value:false,kind:"sec"},{label:"Remove",value:true,kind:"dan"}],
+      function(yes){
+        if(!yes) return;
+        callInviteAdmin({ action:"remove", email:who })
+          .then(loadInvites).then(function(){ INV.result=""; paintInvites(); toast("Removed") })
+          .catch(function(e){ toast((e&&e.msg)||"could not remove it") });
+      });
+  });
+  if(!keep) setTimeout(function(){ try{ ta.focus() }catch(e){} },40);
+}
 
 /* =========================================================================
    KEYS FOR OTHER DEVICES
@@ -8229,6 +8423,9 @@ document.getElementById("taglist").addEventListener("contextmenu",function(e){
   renameTag(t.dataset.tag);
 });
 
+document.getElementById("mobnew").addEventListener("click",function(e){
+  e.stopPropagation(); newNote();
+});
 document.querySelector(".mobtabs").addEventListener("click",function(e){
   var v=e.target.closest("[data-view]");
   if(!v) return;
@@ -8386,7 +8583,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="7";
+var BUILD="64";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
