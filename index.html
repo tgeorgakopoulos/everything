@@ -29,7 +29,7 @@
     --tscale:1;
     --line:rgba(22,26,25,.13); --line-strong:rgba(22,26,25,.26);
     --accent:#1F6B63; --accent-soft:rgba(31,107,99,.12);
-    --make:#3F7D1E; --make-soft:rgba(63,125,30,.12);
+    --make:#557A3B; --make-soft:rgba(85,122,59,.12);
     --blue:#44579F; --green:#5F8442; --red:#B4443A;
     --shadow:0 1px 2px rgba(22,26,25,.04), 0 6px 20px -8px rgba(22,26,25,.10);
     --shadow-lg:0 10px 40px -12px rgba(22,26,25,.22);
@@ -94,7 +94,7 @@
     --ui:#B4BFBD;
     --line:rgba(232,237,236,.14); --line-strong:rgba(232,237,236,.28);
     --accent:#4FB3A6; --accent-soft:rgba(79,179,166,.16);
-    --make:#8FC85A; --make-soft:rgba(143,200,90,.16);
+    --make:#9BBA72; --make-soft:rgba(155,186,114,.16);
     --blue:#95A6E4; --green:#9BBA72; --red:#E0736A;
     --shadow:0 1px 2px rgba(0,0,0,.3), 0 6px 20px -8px rgba(0,0,0,.5);
     --shadow-lg:0 10px 40px -12px rgba(0,0,0,.7);
@@ -843,8 +843,8 @@
   /* Compile is the one constructive action on this bar — everything else
      files, hides or destroys. It carries the same green it has in the
      header so the two read as the same thing. */
-  .selbar button.make{color:#B6E08A}
-  .selbar button.make:hover{background:rgba(143,200,90,.26)}
+  .selbar button.make{color:#B4CC93}
+  .selbar button.make:hover{background:rgba(155,186,114,.24)}
   .refetch{font-size:10.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px}
   .refetch:hover{color:var(--accent)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--accent);
@@ -1446,7 +1446,7 @@
        nothing until you press it. */
     .capwrap{display:none}
     .mobtabs .mobnew{flex:none;width:54px;height:54px;border-radius:50%;
-      background:var(--make);color:#fff;display:grid;place-items:center;
+      background:var(--make);color:var(--surface);display:grid;place-items:center;
       margin:-22px 6px 0;box-shadow:0 6px 18px -6px rgba(0,0,0,.45);padding:0}
     .mobtabs .mobnew svg{width:26px;height:26px;stroke:currentColor;
       stroke-width:2.4;fill:none;stroke-linecap:round}
@@ -8630,7 +8630,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="65";
+var BUILD="66";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
