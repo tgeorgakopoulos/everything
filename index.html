@@ -1981,6 +1981,12 @@ function startInline(card,ev){
   t.setAttribute("contenteditable","plaintext-only");
   if(t.contentEditable!=="plaintext-only") t.setAttribute("contenteditable","true");
   b.setAttribute("contenteditable","true");
+  /* The editor's manners, not just its buttons: your quote marks, two
+     dashes for a divider, spelling underlined. */
+  b.setAttribute("spellcheck","true"); t.setAttribute("spellcheck","true");
+  attachSmartQuotes(t,true);
+  attachSmartQuotes(b,true);
+  b.addEventListener("input",function(){ if(INLINE.el===card) dashesToDivider() });
   card.classList.add("inline");
   card.removeAttribute("draggable");
 
@@ -3116,6 +3122,52 @@ function quoteFor(prev,ch){
   if(ch==="'") return opensHere(prev)?"‘":"’";
   return null;
 }
+/* Two dashes on a line of their own become a divider. Shared by the
+   editor and by a note being written in place in Full, so the two behave
+   the same.
+
+   Done with execCommand rather than by editing the DOM directly, because
+   that is what puts it on the browser's own undo stack: ⌘Z gives you the
+   two dashes back, which is the escape hatch for anyone who wanted to
+   type two dashes and meant it. */
+function dashesToDivider(){
+  var sel=getSelection();
+  if(!sel||!sel.rangeCount||!sel.isCollapsed) return false;
+  var r=sel.getRangeAt(0), n=r.startContainer;
+  if(n.nodeType!==3) return false;
+  var at=r.startOffset;
+  /* What counts as "the start of a line".
+
+     This used to insist the caret sat at offset 2 of a text node whose
+     previous sibling was nothing or a <br>. That describes one shape a line
+     can have. Chrome builds several: press Return in the middle of a note
+     and it may wrap the new line in a <div>, or leave the dashes in a text
+     node that follows a <span> left over from an earlier edit. In any of
+     those the old test failed and the rule quietly did nothing — which is
+     why it worked when you tried it in an empty note and not while you were
+     actually writing.
+
+     So instead of guessing the shape, read the line: walk backwards from
+     the caret, gathering text, and stop at the first <br> or at the start
+     of the block. If everything on the line so far is the two dashes, it
+     is a divider. */
+  var head=n.data.slice(0,at), walk=n;
+  while(walk.previousSibling&&head.length<8){
+    walk=walk.previousSibling;
+    if(walk.nodeName==="BR"||walk.nodeName==="HR") break;
+    head=(walk.textContent||"")+head;
+  }
+  // an en or em dash too: some keyboards and macOS substitutions turn "--"
+  // into one character before we ever see the second keystroke
+  var mark=/^[ \t]*(--|–|—)$/.exec(head);
+  if(!mark) return false;
+  var kill=document.createRange();
+  kill.setStart(n,at-mark[1].length); kill.setEnd(n,at);
+  sel.removeAllRanges(); sel.addRange(kill);
+  try{ document.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
+  return true;
+}
+
 function attachSmartQuotes(el,rich){
   if(!el||el.__sq) return;
   el.__sq=true;
@@ -4396,6 +4448,7 @@ function pushChanges(){
      supposed to mean. */
   var dels=ids.filter(function(id){ return SYNC.queue[id]==="del"||!byId[id] });
   var puts=ids.filter(function(id){ return dels.indexOf(id)<0 });
+  var sentSig={};
   var rows=puts.map(function(id){ return { id:id, data:byId[id], deleted:false } });
 
   SYNC.status="busy"; paintSync();
@@ -4430,6 +4483,15 @@ function pushChanges(){
       .catch(function(){ /* leave them queued; better late than damaged */ });
   }).then(function(){
     var jobs=[];
+    /* Fingerprint what is sent, in the same instant it is serialised. The
+       rows hold the live notes, not copies, and the upload takes time: a
+       note saved again while it is in the air has changed underneath. This
+       used to fingerprint the rows only once the upload had finished, which
+       recorded words the server had never received as if it had them. They
+       were then never sent, and the server's older copy, coming back,
+       replaced them — the Full view's lost sentences, in October. */
+    sentSig={};
+    rows.forEach(function(row){ sentSig[row.id]=sig(row.data) });
     if(rows.length) jobs.push(
       fetch(SUPA.url+"/rest/v1/items?on_conflict=id",{
         method:"POST",
@@ -4447,8 +4509,12 @@ function pushChanges(){
     return Promise.all(jobs);
   }).then(function(){
     rows.forEach(function(row){
-      SYNC.shadow[row.id]=sig(row.data);
-      delete SYNC.queue[row.id];
+      SYNC.shadow[row.id]=sentSig[row.id];
+      /* Changed again while it was going up: the server has the earlier
+         words, so this note still has somewhere to go. */
+      var now=S.items.filter(function(x){ return x.id===row.id })[0];   // live, not the map from before the upload
+      if(now&&sig(now)!==sentSig[row.id]){ SYNC.queue[row.id]="put"; schedulePush() }
+      else delete SYNC.queue[row.id];
     });
     dels.forEach(function(id){ delete SYNC.shadow[id]; delete SYNC.queue[id] });
     SYNC.status="idle"; SYNC.note=""; keepSession(); paintSync();
@@ -5456,49 +5522,7 @@ function openEditor(id){
       linkSelection();
     }
   });
-  /* Two dashes on a line of their own become a divider.
-
-     Done with execCommand rather than by editing the DOM directly, because
-     that is what puts it on the browser's own undo stack: ⌘Z gives you the
-     two dashes back, which is the escape hatch for anyone who wanted to
-     type two dashes and meant it. */
-  body.addEventListener("input",function(){
-    var sel=getSelection();
-    if(!sel||!sel.rangeCount||!sel.isCollapsed) return;
-    var r=sel.getRangeAt(0), n=r.startContainer;
-    if(n.nodeType!==3) return;
-    var at=r.startOffset;
-    /* What counts as "the start of a line".
-
-       This used to insist the caret sat at offset 2 of a text node whose
-       previous sibling was nothing or a <br>. That describes one shape a line
-       can have. Chrome builds several: press Return in the middle of a note
-       and it may wrap the new line in a <div>, or leave the dashes in a text
-       node that follows a <span> left over from an earlier edit. In any of
-       those the old test failed and the rule quietly did nothing — which is
-       why it worked when you tried it in an empty note and not while you were
-       actually writing.
-
-       So instead of guessing the shape, read the line: walk backwards from
-       the caret, gathering text, and stop at the first <br> or at the start
-       of the block. If everything on the line so far is the two dashes, it
-       is a divider. */
-    var head=n.data.slice(0,at), walk=n;
-    while(walk.previousSibling&&head.length<8){
-      walk=walk.previousSibling;
-      if(walk.nodeName==="BR"||walk.nodeName==="HR") break;
-      head=(walk.textContent||"")+head;
-    }
-    // an en or em dash too: some keyboards and macOS substitutions turn "--"
-    // into one character before we ever see the second keystroke
-    var mark=/^[ \t]*(--|–|—)$/.exec(head);
-    if(!mark) return;
-    var kill=document.createRange();
-    kill.setStart(n,at-mark[1].length); kill.setEnd(n,at);
-    sel.removeAllRanges(); sel.addRange(kill);
-    try{ document.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
-    countWords();
-  });
+  body.addEventListener("input",function(){ if(dashesToDivider()) countWords() });
 
   body.addEventListener("keyup",syncFmtButtons);
   body.addEventListener("mouseup",syncFmtButtons);
@@ -8974,7 +8998,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="70";
+var BUILD="71";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
