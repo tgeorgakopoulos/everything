@@ -448,12 +448,25 @@
   .card.inline .ctitle:empty:before{content:"Title";color:var(--faint);font-weight:500}
   .card.inline .cbody:empty:before{content:"Write…";color:var(--faint)}
   .card.inline .desc,.card.inline .more300,.card.inline .quick,.card.inline .pick{display:none!important}
-  .ibar{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px}
-  .ibar .isaved{margin-right:auto;font-size:11.5px;color:var(--faint)}
-  .ibar button{height:28px;padding:0 12px;border-radius:8px;font-size:12.5px;
+  .ibar{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px}
+  .ibar .ifmt{display:flex;gap:5px;flex-wrap:wrap;margin-right:auto}
+  .ibar .isaved{font-size:11.5px;color:var(--faint)}
+  .ibar button.ib{height:28px;padding:0 12px;border-radius:8px;font-size:12.5px;
     border:1px solid var(--line-strong);background:var(--surface);color:var(--ui);cursor:pointer}
-  .ibar button:hover{color:var(--ink);border-color:var(--accent)}
+  .ibar button.ib:hover{color:var(--ink);border-color:var(--accent)}
   .ibar button.idone{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+  /* In Full the card is text you select and write in, so the card itself is
+     not what you drag. A grip at the top centre is — shown on hover, and
+     only while your own order (Mine) is the one on screen. */
+  .grip{position:absolute;top:3px;left:50%;transform:translateX(-50%);z-index:3;
+    width:34px;height:14px;border-radius:6px;cursor:grab;opacity:0;color:var(--faint);
+    transition:opacity .15s,background .15s;
+    background-image:radial-gradient(circle,currentColor 1.15px,transparent 1.5px);
+    background-size:6px 5px;background-position:center;background-repeat:space}
+  .card:hover .grip{opacity:1}
+  .grip:hover{color:var(--ink);background-color:var(--line)}
+  .grip:active{cursor:grabbing}
+  .card.inline .grip{display:none}
   .grid.cards .cbody,.grid.cards .desc{flex:1 1 auto;min-height:0;display:block;
     overflow:hidden;-webkit-line-clamp:unset;
     -webkit-mask-image:linear-gradient(#000 76%,transparent 100%);
@@ -1968,9 +1981,18 @@ function startInline(card,ev){
 
   var bar=document.createElement("div");
   bar.className="ibar";
-  bar.innerHTML='<span class="isaved"></span>'
-    +'<button type="button" data-ifull title="Tags, links, pictures and the rest">⤢ Full editor</button>'
-    +'<button type="button" data-idone class="idone">Done</button>';
+  /* The same six controls as the editor's toolbar, in the same order. */
+  bar.innerHTML='<span class="ifmt">'
+      +'<button type="button" class="facet fmt" data-if="bold" title="Bold — ⌘B"><b>B</b></button>'
+      +'<button type="button" class="facet fmt" data-if="italic" title="Italic — ⌘I"><i>I</i></button>'
+      +'<button type="button" class="facet fmt" data-if="link" title="Link the selected text — ⌘K">⚭</button>'
+      +'<button type="button" class="facet fmt li" data-if="ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
+      +'<button type="button" class="facet fmt li" data-if="ol" title="Numbered list" aria-label="Numbered list">1.</button>'
+      +'<button type="button" class="facet fmt hd" data-if="h" title="Heading — turns this line into a heading" aria-label="Heading">T</button>'
+    +'</span>'
+    +'<span class="isaved"></span>'
+    +'<button type="button" class="ib" data-ifull title="Tags, links, pictures and the rest">⤢ Full editor</button>'
+    +'<button type="button" class="ib idone" data-idone>Done</button>';
   var foot=card.querySelector(".foot");
   if(foot) card.insertBefore(bar,foot); else card.appendChild(bar);
 
@@ -1983,7 +2005,17 @@ function startInline(card,ev){
   card.addEventListener("mousedown",function(e){
     if(INLINE.el!==card) return;
     if(!e.target.closest('[contenteditable]')) e.preventDefault();
+    var f=e.target.closest("[data-if]");
+    if(f) inlineFormat(f.dataset.if,b);
   });
+  function paintFmt(){
+    try{
+      bar.querySelector('[data-if="bold"]').classList.toggle("on",document.queryCommandState("bold"));
+      bar.querySelector('[data-if="italic"]').classList.toggle("on",document.queryCommandState("italic"));
+    }catch(e){}
+  }
+  card.addEventListener("keyup",paintFmt);
+  card.addEventListener("mouseup",paintFmt);
   card.addEventListener("input",function(){
     if(INLINE.el!==card) return;
     clearTimeout(INLINE.timer);
@@ -2005,11 +2037,14 @@ function startInline(card,ev){
       e.preventDefault(); e.stopPropagation(); endInline(); return;
     }
     if(e.target===t&&e.key==="Enter"){ e.preventDefault(); b.focus(); return }
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
+      e.preventDefault(); e.stopPropagation(); inlineFormat("link",b); return;
+    }
     e.stopPropagation();   // the app's own shortcuts wait until you are done
   });
   card.addEventListener("focusout",function(){
     setTimeout(function(){
-      if(INLINE.el===card&&!card.contains(document.activeElement)) endInline();
+      if(INLINE.el===card&&!INLINE.asking&&!card.contains(document.activeElement)) endInline();
     },0);
   });
 
@@ -2021,6 +2056,55 @@ function startInline(card,ev){
     if(!into){ r=document.createRange(); r.selectNodeContents(b); r.collapse(false) }
     sel.removeAllRanges(); sel.addRange(r);
   }
+}
+
+/* The toolbar's six, applied to the body of the note being written. */
+function inlineFormat(k,b){
+  if(!INLINE.el) return;
+  if(k==="link") return inlineLink(b);
+  var sel=window.getSelection&&getSelection();
+  if(!sel||!sel.rangeCount||!b.contains(sel.getRangeAt(0).startContainer)){
+    b.focus();
+    if(sel){ var r=document.createRange(); r.selectNodeContents(b); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r) }
+  }
+  try{
+    if(k==="h") document.execCommand("formatBlock",false,inHeading()?"<div>":"<h3>");
+    else document.execCommand({bold:"bold",italic:"italic",
+      ul:"insertUnorderedList",ol:"insertOrderedList"}[k],false,null);
+  }catch(e){}
+}
+/* Asking for the address takes focus away from the card, which would
+   otherwise count as leaving it. So the card is held open while the
+   question is up, and the selection is put back afterwards — linked if
+   you gave an address, untouched if you cancelled. */
+function inlineLink(b){
+  var sel=window.getSelection&&getSelection();
+  if(!sel||!sel.rangeCount||sel.isCollapsed||!b.contains(sel.getRangeAt(0).startContainer))
+    return toast("Select some text first");
+  var saved=sel.getRangeAt(0).cloneRange(), card=INLINE.el;
+  INLINE.asking=true;
+  function back(){
+    if(INLINE.el!==card) return;
+    try{ b.focus({preventScroll:true}) }catch(e){ b.focus() }
+    var s2=getSelection(); s2.removeAllRanges(); s2.addRange(saved);
+  }
+  askText("Link “"+saved.toString().slice(0,60)+"”","Where should this text point?",
+    "https://","Link",function(v){
+      var url=String(v).trim();
+      if(!url) return;
+      if(!/^[a-z]+:/i.test(url)) url="https://"+url;
+      if(!SAFE_HREF.test(url)) return toast("Only web and mail links");
+      back();
+      try{ document.execCommand("createLink",false,url) }catch(e){}
+    });
+  var watch=setInterval(function(){
+    if(ask.classList.contains("on")) return;
+    clearInterval(watch);
+    if(INLINE.el!==card) return;
+    INLINE.asking=false;
+    if(!card.contains(document.activeElement)) back();
+  },120);
 }
 
 function savedMark(){
@@ -3367,14 +3451,15 @@ function cardHTML(i){
   if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
 
-  var more="";
-  if(layoutFor()==="full"&&i.body&&words(richToText(i.body))>FULL_WORDS){
+  var more="", inFull=layoutFor()==="full";
+  if(inFull&&i.body&&words(richToText(i.body))>FULL_WORDS){
     cls+=" long";
     more='<div class="more300">Continues — click to read and edit the whole note</div>';
   }
   if(S.sel[i.id]) cls+=" picked";
   if(poppedOut(i.id)) cls+=" elsewhere";
-  return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
+  return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()&&!inFull?' draggable="true"':"")+'>'
+    +(canReorder()&&inFull?'<span class="grip" data-grip title="Drag to move"></span>':"")
     +(i.pin?'<div class="pinned"></div>':"")
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
     +'<div class="quick">'
@@ -6251,11 +6336,26 @@ function markTarget(el,after,horiz){
   },210);
 }
 
+/* The grip lends its card the ability to be dragged for exactly as long
+   as it is held. */
+board.addEventListener("mousedown",function(e){
+  var g=e.target.closest("[data-grip]");
+  if(!g) return;
+  var c=g.closest(".card");
+  if(c&&canReorder()) c.setAttribute("draggable","true");
+});
+function disarmGrips(){
+  board.querySelectorAll(".grid.full .card[draggable]").forEach(function(c){
+    if(!c.classList.contains("dragging")) c.removeAttribute("draggable");
+  });
+}
+document.addEventListener("mouseup",function(){ setTimeout(disarmGrips,0) });
 function endReorder(){
   clearTimeout(lineTimer);
   clearMarks(); hideLine();
   board.querySelectorAll(".dragging").forEach(function(el){ el.classList.remove("dragging") });
   internalDrag=false; dragId=null;
+  disarmGrips();
 }
 function moveItem(id,targetId,after){
   if(!id||!targetId||id===targetId) return;
@@ -6425,6 +6525,7 @@ board.addEventListener("click",function(e){
     else if(e.target.closest("[data-ifull]")){ var fid=INLINE.id; endInline(); openEditor(fid) }
     return;
   }
+  if(e.target.closest("[data-grip]")) return;
   // a link written inside a note goes where it points, not to the editor
   var inline=e.target.closest(".cbody a[href],.rexc a[href]");
   if(inline){ e.stopPropagation(); return }
@@ -8868,7 +8969,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="68";
+var BUILD="69";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
