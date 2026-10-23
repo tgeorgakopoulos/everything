@@ -426,6 +426,28 @@
   .grid.cards .ctitle{display:-webkit-box;-webkit-line-clamp:3;
     -webkit-box-orient:vertical;overflow:hidden}
   /* body absorbs the leftover space and fades out rather than cutting mid-line */
+  /* Full: Moodboard's columns, fewer and wider, and the words are not cut.
+     A note runs to about three hundred words before it stops; clicking it
+     opens it where it stands, whole, to be edited in place. */
+  .grid.full .cbody,.grid.full .card.display .cbody,.grid.full .desc{
+    display:block;-webkit-line-clamp:unset;overflow:visible}
+  .grid.full .card.long .cbody{display:-webkit-box;-webkit-line-clamp:30;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .grid.full .card{cursor:text}
+  .more300{font-size:12px;color:var(--faint);margin-top:8px}
+  .card.inline{box-shadow:0 0 0 2px var(--accent),var(--shadow-lg,var(--shadow))}
+  .card.inline .cbody{display:block!important;-webkit-line-clamp:unset!important;
+    overflow:visible!important;outline:none;min-height:1.6em;cursor:text}
+  .card.inline .ctitle{outline:none;cursor:text;display:block}
+  .card.inline .ctitle:empty:before{content:"Title";color:var(--faint);font-weight:500}
+  .card.inline .cbody:empty:before{content:"Write…";color:var(--faint)}
+  .card.inline .desc,.card.inline .more300,.card.inline .quick,.card.inline .pick{display:none!important}
+  .ibar{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px}
+  .ibar .isaved{margin-right:auto;font-size:11.5px;color:var(--faint)}
+  .ibar button{height:28px;padding:0 12px;border-radius:8px;font-size:12.5px;
+    border:1px solid var(--line-strong);background:var(--surface);color:var(--ui);cursor:pointer}
+  .ibar button:hover{color:var(--ink);border-color:var(--accent)}
+  .ibar button.idone{background:var(--accent);border-color:var(--accent);color:var(--surface)}
   .grid.cards .cbody,.grid.cards .desc{flex:1 1 auto;min-height:0;display:block;
     overflow:hidden;-webkit-line-clamp:unset;
     -webkit-mask-image:linear-gradient(#000 76%,transparent 100%);
@@ -1572,6 +1594,7 @@
           <button data-lay="list" title="List">☰</button>
           <button data-lay="cards" title="Cards">▦</button>
           <button data-lay="mood" title="Moodboard">⊞</button>
+          <button data-lay="full" title="Full — whole notes, edited where they stand">▤</button>
         </div>
         <div class="search">
           <span class="si">⌕</span>
@@ -1876,6 +1899,174 @@ function bodyEdited(i,newBody){
   if(i.body!==newBody&&i.source) delete i.source;
   i.body=newBody;
 }
+
+/* =========================================================================
+   WRITING IN PLACE — the Full layout
+   =========================================================================
+
+   In Full, clicking a note does not open the editor over the page. The
+   card itself becomes the editor: its title and its words, whole, with
+   the caret where you clicked. Click the next note and the first is
+   written down as you leave it. The point is to work through every note
+   under a tag at once, without opening and closing anything.
+
+   The same rules as the editor, applied to less:
+     · what is kept is passed through sanitizeRich, as every body is
+     · the first change keeps the version before it, as the editor does
+     · an edit to the body drops the writing machine's Markdown
+     · while you write, a newer copy from another device waits, and the
+       board is not redrawn under you
+     · it is written down every pause of a second and a half, and when you
+       leave, so closing the tab mid-sentence loses at most that.
+
+   Everything else a note has — tags, links, pictures, dates — stays where
+   it is handled, in the full editor, one button away. */
+var FULL_WORDS=300;
+var INLINE={id:null,el:null};
+
+function startInline(card,ev){
+  var id=card.dataset.id, i=byId(id);
+  if(!i) return;
+  if(INLINE.id) endInline();
+  if(!card.isConnected) return;
+  if(lockedWhileCatchingUp(id)){ toast("Catching up — one moment"); return }
+  if(poppedOut(id)){ toast("This note is open in its own window"); return }
+
+  /* Where you clicked, worked out before anything on the card changes. */
+  var r=null;
+  try{
+    if(ev&&document.caretRangeFromPoint) r=document.caretRangeFromPoint(ev.clientX,ev.clientY);
+    else if(ev&&document.caretPositionFromPoint){
+      var cp=document.caretPositionFromPoint(ev.clientX,ev.clientY);
+      if(cp){ r=document.createRange(); r.setStart(cp.offsetNode,cp.offset); r.collapse(true) }
+    }
+  }catch(e){ r=null }
+
+  var holder=card.querySelector(".head>div")||card.querySelector(".head");
+  var t=card.querySelector(".ctitle");
+  if(!t){
+    t=document.createElement("div"); t.className="ctitle own";
+    if(holder) holder.insertBefore(t,holder.firstChild); else card.insertBefore(t,card.firstChild);
+  }
+  var b=card.querySelector(".cbody");
+  if(!b){
+    b=document.createElement("div"); b.className="cbody";
+    var head=card.querySelector(".head");
+    if(head&&head.nextSibling) card.insertBefore(b,head.nextSibling); else card.appendChild(b);
+  }
+  t.setAttribute("contenteditable","plaintext-only");
+  if(t.contentEditable!=="plaintext-only") t.setAttribute("contenteditable","true");
+  b.setAttribute("contenteditable","true");
+  card.classList.add("inline");
+  card.removeAttribute("draggable");
+
+  var bar=document.createElement("div");
+  bar.className="ibar";
+  bar.innerHTML='<span class="isaved"></span>'
+    +'<button type="button" data-ifull title="Tags, links, pictures and the rest">⤢ Full editor</button>'
+    +'<button type="button" data-idone class="idone">Done</button>';
+  var foot=card.querySelector(".foot");
+  if(foot) card.insertBefore(bar,foot); else card.appendChild(bar);
+
+  INLINE={ id:id, el:card, timer:null, snap:false, dirty:false,
+           baseTitle:(i.title||""), base:sanitizeRich(i.body||"") };
+
+  /* Focus stays in the writing when the buttons or the card's edges are
+     pressed — otherwise the press itself would end the editing, and the
+     button would be gone before its click arrived. */
+  card.addEventListener("mousedown",function(e){
+    if(INLINE.el!==card) return;
+    if(!e.target.closest('[contenteditable]')) e.preventDefault();
+  });
+  card.addEventListener("input",function(){
+    if(INLINE.el!==card) return;
+    clearTimeout(INLINE.timer);
+    INLINE.timer=setTimeout(function(){ if(INLINE.el===card&&commitInline()) savedMark() },1500);
+  });
+  b.addEventListener("paste",function(e){
+    if(!e.clipboardData) return;
+    var html=e.clipboardData.getData("text/html"), txt=e.clipboardData.getData("text/plain");
+    e.preventDefault();
+    var clean=html?sanitizeRich(html):"";
+    try{
+      if(clean&&richToText(clean).trim()) document.execCommand("insertHTML",false,clean);
+      else document.execCommand("insertText",false,txt||"");
+    }catch(err){ try{ document.execCommand("insertText",false,txt||"") }catch(e2){} }
+  });
+  card.addEventListener("keydown",function(e){
+    if(INLINE.el!==card) return;
+    if(e.key==="Escape"||((e.metaKey||e.ctrlKey)&&e.key==="Enter")){
+      e.preventDefault(); e.stopPropagation(); endInline(); return;
+    }
+    if(e.target===t&&e.key==="Enter"){ e.preventDefault(); b.focus(); return }
+    e.stopPropagation();   // the app's own shortcuts wait until you are done
+  });
+  card.addEventListener("focusout",function(){
+    setTimeout(function(){
+      if(INLINE.el===card&&!card.contains(document.activeElement)) endInline();
+    },0);
+  });
+
+  var into=r&&(b.contains(r.startContainer)?b:(t.contains(r.startContainer)?t:null));
+  var target=into||b;
+  try{ target.focus({preventScroll:true}) }catch(e){ target.focus() }
+  var sel=window.getSelection&&getSelection();
+  if(sel){
+    if(!into){ r=document.createRange(); r.selectNodeContents(b); r.collapse(false) }
+    sel.removeAllRanges(); sel.addRange(r);
+  }
+}
+
+function savedMark(){
+  var m=INLINE.el&&INLINE.el.querySelector(".isaved");
+  if(m) m.textContent="Saved";
+}
+
+/* Write the card's words into the note, if they changed. True if they did. */
+function commitInline(){
+  var c=INLINE; if(!c.id||!c.el) return false;
+  var i=byId(c.id); if(!i) return false;
+  var t=c.el.querySelector(".ctitle"), b=c.el.querySelector(".cbody");
+  var nt=t?t.textContent.replace(/\s+/g," ").trim():(i.title||"");
+  var nb=b?sanitizeRich(b.innerHTML):c.base;
+  /* A body emptied down to a stray line break is empty. */
+  if(!richToText(nb).trim()&&!/<(hr|li)\b/i.test(nb)) nb="";
+  if(nt===c.baseTitle&&nb===c.base) return false;
+  if(!c.snap){ remember(i,"before your edit"); c.snap=true }
+  if(nt!==c.baseTitle){ i.title=nt; i.titleAuto=false }
+  if(nb!==c.base) bodyEdited(i,nb);
+  i.modified=Date.now();
+  c.base=nb; c.baseTitle=nt;
+  save();
+  return true;
+}
+
+function endInline(){
+  var c=INLINE; if(!c.id) return;
+  clearTimeout(c.timer);
+  commitInline();
+  INLINE={id:null,el:null};
+  var i=byId(c.id);
+  if(c.el&&c.el.isConnected){
+    /* Only this card is redrawn. Redrawing the board here would replace
+       the note you were clicking into while the click was still on its way. */
+    if(i){
+      var tmp=document.createElement("div"); tmp.innerHTML=cardHTML(i);
+      if(tmp.firstChild) c.el.replaceWith(tmp.firstChild); else c.el.remove();
+    } else c.el.remove();
+  }
+  /* Rows held back while you wrote, and any redraw that was asked for —
+     shortly, once the click that ended this has landed. */
+  setTimeout(function(){
+    flushPending();
+    if(c.dirty) render();
+  },350);
+}
+
+window.addEventListener("pagehide",function(){ if(INLINE.id) commitInline() });
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden&&INLINE.id) commitInline();
+});
 
 function newNote(){
   var now=Date.now();
@@ -3170,6 +3361,11 @@ function cardHTML(i){
   if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
 
+  var more="";
+  if(layoutFor()==="full"&&i.body&&words(richToText(i.body))>FULL_WORDS){
+    cls+=" long";
+    more='<div class="more300">Continues — click to read and edit the whole note</div>';
+  }
   if(S.sel[i.id]) cls+=" picked";
   if(poppedOut(i.id)) cls+=" elsewhere";
   return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
@@ -3189,6 +3385,7 @@ function cardHTML(i){
     // your own words win. The fetched excerpt is only a stand-in for them.
     +(i.body?'<div class="cbody">'+i.body+'</div>'
       : (L&&i.desc?'<div class="desc">'+esc(i.desc)+'</div>':""))
+    +more
     +checks
     +(foot.length?'<div class="foot">'+foot.join("")+'</div>':"")
     +'</article>';
@@ -3244,8 +3441,12 @@ function rowHTML(i){
 function moodCols(){
   var phone=window.matchMedia&&matchMedia("(max-width:820px)").matches;
   var w=board.clientWidth||0;
-  if(!w) return phone?2:3;
-  var min=phone?150:250, gap=phone?10:14, most=phone?2:4;
+  /* Full wants a line long enough to read: fewer, wider columns, and on a
+     phone just the one. */
+  var full=layoutFor()==="full";
+  if(!w) return full?(phone?1:2):(phone?2:3);
+  var min=full?(phone?999:340):(phone?150:250), gap=phone?10:14,
+      most=full?(phone?1:3):(phone?2:4);
   return Math.max(1,Math.min(most,Math.floor((w+gap)/(min+gap))));
 }
 /* Card i goes to column i mod n, so reading across the top row gives the
@@ -3261,7 +3462,7 @@ function block(list){
   if(lay==="list") return '<div class="list">'+list.map(rowHTML).join("")+'</div>';
   if(lay==="cards") return '<div class="grid cards">'+list.map(cardHTML).join("")+'</div>';
   var n=moodCols();
-  return '<div class="grid mood" data-cols="'+n+'">'
+  return '<div class="grid mood'+(lay==="full"?" full":"")+'" data-cols="'+n+'">'
     +moodColumns(list.map(cardHTML),n,0).map(function(c){
       return '<div class="mcol">'+c.join("")+'</div>' }).join("")
     +'</div>';
@@ -3324,7 +3525,7 @@ function showMore(){
   var last=groups[groups.length-1];
   if((pins&&pins>=from)||!last){ render(); return }
   var lay=layoutFor();
-  if(lay==="mood"){
+  if(lay==="mood"||lay==="full"){
     /* Into the columns, carrying on the count from where the last page
        stopped. Within the unpinned group, its first card was index 0. */
     var cols=last.querySelectorAll(".mcol"), n=cols.length;
@@ -3369,6 +3570,10 @@ function bucket(i){
 }
 
 function render(){
+  /* A note being written in place is not redrawn underneath you. Whatever
+     asked for the redraw — a sync, a preview arriving — waits until you
+     leave the note; anything you do yourself leaves it first. */
+  if(INLINE.id&&INLINE.el&&INLINE.el.isConnected){ INLINE.dirty=true; return }
   var list=visible(), lens=LENS[S.view]||LENS.all;
 
   /* Posts is not a lens over your items — it lists a different table
@@ -4306,7 +4511,7 @@ function applyIncoming(rows){
        never applied. */
     /* A note being written — in the sheet here, or in its own window — is
        left alone until the writing stops. Held rows are applied on close. */
-    if(S.editing===row.id||poppedOut(row.id)){
+    if(S.editing===row.id||INLINE.id===row.id||poppedOut(row.id)){
       SYNC.pending[row.id]=row;
       deferred=true;
       return;
@@ -6192,6 +6397,13 @@ light.addEventListener("click",function(e){
    ========================================================================= */
 
 board.addEventListener("click",function(e){
+  /* Inside a note being written in place, clicks belong to the writing. */
+  var live=e.target.closest(".card.inline");
+  if(live){
+    if(e.target.closest("[data-idone]")) endInline();
+    else if(e.target.closest("[data-ifull]")){ var fid=INLINE.id; endInline(); openEditor(fid) }
+    return;
+  }
   // a link written inside a note goes where it points, not to the editor
   var inline=e.target.closest(".cbody a[href],.rexc a[href]");
   if(inline){ e.stopPropagation(); return }
@@ -6283,7 +6495,12 @@ board.addEventListener("click",function(e){
   var row=e.target.closest(".card,.row-item");
   if(!row) return;
   // while a selection is live, clicking adds to it rather than opening
-  if(selCount()) togglePick(row.dataset.id); else openEditor(row.dataset.id);
+  if(selCount()) togglePick(row.dataset.id);
+  /* In Full, a note opens where it stands. Its pictures still open the
+     whole editor, which is where pictures are handled. */
+  else if(layoutFor()==="full"&&row.classList.contains("card")
+          &&!e.target.closest(".photos,.thumb")) startInline(row,e);
+  else openEditor(row.dataset.id);
 });
 
 /* ---- multi-select ----------------------------------------------------
@@ -8630,7 +8847,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="66";
+var BUILD="67";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
