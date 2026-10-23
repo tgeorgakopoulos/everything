@@ -458,7 +458,7 @@
   /* In Full the card is text you select and write in, so the card itself is
      not what you drag. A grip at the top centre is — shown on hover, and
      only while your own order (Mine) is the one on screen. */
-  .grip{position:absolute;top:3px;left:50%;transform:translateX(-50%);z-index:3;
+  .grip{position:absolute;top:calc(var(--toprow) - 7px);left:50%;transform:translateX(-50%);z-index:3;
     width:34px;height:14px;border-radius:6px;cursor:grab;opacity:0;color:var(--faint);
     transition:opacity .15s,background .15s;
     background-image:radial-gradient(circle,currentColor 1.15px,transparent 1.5px);
@@ -819,7 +819,12 @@
   .row-item:hover::after{opacity:.42}
 
   /* quick facet toggles on hover — conversion in one click */
-  .quick{position:absolute;top:7px;right:7px;display:flex;gap:2px;padding:3px;
+  /* The three things on a card's top edge — the select ring, the grip and
+     the toolbox — share one centre line, --toprow from the card's top, so
+     they read as one row. Each sits at that line minus half its own height:
+     the toolbox is 32px tall, the ring 21, the grip 14. */
+  .card{--toprow:23px}
+  .quick{position:absolute;top:calc(var(--toprow) - 16px);right:7px;display:flex;gap:2px;padding:3px;
     background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;
     box-shadow:var(--shadow-lg);opacity:0;transform:translateY(-3px) scale(.97);
     transition:opacity .14s,transform .14s;z-index:4}
@@ -856,7 +861,7 @@
   .card:hover .pinned,.row-item:hover .pinned{opacity:0}
 
   /* selection */
-  .pick{position:absolute;top:8px;left:8px;z-index:4;width:21px;height:21px;border-radius:50%;
+  .pick{position:absolute;top:calc(var(--toprow,18.5px) - 10.5px);left:8px;z-index:4;width:21px;height:21px;border-radius:50%;
     border:1.8px solid var(--line-strong);background:var(--surface);color:transparent;
     display:grid;place-items:center;font-size:11px;z-index:3;
     opacity:0;transform:scale(.85);transition:.12s}
@@ -8969,7 +8974,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="69";
+var BUILD="70";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
