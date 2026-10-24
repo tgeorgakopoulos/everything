@@ -4735,6 +4735,21 @@ function applyIncoming(rows){
     var dirty=SYNC.shadow[row.id]!==undefined&&SYNC.shadow[row.id]!==mine;
 
     if(!dirty){
+      /* An echo of something we have since moved past is not news.
+
+         Rows for a note being written are held back until you leave it,
+         and the one held is whichever arrived last — often a copy of one
+         of your own saves from a minute earlier. By the time it is let in,
+         everything newer has already gone up, so nothing here looks unsent,
+         and this branch used to read "nothing of ours at stake" as "take
+         theirs". It replaced your note with its own past, and the next save
+         stamped that past as new. That is what the ledger showed on the
+         evening of 23 October: a dozen accepted saves, then the text from a
+         minute before them, written fresh.
+
+         The server refuses any write older than the one it holds, so a row
+         older than our copy can only be a copy we have already superseded. */
+      if((incoming.modified||0)<(here.modified||0)) return;
       // nothing of ours is at stake; take theirs
       if(sig(incoming)!==mine){
         remember(here,"replaced by a newer copy from another device");
@@ -8998,7 +9013,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="71";
+var BUILD="72";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
