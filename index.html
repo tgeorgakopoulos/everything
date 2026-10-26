@@ -1329,6 +1329,9 @@
     padding-top:14px;border-top:1px solid var(--line)}
   .swatches{display:flex;gap:5px}
   .sw{width:19px;height:19px;border-radius:50%;border:1.5px solid var(--line-strong);cursor:pointer}
+  .selsw{display:flex;gap:12px;justify-content:center;margin:14px 0 6px}
+  .selsw .sw{width:30px;height:30px}
+  .selsw .sw:hover{border-color:var(--accent)}
   .sw.on{outline:2px solid var(--accent);outline-offset:2px}
   /* The !important here is not laziness, it is arithmetic.
 
@@ -1686,6 +1689,7 @@
   <button data-sel="all">Select all</button>
   <button data-sel="tag">＋ Tag</button>
   <button data-sel="untag">－ Tag</button>
+  <button data-sel="tint">◐ Colour</button>
   <button data-sel="arch">▣ Archive</button>
   <button data-sel="comp" class="make">⇥ Compile</button>
   <button data-sel="del" class="dan">Delete</button>
@@ -1908,6 +1912,7 @@ function slimPhotos(items){
    it becomes a task with a date, #tags anywhere are pulled out. Anything
    longer is a note, exactly as written. */
 var FRESH={};
+var AUTOTAG={};   // a new note's tag that came from the page, not from you
 function isBlank(i){
   return !i.title&&!richToText(i.body||"").trim()&&!i.url
     &&!(i.photos||[]).length&&!(i.checks||[]).length;
@@ -2172,6 +2177,8 @@ document.addEventListener("visibilitychange",function(){
 function newNote(){
   var now=Date.now();
   var item=normalizeItem({ id:uid(), title:"", body:"", created:now, modified:now });
+  tagFromPage(item);
+  if(item.tags.length) AUTOTAG[item.id]=item.tags[0];
   S.items.unshift(item);
   FRESH[item.id]=1;
   openEditor(item.id);
@@ -2186,6 +2193,10 @@ function quickJot(i,text){
   i.body=toRich(shape.body||"");
   if(shape.checks&&shape.checks.length) i.checks=shape.checks;
   if(p.url){ i.url=p.url; i.titleAuto=p.titleAuto; i.metaState=null }
+  /* #tags you typed replace the one the page gave it. */
+  if((p.tags||[]).length&&AUTOTAG[i.id]){
+    var at=i.tags.indexOf(AUTOTAG[i.id]); if(at>=0) i.tags.splice(at,1);
+  }
   (p.tags||[]).forEach(function(t){ if(i.tags.indexOf(t)<0) i.tags.push(t) });
   if(act){ i.actionable=true; i.due=p.due; i.timed=!!p.timed }
 }
@@ -2875,6 +2886,7 @@ function newItemWithPhotos(photos){
   var fresh={id:uid(),title:"",body:"",url:"",image:"",desc:"",logo:"",site:"",
     metaState:null,titleAuto:false,actionable:false,due:null,done:false,tint:"",tags:[],
     photos:photos,checks:[],archived:false,pin:false,created:now,modified:now};
+  tagFromPage(fresh);
   S.items.unshift(fresh);
   followItem(fresh);
   save(); render();
@@ -3981,6 +3993,13 @@ function taskRowHTML(i){
 
 /* Lenses, counts, tags and which nav row is lit. Split out of render because
    the Posts page needs all of it and none of the item machinery above. */
+var SOURCE_TAGS=[
+  { tag:"write_machine", label:"write machine", mark:"⌨",
+    title:"Written on the writing machine" },
+  { tag:"phone", label:"phone", mark:"↗",
+    title:"Saved from the share sheet on your phone or iPad" }
+];
+var SOURCE_TAG={}; SOURCE_TAGS.forEach(function(s){ SOURCE_TAG[s.tag]=s });
 function paintSidebar(){
   var all=S.items;
   function count(v){ return all.filter(LENS[v].test).length }
@@ -4013,12 +4032,22 @@ function paintSidebar(){
      of the whole collection, not of the name, so anything working it out from
      the name alone will quietly disagree with the sidebar. */
   var tcol=TAGCOL=tagColorMap(Object.keys(counts));
+  /* Tags filled by something other than you — the writing machine, the
+     phone's share sheet — sit at the top with compiled, set the same way,
+     because they are sources rather than subjects. They are still real
+     tags: you can open, add and remove them like any other. */
+  var srcRows=SOURCE_TAGS.filter(function(st){ return counts[st.tag] }).map(function(st){
+    return '<button class="nav auto src'+(S.tag===st.tag?" on":"")+'" data-tag="'+esc(st.tag)+'"'
+      +' title="'+esc(st.title)+'">'
+      +'<span class="lock">'+st.mark+'</span>'+esc(st.label)+'<span class="n">'+counts[st.tag]+'</span></button>';
+  }).join("");
   /* Alphabetical, deliberately.
      Ordering by how many notes carry a tag means the list rearranges itself
      every time you write something — the thing you are reaching for moves
      while you reach for it. A tag should be where it was yesterday, and
      alphabetical is the only order a person can predict without looking. */
-  document.getElementById("taglist").innerHTML=autoRow+Object.keys(counts)
+  document.getElementById("taglist").innerHTML=autoRow+srcRows+Object.keys(counts)
+    .filter(function(k){ return !SOURCE_TAG[k] })
     .sort(function(a,b){ return a.localeCompare(b,undefined,{sensitivity:"base"}) })
     .map(function(k){
       return '<button class="nav'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'"'
@@ -5276,8 +5305,14 @@ function refreshCap(){
 /* After saving, stay put if the current lens can show the new item; otherwise
    follow it to a lens that can. Saving a link from Links keeps you in Links;
    jotting a note there moves you to Notes rather than filing it out of sight. */
+/* Written on a tag page, a note belongs to that tag — unless you gave it
+   tags of your own, in which case you have said where it goes and the
+   page follows it to the first of them. */
+function tagFromPage(item){
+  if(S.tag&&!S.q&&!(item.tags||[]).length) item.tags=[S.tag];
+}
 function followItem(item){
-  if(S.tag && (item.tags||[]).indexOf(S.tag)<0) S.tag=null;
+  if(S.tag && (item.tags||[]).indexOf(S.tag)<0) S.tag=(item.tags||[])[0]||null;
   if(S.q){ S.q=""; document.getElementById("q").value="" }
   var lens=LENS[S.view];
   if(S.tag) return;
@@ -5292,6 +5327,7 @@ function commit(asTask){
   var item={id:uid(),title:shape.title,body:shape.body,url:p.url,image:"",desc:"",logo:"",site:"",
     metaState:null,titleAuto:p.titleAuto,actionable:act,due:p.due,timed:!!p.timed,done:false,
     tint:"",tags:p.tags,photos:[],checks:shape.checks,archived:false,pin:false,created:now,modified:now};
+  tagFromPage(item);
   S.items.unshift(item);
   capin.value=""; capForce=null; refreshCap(); save();
   var names=[]; if(p.url) names.push("Links"); if(act) names.push("Tasks");
@@ -5836,6 +5872,9 @@ function openEditor(id){
       var jot=richToText(i.body||"").trim();
       if(jot&&jot.indexOf("\n")<0) quickJot(i,jot);
     }
+    /* A new note that left this tag behind takes you to where it went. */
+    if(FRESH[i.id]&&S.tag&&i.tags.indexOf(S.tag)<0&&i.tags.length) S.tag=i.tags[0];
+    delete AUTOTAG[i.id];
     if(!i.url){ i.image=""; i.desc=""; i.logo=""; i.site=""; i.metaState=null }
     save();
     if(!keepOpen) close();
@@ -6532,6 +6571,7 @@ capin.addEventListener("paste",function(e){
       S.items.unshift({id:uid(),title:sh.title,body:sh.body,url:p.url,image:"",desc:"",logo:"",site:"",
         metaState:null,titleAuto:p.titleAuto,actionable:act,due:p.due,timed:!!p.timed,done:false,
         tint:"",tags:p.tags,photos:photos,checks:sh.checks,archived:false,pin:false,created:now,modified:now});
+      tagFromPage(S.items[0]);
       capin.value=""; capForce=null; refreshCap(); followItem(S.items[0]); save(); render();
       toast("Saved with "+photos.length+" image"+(photos.length>1?"s":""));
     } else newItemWithPhotos(photos);
@@ -6561,6 +6601,11 @@ light.addEventListener("click",function(e){
    EVENTS
    ========================================================================= */
 
+/* Shift-click selects; it should not also drag a text selection across
+   the page on its way. */
+board.addEventListener("mousedown",function(e){
+  if(e.shiftKey&&e.target.closest(".card,.row-item")&&!e.target.closest(".card.inline")) e.preventDefault();
+});
 board.addEventListener("click",function(e){
   /* Inside a note being written in place, clicks belong to the writing. */
   var live=e.target.closest(".card.inline");
@@ -6656,10 +6701,12 @@ board.addEventListener("click",function(e){
   if(au){ e.stopPropagation(); S.view=au.dataset.auto; S.tag=null; S.sel={}; render(); return }
 
   var pk=e.target.closest("[data-pick]");
-  if(pk){ e.stopPropagation(); togglePick(pk.dataset.pick); return }
+  if(pk){ e.stopPropagation(); if(e.shiftKey) shiftPick(pk.dataset.pick); else togglePick(pk.dataset.pick); return }
 
   var row=e.target.closest(".card,.row-item");
   if(!row) return;
+  // shift always selects — it never opens a note
+  if(e.shiftKey){ shiftPick(row.dataset.id); return }
   // while a selection is live, clicking adds to it rather than opening
   if(selCount()) togglePick(row.dataset.id);
   /* In Full, a note opens where it stands. Its pictures still open the
@@ -6699,13 +6746,31 @@ function paintPicked(id){
   });
 }
 function togglePick(id){
-  if(S.sel[id]) delete S.sel[id]; else S.sel[id]=1;
+  if(S.sel[id]) delete S.sel[id]; else { S.sel[id]=1; PICK_ANCHOR=id }
   paintPicked(id);
   paintSel();
 }
+/* Shift-click: everything from the last card you ticked to this one, in
+   the order the page reads — pinned first, then the rest, which is the
+   order the cards are laid out in, not the order the columns hold them. */
+var PICK_ANCHOR=null;
+function pageOrder(){
+  var l=visible(), p=l.filter(function(i){ return i.pin }), r=l.filter(function(i){ return !i.pin });
+  return (p.length&&r.length?p.concat(r):l).map(function(i){ return i.id });
+}
+function pickRange(id){
+  var ord=pageOrder(), a=ord.indexOf(PICK_ANCHOR), b=ord.indexOf(id);
+  if(a<0||b<0){ if(!S.sel[id]) togglePick(id); return }
+  for(var k=Math.min(a,b);k<=Math.max(a,b);k++){ S.sel[ord[k]]=1; paintPicked(ord[k]) }
+  PICK_ANCHOR=id;
+  paintSel();
+}
+function shiftPick(id){
+  if(selCount()&&PICK_ANCHOR) pickRange(id); else if(!S.sel[id]) togglePick(id);
+}
 function clearSel(){
   var was=selIds();
-  S.sel={};
+  S.sel={}; PICK_ANCHOR=null;
   was.forEach(paintPicked);       // un-tick what was ticked, and only that
   paintSel();
 }
@@ -6729,6 +6794,32 @@ selbar.addEventListener("click",function(e){
        more menu between the intent and the result is a menu too many.
        compileToNote clears the selection itself. */
     compileToNote();
+    return;
+  }
+
+  if(act==="tint"){
+    /* The editor's own swatches, the first one being none. Applied at
+       once; the selection stays, so a colour you do not like is one more
+       click away from another. */
+    askbox.innerHTML='<h3>Colour '+n+' item'+(n===1?"":"s")+'</h3>'
+      +'<div class="swatches selsw">'+TINTS.map(function(t){
+        return '<div class="sw" data-seltint="'+t+'" title="'+(t||"No colour")+'" style="background:'
+          +TINTHEX[t]+'"></div>' }).join("")+'</div>'
+      +'<div class="askrow"><button class="btn sec" data-ax="0">Cancel</button></div>';
+    ask.classList.add("on");
+    askCB=function(){};
+    askbox.onclick=function(ev){
+      var sw=ev.target.closest("[data-seltint]");
+      if(!sw&&!ev.target.closest("[data-ax]")) return;
+      closeAsk(); askCB=null;
+      if(!sw) return;
+      var tint=sw.dataset.seltint, now=Date.now(), touched=0;
+      S.items.forEach(function(x){
+        if(S.sel[x.id]&&(x.tint||"")!==tint){ x.tint=tint; x.modified=now; touched++ }
+      });
+      save(); render();
+      toast(touched?(tint?"Coloured "+touched:"Colour removed from "+touched):"Nothing changed");
+    };
     return;
   }
 
@@ -9013,7 +9104,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="72";
+var BUILD="73";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
