@@ -664,6 +664,7 @@
     justify-content:center}
   .fmt b{font-weight:800}
   .fmt i{font-family:Georgia,serif}
+  .fmt s{text-decoration-thickness:1.5px}
   .fmt.li{font-size:14px;font-weight:700;letter-spacing:-.04em}
 
   /* history — earlier versions of the open note */
@@ -1386,6 +1387,18 @@
   [data-theme="dark"] .tint-sky{background-color:#1A2430}
   [data-theme="dark"] .tint-rose{background-color:#2C1E1D}
   [data-theme="dark"] .tint-lilac{background-color:#231F2E}
+  .tint-butter{background-color:#FBF7DC}
+  .tint-peach{background-color:#FDEEE2}
+  .tint-clay{background-color:#F7E6DF}
+  .tint-teal{background-color:#E1EFEE}
+  .tint-mint{background-color:#E6F5EE}
+  .tint-stone{background-color:#EFEEEB}
+  [data-theme="dark"] .tint-butter{background-color:#2A2816}
+  [data-theme="dark"] .tint-peach{background-color:#2E2219}
+  [data-theme="dark"] .tint-clay{background-color:#2D1F1A}
+  [data-theme="dark"] .tint-teal{background-color:#172827}
+  [data-theme="dark"] .tint-mint{background-color:#17281F}
+  [data-theme="dark"] .tint-stone{background-color:#24241F}
   /* The action bar is sticky, so text scrolls beneath it — it has to stay
      opaque. On a tinted sheet it takes the sheet's own colour rather than
      going transparent, which is what let text show through it. */
@@ -2001,6 +2014,7 @@ function startInline(card,ev){
   bar.innerHTML='<span class="ifmt">'
       +'<button type="button" class="facet fmt" data-if="bold" title="Bold — ⌘B"><b>B</b></button>'
       +'<button type="button" class="facet fmt" data-if="italic" title="Italic — ⌘I"><i>I</i></button>'
+      +'<button type="button" class="facet fmt" data-if="strike" title="Strikethrough — ⌘⇧X"><s>S</s></button>'
       +'<button type="button" class="facet fmt" data-if="link" title="Link the selected text — ⌘K">⚭</button>'
       +'<button type="button" class="facet fmt li" data-if="ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button type="button" class="facet fmt li" data-if="ol" title="Numbered list" aria-label="Numbered list">1.</button>'
@@ -2028,6 +2042,7 @@ function startInline(card,ev){
     try{
       bar.querySelector('[data-if="bold"]').classList.toggle("on",document.queryCommandState("bold"));
       bar.querySelector('[data-if="italic"]').classList.toggle("on",document.queryCommandState("italic"));
+      bar.querySelector('[data-if="strike"]').classList.toggle("on",document.queryCommandState("strikethrough"));
     }catch(e){}
   }
   card.addEventListener("keyup",paintFmt);
@@ -2055,6 +2070,9 @@ function startInline(card,ev){
     if(e.target===t&&e.key==="Enter"){ e.preventDefault(); b.focus(); return }
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
       e.preventDefault(); e.stopPropagation(); inlineFormat("link",b); return;
+    }
+    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==="x"){
+      e.preventDefault(); e.stopPropagation(); inlineFormat("strike",b); return;
     }
     e.stopPropagation();   // the app's own shortcuts wait until you are done
   });
@@ -2086,7 +2104,7 @@ function inlineFormat(k,b){
   }
   try{
     if(k==="h") document.execCommand("formatBlock",false,inHeading()?"<div>":"<h3>");
-    else document.execCommand({bold:"bold",italic:"italic",
+    else document.execCommand({bold:"bold",italic:"italic",strike:"strikethrough",
       ul:"insertUnorderedList",ol:"insertOrderedList"}[k],false,null);
   }catch(e){}
 }
@@ -2584,12 +2602,37 @@ function defaultLayout(){
   return DEFAULT_LAYOUT[S.view]||"mood";
 }
 function layoutFor(){ return S.layouts[pageKey()]||defaultLayout() }
+/* A pin belongs to a page, not to the note. Pinned in Notes is not pinned
+   under #books, and the other way round. pins holds the pages: "notes",
+   "all", "tag:books" — whatever pageKey() calls the page.
+
+   Notes pinned before pins were per page carry only the old pin flag.
+   They stay pinned where they used to matter most — All and their own
+   home (Notes, Links or Tasks) — until you pin or unpin them again, at
+   which point the list takes over. Nothing is rewritten in the meantime,
+   so nothing has to be uploaded again. */
+function pinsOf(i){
+  if(Array.isArray(i.pins)) return i.pins;
+  return i.pin?["all",homeLens(i)]:[];
+}
+function pinnedHere(i){ return pinsOf(i).indexOf(pageKey())>=0 }
+function setPinnedHere(i,on){
+  var key=pageKey(), list=pinsOf(i).filter(function(k){ return k!==key });
+  if(on) list.push(key);
+  i.pins=list;
+  i.pin=list.length>0;          // older copies of the app still see "pinned somewhere"
+}
 function setLayout(lay){
   S.layouts[pageKey()]=lay;
   try{ localStorage.setItem("trove.layouts",JSON.stringify(S.layouts)) }catch(e){}
 }
-var TINTS=["","amber","sage","sky","rose","lilac"];
-var TINTHEX={"":"transparent",amber:"#FCF3E3",sage:"#EDF3EC",sky:"#EAF1F8",rose:"#FAEDEC",lilac:"#F0EDF8"};
+/* Twelve, ordered round the wheel so the row reads as a spectrum: warm,
+   then cool, then the neutral. All pale enough to write on, with a dark
+   twin for the dark theme. */
+var TINTS=["","butter","amber","peach","clay","rose","lilac","sky","teal","mint","sage","stone"];
+var TINTHEX={"":"transparent",butter:"#FBF7DC",amber:"#FCF3E3",peach:"#FDEEE2",clay:"#F7E6DF",
+  rose:"#FAEDEC",lilac:"#F0EDF8",sky:"#EAF1F8",teal:"#E1EFEE",mint:"#E6F5EE",sage:"#EDF3EC",
+  stone:"#EFEEEB"};
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7) }
 
 /* ---- dates ---- */
@@ -2963,7 +3006,7 @@ function visible(){
   function made(i){ return i.created||i.modified||0 }
   function touched(i){ return i.modified||i.created||0 }
   list.sort(function(a,b){
-    var p=(!!b.pin)-(!!a.pin);
+    var p=pinnedHere(b)-pinnedHere(a);
     if(p) return p;
     if(how==="due"){
       if(a.due!=null&&b.due!=null) return a.due-b.due;
@@ -3240,7 +3283,7 @@ function setNoteSize(ix){
    that stops being a quote on its way through is a small loss on every
    round trip. There is still no button to make one here; one that arrives
    is kept. */
-var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1,BLOCKQUOTE:1};
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,S:1,STRIKE:1,DEL:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1,BLOCKQUOTE:1};
 
 /* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
    obvious way to ask and disagrees between browsers — Safari answers "h3",
@@ -3346,7 +3389,7 @@ function richToText(html){
 
    Rather than extend the list again and wait for the next tag to be
    forgotten, this asks about every tag the editor can produce. */
-var RICH_TAGS="strong|b|em|i|u|br|a|ul|ol|li|p|div|h3|hr|blockquote";
+var RICH_TAGS="strong|b|em|i|u|s|strike|del|br|a|ul|ol|li|p|div|h3|hr|blockquote";
 var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
 var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
 
@@ -3529,12 +3572,12 @@ function cardHTML(i){
   if(poppedOut(i.id)) cls+=" elsewhere";
   return '<article class="'+cls+'" data-id="'+i.id+'"'+(canReorder()&&!inFull?' draggable="true"':"")+'>'
     +(canReorder()&&inFull?'<span class="grip" data-grip title="Drag to move"></span>':"")
-    +(i.pin?'<div class="pinned"></div>':"")
+    +(pinnedHere(i)?'<div class="pinned"></div>':"")
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
     +'<div class="quick">'
       +(L?'<button data-open="'+i.id+'" class="go" title="Open link in a new tab">↗</button>':"")
       +(L?'<button data-refetch="'+i.id+'" title="Fetch the preview again">↻</button>':"")
-      +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
+      +'<button data-pin="'+i.id+'" class="'+(pinnedHere(i)?"on":"")+'" title="'+(pinnedHere(i)?"Unpin from this page":"Pin to this page")+'">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-addimg="'+i.id+'" title="Add images">⊞</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
@@ -3576,7 +3619,7 @@ function rowHTML(i){
   if(S.sel[i.id]) cls+=" picked";
   if(poppedOut(i.id)) cls+=" elsewhere";
   return '<div class="'+cls+'" data-id="'+i.id+'"'+(canReorder()?' draggable="true"':"")+'>'
-    +(i.pin?'<div class="pinned"></div>':"")
+    +(pinnedHere(i)?'<div class="pinned"></div>':"")
     +'<button class="pick" data-pick="'+i.id+'" title="Select">✓</button>'
     +(A?'<div class="box" data-check="'+i.id+'">✓</div>':"")
     +thumb
@@ -3587,7 +3630,7 @@ function rowHTML(i){
     +'<div class="rdue">'+due+'</div>'
     +'<div class="quick">'
       +(L?'<button data-open="'+i.id+'" class="go" title="Open link in a new tab">↗</button>':"")
-      +'<button data-pin="'+i.id+'" class="'+(i.pin?"on":"")+'" title="Pin">◆</button>'
+      +'<button data-pin="'+i.id+'" class="'+(pinnedHere(i)?"on":"")+'" title="'+(pinnedHere(i)?"Unpin from this page":"Pin to this page")+'">◆</button>'
       +'<button data-act="'+i.id+'" class="'+(A?"on":"")+'" title="'+(A?"Remove checkbox":"Make actionable")+'">☑</button>'
       +'<button data-post="'+i.id+'" class="'+(i.postId?"posted":"")+'" title="'
         +(i.postId?"Published — open the post":"Post this publicly")+'">'+POST_ICO+'</button>'
@@ -3695,7 +3738,7 @@ function showMore(){
   /* Pinned notes come first and get their own group. If this page still
      reaches into them, or the board has no group yet, the grouping is
      about to change shape — redraw it properly rather than guess. */
-  var pins=list.filter(function(i){ return i.pin }).length;
+  var pins=list.filter(pinnedHere).length;
   var groups=board.querySelectorAll(".grid,.list");
   var last=groups[groups.length-1];
   if((pins&&pins>=from)||!last){ render(); return }
@@ -3720,8 +3763,8 @@ function showMore(){
 }
 
 function pinSplit(list,restLabel){
-  var pins=list.filter(function(i){ return i.pin }),
-      rest=list.filter(function(i){ return !i.pin });
+  var pins=list.filter(pinnedHere),
+      rest=list.filter(function(i){ return !pinnedHere(i) });
   if(!pins.length||!rest.length) return block(list);   // no split worth marking
   return '<div class="grouphead">Pinned</div>'+block(pins)
         +'<div class="grouphead">'+esc(restLabel)+'</div>'+block(rest);
@@ -4924,6 +4967,12 @@ function normalizeItem(o){
     created:(typeof o.created==="number")?o.created:now,
     modified:(typeof o.modified==="number")?o.modified:(o.created||now)
   };
+  /* Per-page pins, carried only when present so that a note nobody has
+     pinned this way fingerprints exactly as before. */
+  if(Array.isArray(o.pins)){
+    out.pins=o.pins.filter(function(k){ return typeof k==="string"&&k })
+      .map(function(k){ return k.slice(0,200) }).slice(0,64);
+  }
   Object.keys(CARRY).forEach(function(k){
     if(typeof o[k]!=="string"||!o[k]) return;   // absent or not ours to keep
     /* Over the limit, source is dropped, not cut. A Markdown original cut
@@ -5366,7 +5415,7 @@ function openEditor(id){
      every conflict we have had; bring that window forward instead. */
   var out=poppedOut(id);
   if(out){ out.focus(); toast("That note is open in its own window"); return }
-  var d={url:i.url||"",actionable:hasAction(i),due:i.due,timed:!!i.timed,tint:i.tint||"",pin:!!i.pin};
+  var d={url:i.url||"",actionable:hasAction(i),due:i.due,timed:!!i.timed,tint:i.tint||"",pin:pinnedHere(i)};
 
   FOCUS=false;      // fresh every time: every note opens in the ordinary editor
   S.editing=id;
@@ -5387,6 +5436,7 @@ function openEditor(id){
     +'<div class="fmtbar">'
       +'<button class="facet fmt" id="e-bold" title="Bold — ⌘B"><b>B</b></button>'
       +'<button class="facet fmt" id="e-ital" title="Italic — ⌘I"><i>I</i></button>'
+      +'<button class="facet fmt" id="e-strike" title="Strikethrough — ⌘⇧X"><s>S</s></button>'
       +'<button class="facet fmt" id="e-link" title="Link the selected text — ⌘K">⚭</button>'
       /* Drawn rather than set in glyphs: "•—" and "1—" are two characters
          wide, so the buttons stretched next to the square B, I and ⚭. These
@@ -5409,7 +5459,7 @@ function openEditor(id){
     +'<div class="facetbar">'
       +'<button class="facet'+(d.url?" on":"")+'" id="f-link"><span class="fi">⚭</span>Link</button>'
       +'<button class="facet'+(d.actionable?" on":"")+'" id="f-act"><span class="fi">☑</span>Actionable</button>'
-      +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin</button>'
+      +'<button class="facet'+(d.pin?" on":"")+'" id="e-pin"><span class="fi">◆</span>Pin here</button>'
       +'<button class="facet'+(FOCUS?" on":"")+'" id="e-focus" title="Room to write — ⌘⇧F">'
         +'<span class="fi">◫</span>Focus</button>'
       +'<button class="facet" id="e-pop" title="Open this note in its own window">'
@@ -5534,6 +5584,7 @@ function openEditor(id){
     try{
       q("#e-bold").classList.toggle("on",document.queryCommandState("bold"));
       q("#e-ital").classList.toggle("on",document.queryCommandState("italic"));
+      q("#e-strike").classList.toggle("on",document.queryCommandState("strikethrough"));
     }catch(e){}
   }
   function linkSelection(){
@@ -5557,6 +5608,7 @@ function openEditor(id){
   }
   q("#e-bold").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("bold") });
   q("#e-ital").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("italic") });
+  q("#e-strike").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("strikethrough") });
   q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
   q("#e-ul").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertUnorderedList") });
   q("#e-ol").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertOrderedList") });
@@ -5571,6 +5623,9 @@ function openEditor(id){
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
       e.preventDefault(); e.stopPropagation();   // don't fall through to capture
       linkSelection();
+    }
+    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==="x"){
+      e.preventDefault(); e.stopPropagation(); fmt("strikethrough");
     }
   });
   body.addEventListener("input",function(){ if(dashesToDivider()) countWords() });
@@ -5867,7 +5922,9 @@ function openEditor(id){
     i.checks=draftChecks.filter(function(c){ return c.t.trim() })
       .map(function(c){ return {t:c.t.trim(),d:!!c.d} });
     i.tags=q("#e-tags").value.split(",").map(function(s){ return s.trim().toLowerCase() }).filter(Boolean);
-    i.tint=d.tint; i.pin=d.pin; i.modified=Date.now();
+    i.tint=d.tint;
+    if(d.pin!==pinnedHere(i)) setPinnedHere(i,d.pin);
+    i.modified=Date.now();
     if(FRESH[i.id]&&!i.title&&!i.url){
       var jot=richToText(i.body||"").trim();
       if(jot&&jot.indexOf("\n")<0) quickJot(i,jot);
@@ -6661,7 +6718,8 @@ board.addEventListener("click",function(e){
   }
 
   var pn=e.target.closest("[data-pin]");
-  if(pn){ e.stopPropagation(); var p=byId(pn.dataset.pin); if(p){ p.pin=!p.pin; save(); render() } return }
+  if(pn){ e.stopPropagation(); var p=byId(pn.dataset.pin);
+    if(p){ setPinnedHere(p,!pinnedHere(p)); p.modified=Date.now(); save(); render() } return }
 
   var ac=e.target.closest("[data-act]");
   if(ac){
@@ -6755,7 +6813,7 @@ function togglePick(id){
    order the cards are laid out in, not the order the columns hold them. */
 var PICK_ANCHOR=null;
 function pageOrder(){
-  var l=visible(), p=l.filter(function(i){ return i.pin }), r=l.filter(function(i){ return !i.pin });
+  var l=visible(), p=l.filter(pinnedHere), r=l.filter(function(i){ return !pinnedHere(i) });
   return (p.length&&r.length?p.concat(r):l).map(function(i){ return i.id });
 }
 function pickRange(id){
@@ -8923,6 +8981,10 @@ function renameTag(old){
         if(at<0) return;
         x.tags.splice(at,1);
         if(x.tags.indexOf(next)<0) x.tags.push(next);
+        // a pin on the old tag's page moves with the page
+        if(Array.isArray(x.pins)&&x.pins.indexOf("tag:"+old)>=0){
+          x.pins=x.pins.filter(function(k){ return k!=="tag:"+old&&k!=="tag:"+next }).concat("tag:"+next);
+        }
         x.modified=Date.now(); n++;
       });
       if(S.tag===old) S.tag=next;
@@ -9104,7 +9166,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="73";
+var BUILD="74";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
