@@ -676,6 +676,7 @@
   .fmt b{font-weight:800}
   .fmt i{font-family:Georgia,serif}
   .fmt s{text-decoration-thickness:1.5px}
+  .fmt.nlb{width:auto;min-width:0;padding:0 11px;font-size:12px;font-weight:600}
   .fmt.li{font-size:14px;font-weight:700;letter-spacing:-.04em}
 
   /* history — earlier versions of the open note */
@@ -735,6 +736,17 @@
   .cbody ul,.ebody ul{list-style:disc}
   .cbody ol,.ebody ol{list-style:decimal}
   .ebody li{line-height:1.6}
+  /* Newsletter images: one look for all of them, set here and in the
+     email template, never per picture. */
+  .ebody img,.cbody img{display:block;max-width:100%;height:auto;border-radius:10px;margin:8px 0}
+  .ebody img{cursor:pointer}
+  .ebody a img{outline:2px solid transparent}
+  .ebody a:has(img){text-decoration:none}
+  .ebody figure,.cbody figure{display:inline-block;vertical-align:top;width:calc(50% - 10px);
+    margin:8px 8px 8px 0}
+  .ebody figure img,.cbody figure img{margin:0 0 6px}
+  .ebody figcaption,.cbody figcaption{font-size:.88em;line-height:1.45;color:var(--read)}
+  .cbody img{max-height:160px;object-fit:cover;width:100%}
   .ebody a{cursor:pointer}
 
   /* Short, text-only notes get set large — a stray thought should look like one,
@@ -3301,7 +3313,21 @@ function setNoteSize(ix){
    that stops being a quote on its way through is a small loss on every
    round trip. There is still no button to make one here; one that arrives
    is kept. */
-var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,S:1,STRIKE:1,DEL:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1,BLOCKQUOTE:1};
+var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,S:1,STRIKE:1,DEL:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1,BLOCKQUOTE:1,
+  IMG:1,FIGURE:1,FIGCAPTION:1};
+/* Images in a body exist for the newsletter, and only one kind is kept:
+   a picture in the newsletter's own public folder on this app's server.
+   Anything else — another site's image, a data: address, a tracking pixel
+   — is removed, so a body still cannot make your browser fetch from
+   anywhere you did not put there yourself. */
+function nlImagePrefix(){
+  return (typeof SUPA!=="undefined"&&SUPA&&SUPA.url)?SUPA.url+"/storage/v1/object/public/newsletter/":"\u0000";
+}
+function nlImageOk(src){
+  var pre=nlImagePrefix();
+  return src.indexOf(pre)===0&&/^[A-Za-z0-9._\/-]{1,200}$/.test(src.slice(pre.length))
+    &&src.indexOf("..")<0;
+}
 
 /* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
    obvious way to ask and disagrees between browsers — Safari answers "h3",
@@ -3378,6 +3404,13 @@ function sanitizeRich(html){
         }
         return;
       }
+      if(tag==="IMG"){
+        var src=(n.getAttribute("src")||"").trim(), alt=(n.getAttribute("alt")||"").slice(0,200);
+        [].slice.call(n.attributes).forEach(function(a){ n.removeAttribute(a.name) });
+        if(!nlImageOk(src)){ parent.removeChild(n); return }
+        n.setAttribute("src",src); n.setAttribute("alt",alt);
+        return;
+      }
       [].slice.call(n.attributes).forEach(function(a){ n.removeAttribute(a.name) });
     });
   })(box);
@@ -3407,7 +3440,7 @@ function richToText(html){
 
    Rather than extend the list again and wait for the next tag to be
    forgotten, this asks about every tag the editor can produce. */
-var RICH_TAGS="strong|b|em|i|u|s|strike|del|br|a|ul|ol|li|p|div|h3|hr|blockquote";
+var RICH_TAGS="strong|b|em|i|u|s|strike|del|br|a|ul|ol|li|p|div|h3|hr|blockquote|img|figure|figcaption";
 var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
 var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
 
@@ -5363,6 +5396,51 @@ function carryOver(body){
   });
   return joinSections(parts);
 }
+/* A file picker of its own: the shared one is wired to attach photos to
+   the note, and a newsletter picture is not one of those. */
+function pickImageFiles(multiple,cb){
+  var inp=document.createElement("input");
+  inp.type="file"; inp.accept="image/*"; inp.multiple=!!multiple;
+  inp.addEventListener("change",function(){
+    var f=[].slice.call(inp.files||[]).filter(function(x){ return /^image\//.test(x.type) });
+    if(f.length) cb(f);
+  });
+  inp.click();
+}
+function dataUrlToBlob(u){
+  var m=/^data:([^;]+);base64,(.*)$/.exec(u||""); if(!m) return null;
+  var bin=atob(m[2]), arr=new Uint8Array(bin.length);
+  for(var k=0;k<bin.length;k++) arr[k]=bin.charCodeAt(k);
+  return new Blob([arr],{type:m[1]});
+}
+/* Into the newsletter's public folder, made the same size as any picture
+   added to a note (1200px on the long side: sharp at the email's 600px on
+   a high-density screen). Resolves to the public addresses, in order. */
+function uploadNewsletterImages(files){
+  if(!SYNC.session) return Promise.reject("Sign in first — pictures are kept on the server");
+  toast("Uploading "+files.length+" picture"+(files.length===1?"":"s")+"…");
+  return withFreshSession().then(function(){
+    return Promise.all(files.map(function(file){
+      return readImage(file).then(function(p){
+        var blob=p&&dataUrlToBlob(p.src);
+        if(!blob) throw "That file is not a picture";
+        var path="issues/"+uid()+(/png/.test(blob.type)?".png":".jpg");
+        return fetch(SUPA.url+"/storage/v1/object/newsletter/"+path,{
+          method:"POST",
+          headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token,
+                    "Content-Type":blob.type, "x-upsert":"false" },
+          body:blob
+        }).then(function(r){
+          if(r.status===400||r.status===403||r.status===404)
+            throw "The server would not take the picture. Has the newsletter-images step been run in Supabase?";
+          if(!r.ok) throw "Upload failed ("+r.status+")";
+          return nlImagePrefix()+path;
+        });
+      });
+    }));
+  });
+}
+
 function newIssue(){
   var last=latestIssue();
   function make(n){
@@ -5607,8 +5685,10 @@ function openEditor(id){
          every other control. */
       +'<button class="facet fmt li" id="e-ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button class="facet fmt li" id="e-ol" title="Numbered list" aria-label="Numbered list">1.</button>'
-      +'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
+      +'<button class="facet fmt hd" id="e-h" title="'+(i.issue?"Section title — turns this line into one":"Heading — turns this line into a heading")+'" '
         +'aria-label="Heading">T</button>'
+      +(i.issue?'<button class="facet fmt nlb" id="e-nlimg" title="Image — full width, with a link if you like">▭ Image</button>'
+        +'<button class="facet fmt nlb" id="e-nlcards" title="Two pictures side by side, each with a title, a caption and a link">▥ Cards</button>':"")
       +'<span class="wc" id="e-wc"></span>'
       +'<span class="edat" id="e-when" title="When this note last changed"></span>'
     +'</div>'
@@ -5781,6 +5861,55 @@ function openEditor(id){
        ask what the caret is already sitting in and turn it back to a plain
        paragraph if it is a heading. */
     fmt("formatBlock", inHeading()?"<div>":"<h3>");
+  });
+  /* The newsletter's pictures. Picking a file takes focus away from the
+     text, so where the caret was is remembered first and put back before
+     the picture goes in. */
+  var nlSaved=null;
+  function nlRemember(){
+    var sel=getSelection();
+    nlSaved=(sel&&sel.rangeCount&&body.contains(sel.getRangeAt(0).startContainer))?sel.getRangeAt(0).cloneRange():null;
+  }
+  function nlInsert(html){
+    body.focus();
+    var sel=getSelection();
+    sel.removeAllRanges();
+    if(nlSaved) sel.addRange(nlSaved);
+    else { var r=document.createRange(); r.selectNodeContents(body); r.collapse(false); sel.addRange(r) }
+    try{ document.execCommand("insertHTML",false,sanitizeRich(html)) }catch(e){}
+    countWords();
+  }
+  function nlLink(cb){
+    askText("A link for this picture","Where clicking it should take the reader. Leave it empty for none.",
+      "https://","Done",function(v){ v=(v||"").trim(); cb(SAFE_HREF.test(v)&&v!=="https://"?v:"") });
+  }
+  function nlPicture(src,href){
+    var img='<img src="'+esc(src)+'" alt="">';
+    return href?'<a href="'+esc(href)+'">'+img+'</a>':img;
+  }
+  if(q("#e-nlimg")) q("#e-nlimg").addEventListener("mousedown",function(e){
+    e.preventDefault(); nlRemember();
+    pickImageFiles(false,function(files){
+      uploadNewsletterImages(files).then(function(urls){
+        nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>") });
+      },function(err){ toast(String(err)) });
+    });
+  });
+  if(q("#e-nlcards")) q("#e-nlcards").addEventListener("mousedown",function(e){
+    e.preventDefault(); nlRemember();
+    pickImageFiles(true,function(files){
+      uploadNewsletterImages(files.slice(0,2)).then(function(urls){
+        var html="", k=0;
+        (function next(){
+          if(k>=urls.length){ nlInsert(html+"<br>"); return }
+          nlLink(function(href){
+            html+='<figure>'+nlPicture(urls[k],href)
+              +'<figcaption><b>Τίτλος</b><br>Λεζάντα</figcaption></figure>';
+            k++; next();
+          });
+        })();
+      },function(err){ toast(String(err)) });
+    });
   });
   body.addEventListener("keydown",function(e){
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
@@ -6527,6 +6656,25 @@ sheet.addEventListener("click",function(e){
     var it=editingItem(); if(!it||!it.photos) return;
     it.photos.splice(+rm.dataset.rmimg,1);
     save(); repaintGallery(); render();
+    return;
+  }
+  /* A picture in the body: clicking it changes where it links, rather
+     than following the link. */
+  var pic=e.target.closest(".ebody img");
+  if(pic){
+    e.preventDefault(); e.stopPropagation();
+    var wrap=pic.parentNode&&pic.parentNode.nodeName==="A"?pic.parentNode:null;
+    askText("A link for this picture","Where clicking it should take the reader. Empty it to remove the link.",
+      wrap?wrap.getAttribute("href"):"https://","Done",function(v){
+        v=(v||"").trim();
+        var ok=SAFE_HREF.test(v)&&v!=="https://";
+        if(wrap&&!ok){ wrap.parentNode.insertBefore(pic,wrap); wrap.parentNode.removeChild(wrap) }
+        else if(wrap) wrap.setAttribute("href",v);
+        else if(ok){ var a2=document.createElement("a"); a2.setAttribute("href",v);
+          pic.parentNode.insertBefore(a2,pic); a2.appendChild(pic) }
+        var b=document.getElementById("e-body");
+        if(b) b.dispatchEvent(new Event("input",{bubbles:true}));
+      });
     return;
   }
   // A link inside the editable body would otherwise just place the caret.
@@ -9337,7 +9485,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="75";
+var BUILD="76";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
