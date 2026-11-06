@@ -473,6 +473,9 @@
   .nlbox:hover .nlgrip{opacity:1}
   .nlx{flex:none;width:26px;height:26px;border-radius:8px;color:var(--faint);font-size:12px;opacity:0;transition:opacity .15s}
   .nlbox:hover .nlx,.nlbox:focus-within .nlx{opacity:1}
+  .nldup{flex:none;width:26px;height:26px;border-radius:8px;color:var(--faint);font-size:13px;opacity:0;transition:opacity .15s}
+  .nlbox:hover .nldup,.nlbox:focus-within .nldup{opacity:1}
+  .nldup:hover{background:var(--line);color:var(--accent)}
   .nlx:hover{background:var(--line);color:var(--red)}
   /* ＋ sits on the gap below each box: a new box goes exactly there. */
   .nladd{position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);z-index:2;
@@ -484,7 +487,7 @@
   .nlbox.nlbefore{box-shadow:0 -3px 0 0 var(--accent)}
   .nlbox.nlafter{box-shadow:0 3px 0 0 var(--accent)}
   .ebody.boxes.locked .nlbox{opacity:.7}
-  @media (hover:none){ .nlx,.nladd,.nlgrip{opacity:1} }
+  @media (hover:none){ .nlx,.nldup,.nladd,.nlgrip{opacity:1} }
   .issueacts .btn{height:30px;padding:0 12px;font-size:12.5px}
   /* The preview: the email as an inbox would draw it, over everything. */
   .nlprev{position:fixed;inset:0;z-index:60;background:rgba(26,25,23,.55);display:none;
@@ -5444,6 +5447,7 @@ function boxHTML(title,inner){
     +(ed?'<div class="nlhead"><span class="nllab">Editorial</span></div>'
         :'<div class="nlhead"><span class="grip nlgrip" title="Drag to move this box"></span>'
           +'<div class="nlt" contenteditable="true" spellcheck="true" data-ph="Section title">'+esc(title)+'</div>'
+          +'<button type="button" class="nldup" title="Duplicate this box">⧉</button>'
           +'<button type="button" class="nlx" title="Remove this box">✕</button></div>')
     +'<div class="nlc" contenteditable="true" spellcheck="true" data-ph="'+(ed?"The editorial…":"Write…")+'">'+inner+'</div>'
     +'<button type="button" class="nladd" title="A new box below this one">＋</button>'
@@ -5486,6 +5490,19 @@ function wireBoxes(container){
       e.preventDefault();
       var nb=addBox(container,add.closest(".nlbox"));
       var t=nb.querySelector(".nlt"); if(t){ t.focus(); selectAllIn(t) }
+      return;
+    }
+    var dup=e.target.closest(".nldup");
+    if(dup){
+      e.preventDefault();
+      /* A copy, right below the original, with everything in it — the
+         way a weekly section is usually reused. */
+      var src=dup.closest(".nlbox"), copy=src.cloneNode(true);
+      copy.classList.remove("nldrag","nlbefore","nlafter"); copy.removeAttribute("draggable");
+      src.parentNode.insertBefore(copy,src.nextSibling);
+      boxChanged(container);
+      var ct=copy.querySelector(".nlt"); if(ct){ ct.focus(); selectAllIn(ct) }
+      toast("Box duplicated");
       return;
     }
     var x=e.target.closest(".nlx");
@@ -5881,7 +5898,7 @@ function issueToEmail(item){
        +'" style="display:block;width:100%;height:auto;border:0"></a>',"0"):"")
     +row(para(meta,{size:13.5,color:T.muted,font:NL_SANS,mt:30,mb:10,lh:1.5}))
     +row('<h1 style="margin:0 0 22px;font-family:'+NL_SANS+';font-size:30px;line-height:1.2;font-weight:600;letter-spacing:-.02em;color:'
-       +T.titles+'">'+esc(item.title||"")+'</h1>')
+       +T.ink+'">'+esc(item.title||"")+'</h1>')
     +rows.join("")
     +'<tr><td class="pad" style="padding:34px 40px 40px;border-top:1px solid '+T.line+'">'+foot+'</td></tr>'
     +'</table></td></tr></table></body></html>';
@@ -9969,7 +9986,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="78";
+var BUILD="79";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
