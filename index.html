@@ -456,6 +456,35 @@
     font-weight:600;letter-spacing:.02em}
   .issuebar label.wide{grid-column:1 / -1}
   .issueacts{grid-column:1 / -1;display:flex;gap:8px;justify-content:flex-end}
+  /* The issue's boxes: each part of the newsletter a small card of its own,
+     with the same type and spacing as the note editor inside it. */
+  .ebody.boxes{display:flex;flex-direction:column;gap:0;min-height:0}
+  .nlbox{position:relative;background:var(--surface);border:1px solid var(--line-strong);
+    border-radius:14px;padding:12px 18px 16px;margin:0 0 18px;transition:box-shadow .15s,border-color .15s}
+  .nlbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .nlbox.ed{background:var(--surface-2)}
+  .nlhead{display:flex;align-items:center;gap:8px;min-height:30px;margin-bottom:4px}
+  .nllab{font-size:11.5px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .nlt{flex:1;min-width:0;font-family:inherit;font-size:calc(17.5px*var(--tscale));font-weight:640;
+    letter-spacing:-.015em;color:var(--accent);outline:none;line-height:1.3}
+  .nlt:empty:before,.nlc:empty:before{content:attr(data-ph);color:var(--faint);font-weight:400}
+  .nlc{outline:none;min-height:1.6em}
+  .nlbox .nlgrip{position:static;transform:none;opacity:.55;flex:none;width:22px;height:14px;color:var(--faint)}
+  .nlbox:hover .nlgrip{opacity:1}
+  .nlx{flex:none;width:26px;height:26px;border-radius:8px;color:var(--faint);font-size:12px;opacity:0;transition:opacity .15s}
+  .nlbox:hover .nlx,.nlbox:focus-within .nlx{opacity:1}
+  .nlx:hover{background:var(--line);color:var(--red)}
+  /* ＋ sits on the gap below each box: a new box goes exactly there. */
+  .nladd{position:absolute;left:50%;bottom:-15px;transform:translateX(-50%);z-index:2;
+    width:24px;height:24px;border-radius:50%;border:1px solid var(--line-strong);background:var(--surface);
+    color:var(--accent);font-size:15px;line-height:1;opacity:0;transition:opacity .15s}
+  .nlbox:hover .nladd{opacity:1}
+  .nladd:hover{border-color:var(--accent)}
+  .nlbox.nldrag{opacity:.45}
+  .nlbox.nlbefore{box-shadow:0 -3px 0 0 var(--accent)}
+  .nlbox.nlafter{box-shadow:0 3px 0 0 var(--accent)}
+  .ebody.boxes.locked .nlbox{opacity:.7}
+  @media (hover:none){ .nlx,.nladd,.nlgrip{opacity:1} }
   .issueacts .btn{height:30px;padding:0 12px;font-size:12.5px}
   /* The preview: the email as an inbox would draw it, over everything. */
   .nlprev{position:fixed;inset:0;z-index:60;background:rgba(26,25,23,.55);display:none;
@@ -4731,7 +4760,10 @@ function setEditorLock(on,why){
       title=document.getElementById("e-title"),
       bar=document.getElementById("e-catchup");
   if(!body) return;
-  body.setAttribute("contenteditable",on?"false":"true");
+  if(body.classList.contains("boxes")){
+    body.querySelectorAll(".nlc,.nlt").forEach(function(el){ el.setAttribute("contenteditable",on?"false":"true") });
+    body.classList.toggle("locked",!!on);
+  } else body.setAttribute("contenteditable",on?"false":"true");
   if(title) title.disabled=!!on;
   if(bar){ bar.hidden=!on; if(on&&why) bar.textContent=why }
 }
@@ -5385,6 +5417,152 @@ function issueFromEditor(i){
   if(i.issue.template) out.template=i.issue.template;
   return out;
 }
+/* ---- the issue editor's boxes ----------------------------------------
+
+   The issue is still stored the way it always was: an editorial, then
+   sections each opened by a heading. On screen each part is a box — a
+   small editor of its own with its title above it — so you can see where
+   one part ends and the next begins, drag a box by its grip to move it,
+   and add or remove boxes. Saving joins the boxes back into one body;
+   the email and every other part of the app see exactly what they saw
+   before. */
+function issueBoxesHTML(html){
+  var parts=issueSections(html), out="";
+  parts.forEach(function(p,ix){
+    var holder=inertDiv();
+    (ix===0?p.nodes:p.nodes.slice(1)).forEach(function(n){ holder.appendChild(n.cloneNode(true)) });
+    var inner=sanitizeRich(holder.innerHTML);
+    if(ix===0) out+=boxHTML(null,inner);
+    else out+=boxHTML(p.head||"",inner);
+  });
+  if(parts.length<2) out+="";   // an issue with no sections is just its editorial
+  return out;
+}
+function boxHTML(title,inner){
+  var ed=title===null;
+  return '<section class="nlbox'+(ed?" ed":"")+'">'
+    +(ed?'<div class="nlhead"><span class="nllab">Editorial</span></div>'
+        :'<div class="nlhead"><span class="grip nlgrip" title="Drag to move this box"></span>'
+          +'<div class="nlt" contenteditable="true" spellcheck="true" data-ph="Section title">'+esc(title)+'</div>'
+          +'<button type="button" class="nlx" title="Remove this box">✕</button></div>')
+    +'<div class="nlc" contenteditable="true" spellcheck="true" data-ph="'+(ed?"The editorial…":"Write…")+'">'+inner+'</div>'
+    +'<button type="button" class="nladd" title="A new box below this one">＋</button>'
+    +'</section>';
+}
+function boxesToHtml(container){
+  var out="";
+  [].forEach.call(container.querySelectorAll(":scope > .nlbox"),function(bx){
+    var c=bx.querySelector(".nlc"), t=bx.querySelector(".nlt");
+    var inner=c?c.innerHTML:"";
+    if(bx.classList.contains("ed")) out+=inner;
+    else{
+      var title=(t?t.textContent:"").replace(/\s+/g," ").trim()||"Χωρίς τίτλο";
+      out+="<h3>"+esc(title)+"</h3>"+inner;
+    }
+  });
+  return sanitizeRich(out);
+}
+function selectAllIn(el){
+  var r=document.createRange(); r.selectNodeContents(el);
+  var s=getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function boxChanged(container){
+  container.dispatchEvent(new Event("input",{bubbles:true}));
+}
+function addBox(container,after){
+  var tmp=inertDiv(); tmp.innerHTML=boxHTML("","");
+  var nb=document.importNode(tmp.firstChild,true);
+  if(after&&after.parentNode===container) container.insertBefore(nb,after.nextSibling);
+  else container.appendChild(nb);
+  boxChanged(container);
+  return nb;
+}
+function wireBoxes(container){
+  if(container.__boxes) return;
+  container.__boxes=true;
+  container.addEventListener("click",function(e){
+    var add=e.target.closest(".nladd");
+    if(add){
+      e.preventDefault();
+      var nb=addBox(container,add.closest(".nlbox"));
+      var t=nb.querySelector(".nlt"); if(t){ t.focus(); selectAllIn(t) }
+      return;
+    }
+    var x=e.target.closest(".nlx");
+    if(x){
+      e.preventDefault();
+      var bx=x.closest(".nlbox"), c=bx.querySelector(".nlc");
+      var title=(bx.querySelector(".nlt")||{}).textContent||"";
+      function drop(){ bx.parentNode.removeChild(bx); boxChanged(container) }
+      if(!c||!richToText(c.innerHTML).trim()&&!c.querySelector("img")) return drop();
+      askChoice("Remove “"+title.trim()+"”?","The box and what is written in it go. "
+        +"Cancel on the note undoes it, and the issue's history keeps every saved version.",
+        [{label:"Keep it",value:false,kind:"sec"},{label:"Remove",value:true,kind:"dan"}],
+        function(go){ if(go) drop() });
+    }
+  });
+  /* A title is one line: Return moves down into the box's text. */
+  container.addEventListener("keydown",function(e){
+    if(e.target.classList&&e.target.classList.contains("nlt")&&e.key==="Enter"){
+      e.preventDefault();
+      var c=e.target.closest(".nlbox").querySelector(".nlc");
+      if(c){ c.focus(); var r=document.createRange(); r.selectNodeContents(c); r.collapse(true);
+        var sl=getSelection(); sl.removeAllRanges(); sl.addRange(r) }
+    }
+  });
+  /* Moving a box. As in Full: the grip lends its box the ability to be
+     dragged for exactly as long as it is held, so selecting text inside a
+     box is never mistaken for a drag. */
+  var dragging=null;
+  container.addEventListener("mousedown",function(e){
+    var g=e.target.closest(".nlgrip"); if(!g) return;
+    var bx=g.closest(".nlbox"); if(bx) bx.setAttribute("draggable","true");
+  });
+  document.addEventListener("mouseup",function up(){
+    if(!container.isConnected){ document.removeEventListener("mouseup",up); return }   // that editor has closed
+    setTimeout(function(){
+      container.querySelectorAll(".nlbox[draggable]").forEach(function(b){ if(b!==dragging) b.removeAttribute("draggable") });
+    },0);
+  });
+  function clearMarks(){ container.querySelectorAll(".nlbefore,.nlafter").forEach(function(b){ b.classList.remove("nlbefore","nlafter") }) }
+  container.addEventListener("dragstart",function(e){
+    var bx=e.target.closest&&e.target.closest(".nlbox");
+    if(!bx||!bx.hasAttribute("draggable")){ return }
+    e.stopPropagation();
+    dragging=bx; bx.classList.add("nldrag");
+    try{ e.dataTransfer.effectAllowed="move"; e.dataTransfer.setData("text/plain","") }catch(err){}
+  });
+  container.addEventListener("dragover",function(e){
+    if(!dragging) return;
+    e.preventDefault(); e.stopPropagation();
+    var bx=e.target.closest&&e.target.closest(".nlbox");
+    if(!bx||bx===dragging||bx.classList.contains("ed")&&false) return;
+    var r=bx.getBoundingClientRect(), after=e.clientY>r.top+r.height/2;
+    if(bx.classList.contains("ed")) after=true;     // nothing goes above the editorial
+    clearMarks(); bx.classList.add(after?"nlafter":"nlbefore");
+  });
+  container.addEventListener("drop",function(e){
+    if(!dragging) return;
+    e.preventDefault(); e.stopPropagation();
+    var m=container.querySelector(".nlbefore,.nlafter");
+    if(m&&m!==dragging) moveBox(container,dragging,m,m.classList.contains("nlafter"));
+    endBoxDrag();
+  });
+  container.addEventListener("dragend",endBoxDrag);
+  function endBoxDrag(){
+    clearMarks();
+    if(dragging){ dragging.classList.remove("nldrag"); dragging.removeAttribute("draggable") }
+    dragging=null;
+  }
+}
+/* The editorial is always first: it is what the email opens with. */
+function moveBox(container,bx,target,after){
+  if(bx.classList.contains("ed")) return;
+  if(target.classList.contains("ed")) after=true;
+  container.insertBefore(bx,after?target.nextSibling:target);
+  boxChanged(container);
+}
+
 function latestIssue(){
   return S.items.filter(function(i){ return i.issue })
     .sort(function(a,b){ return b.issue.n-a.issue.n })[0]||null;
@@ -5944,8 +6122,10 @@ function openEditor(id){
       +'</div>':"")
     +'<input class="etitle" id="e-title" placeholder="'+(i.issue?"The issue's title":"Title")+'" value="'+esc(i.title)+'">'
     +ctx
-    +'<div class="ebody" id="e-body" contenteditable="true" spellcheck="true" '
-      +'data-ph="Write something…">'+sanitizeRich(i.body)+'</div>'
+    +(i.issue
+      ? '<div class="ebody boxes" id="e-body">'+issueBoxesHTML(i.body)+'</div>'
+      : '<div class="ebody" id="e-body" contenteditable="true" spellcheck="true" '
+        +'data-ph="Write something…">'+sanitizeRich(i.body)+'</div>')
     +'<div class="fmtbar">'
       +'<button class="facet fmt" id="e-bold" title="Bold — ⌘B"><b>B</b></button>'
       +'<button class="facet fmt" id="e-ital" title="Italic — ⌘I"><i>I</i></button>'
@@ -5957,8 +6137,9 @@ function openEditor(id){
          every other control. */
       +'<button class="facet fmt li" id="e-ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button class="facet fmt li" id="e-ol" title="Numbered list" aria-label="Numbered list">1.</button>'
-      +'<button class="facet fmt hd" id="e-h" title="'+(i.issue?"Section title — turns this line into one":"Heading — turns this line into a heading")+'" '
-        +'aria-label="Heading">T</button>'
+      +(i.issue?'<button class="facet fmt nlb" id="e-nlbox" title="A new box at the end — a section of its own">＋ Box</button>'
+        :'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
+        +'aria-label="Heading">T</button>')
       +(i.issue?'<button class="facet fmt nlb" id="e-nlimg" title="Image — full width, with a link if you like">▭ Image</button>'
         +'<button class="facet fmt nlb" id="e-nlcards" title="Two pictures side by side, each with a title, a caption and a link">▥ Cards</button>':"")
       +'<span class="wc" id="e-wc"></span>'
@@ -6029,8 +6210,31 @@ function openEditor(id){
   // ⌘B and ⌘I are handled natively, the buttons drive the same command.
   var body=q("#e-body");
   try{ document.execCommand("styleWithCSS",false,false) }catch(e){}   // emit <b>/<i>, not styled spans
+  /* An issue's body is a column of boxes, each its own small editor; every
+     other note is one editor. These two are the only places that know. */
+  function bodyHtml(){ return i.issue?boxesToHtml(body):body.innerHTML }
+  function setBodyHtml(h){
+    if(i.issue){ body.innerHTML=issueBoxesHTML(h) } else body.innerHTML=sanitizeRich(h);
+  }
+  /* Where typing and the toolbar go: in an issue, the box you were last in. */
+  var lastEditable=null;
+  body.addEventListener("focusin",function(e){
+    var ed=e.target.closest&&e.target.closest(".nlc");
+    if(ed) lastEditable=ed;
+  });
+  function writingIn(){
+    if(!i.issue) return body;
+    if(lastEditable&&body.contains(lastEditable)) return lastEditable;
+    return body.querySelector(".nlc");
+  }
+  if(i.issue) wireBoxes(body);
+  if(q("#e-nlbox")) q("#e-nlbox").addEventListener("mousedown",function(e){
+    e.preventDefault();
+    var nb=addBox(body,null);
+    var t=nb.querySelector(".nlt"); if(t){ t.focus(); selectAllIn(t) }
+  });
   function countWords(){
-    var n=words(richToText(body.innerHTML));
+    var n=words(richToText(bodyHtml()));
     q("#e-wc").textContent = n ? n.toLocaleString()+" word"+(n===1?"":"s") : "";
   }
   function paintWhen(){
@@ -6091,7 +6295,9 @@ function openEditor(id){
     if(e.key&&e.key.indexOf("Arrow")===0) keepCaretVisible(true);
   });
   function fmt(cmd,arg){
-    body.focus();
+    var w=writingIn();
+    var sel=getSelection();
+    if(!(sel&&sel.rangeCount&&w.contains(sel.getRangeAt(0).startContainer))) w.focus();
     try{ document.execCommand(cmd,false,arg||null) }catch(e){}
     countWords(); syncFmtButtons();
   }
@@ -6127,7 +6333,7 @@ function openEditor(id){
   q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
   q("#e-ul").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertUnorderedList") });
   q("#e-ol").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertOrderedList") });
-  q("#e-h").addEventListener("mousedown",function(e){
+  if(q("#e-h")) q("#e-h").addEventListener("mousedown",function(e){
     e.preventDefault();
     /* A toggle, not a one-way trip. formatBlock has no "undo" of its own, so
        ask what the caret is already sitting in and turn it back to a plain
@@ -6143,11 +6349,12 @@ function openEditor(id){
     nlSaved=(sel&&sel.rangeCount&&body.contains(sel.getRangeAt(0).startContainer))?sel.getRangeAt(0).cloneRange():null;
   }
   function nlInsert(html){
-    body.focus();
+    var w=writingIn(); w.focus();
     var sel=getSelection();
     sel.removeAllRanges();
-    if(nlSaved) sel.addRange(nlSaved);
-    else { var r=document.createRange(); r.selectNodeContents(body); r.collapse(false); sel.addRange(r) }
+    if(nlSaved&&nlSaved.startContainer&&body.contains(nlSaved.startContainer)
+       &&!(nlSaved.startContainer.closest?nlSaved.startContainer:nlSaved.startContainer.parentNode).closest(".nlt")) sel.addRange(nlSaved);
+    else { var r=document.createRange(); r.selectNodeContents(w); r.collapse(false); sel.addRange(r) }
     try{ document.execCommand("insertHTML",false,sanitizeRich(html)) }catch(e){}
     countWords();
   }
@@ -6162,7 +6369,7 @@ function openEditor(id){
   /* Preview and copy what is in front of you, saved or not — the point of
      a preview is to look before you commit. */
   function issueNow(){
-    return { id:i.id, title:q("#e-title").value.trim(), body:sanitizeRich(body.innerHTML), issue:issueFromEditor(i) };
+    return { id:i.id, title:q("#e-title").value.trim(), body:sanitizeRich(bodyHtml()), issue:issueFromEditor(i) };
   }
   if(q("#e-iprev")) q("#e-iprev").addEventListener("click",function(){ showIssuePreview(issueNow()) });
   if(q("#e-icopy")) q("#e-icopy").addEventListener("click",function(){ copyIssueHtml(issueNow()) });
@@ -6486,7 +6693,7 @@ function openEditor(id){
     if(i.issue&&q("#e-inum")){
       i.issue=issueFromEditor(i);
     }
-    bodyEdited(i,sanitizeRich(q("#e-body").innerHTML));
+    bodyEdited(i,sanitizeRich(bodyHtml()));
     i.url=q("#p-link").classList.contains("on")?q("#e-url").value.trim():"";
     if(i.url&&!/^https?:/i.test(i.url)) i.url="https://"+i.url;
     i.actionable=d.actionable;
@@ -6638,14 +6845,14 @@ function openEditor(id){
     var v=historyFor(id)[+b.dataset.ver]; if(!v) return;
     remember(readEditorNow(),"before putting an older version back");
     q("#e-title").value=v.title;
-    q("#e-body").innerHTML=sanitizeRich(v.body);
+    setBodyHtml(v.body);
     q("#e-tags").value=(v.tags||[]).join(", ");
     histBox.setAttribute("hidden",""); q("#e-hist").classList.remove("on");
     toast("Restored — press Done to keep it, Cancel to think again");
   });
   // what is on screen this second, so a restore can be undone as well
   function readEditorNow(){
-    return { id:id, title:q("#e-title").value, body:sanitizeRich(q("#e-body").innerHTML),
+    return { id:id, title:q("#e-title").value, body:sanitizeRich(bodyHtml()),
       tags:q("#e-tags").value.split(",").map(function(t){ return t.trim() }).filter(Boolean),
       url:i.url, due:i.due, checks:i.checks, tint:i.tint, photos:i.photos };
   }
@@ -7364,7 +7571,7 @@ board.addEventListener("click",function(e){
   /* In Full, a note opens where it stands. Its pictures still open the
      whole editor, which is where pictures are handled. */
   else if(layoutFor()==="full"&&row.classList.contains("card")
-          &&!e.target.closest(".photos,.thumb")) startInline(row,e);
+          &&!e.target.closest(".photos,.thumb")&&!(byId(row.dataset.id)||{}).issue) startInline(row,e);
   else openEditor(row.dataset.id);
 });
 
@@ -9762,7 +9969,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="77";
+var BUILD="78";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
