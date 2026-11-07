@@ -497,6 +497,12 @@
   .ebody.boxes.locked .nlbox{opacity:.7}
   @media (hover:none){ .nlx,.nldup,.nladd,.nlgrip{opacity:1} }
   .issueacts .btn{height:30px;padding:0 12px;font-size:12.5px}
+  .issueacts .btn,.nlpbar .btn{transition:transform .08s,background .2s,color .2s,border-color .2s}
+  .issueacts .btn:active,.nlpbar .btn:active{transform:scale(.95)}
+  .btn.done{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--surface)!important;
+    animation:btnpop .3s cubic-bezier(.2,.8,.3,1.4)}
+  .btn.fail{background:var(--red)!important;border-color:var(--red)!important;color:#fff!important}
+  @keyframes btnpop{0%{transform:scale(.92)}100%{transform:scale(1)}}
   /* The preview: the email as an inbox would draw it, over everything. */
   .nlprev{position:fixed;inset:0;z-index:60;background:rgba(26,25,23,.55);display:none;
     flex-direction:column;align-items:center;padding:14px}
@@ -1162,7 +1168,22 @@
     box-shadow:0 1px 3px rgba(0,0,0,.07)}
   .pmore:hover::before{border-color:var(--accent)}
   .pfold.open .pmore,.pfold.short .pmore{display:none}
-  .postcard .ptext a{color:var(--blue)}
+  /* A post reads like the newsletter it often comes from: clay links,
+     teal section titles over a clay rule, quotations set apart, pictures
+     inside the column with the same rounded corners, cards two to a row. */
+  .postcard .ptext a,.pbody a{color:#A14E2B;text-underline-offset:2px}
+  .postcard .ptext h3,.pbody h3{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    font-size:1.25em;font-weight:600;color:var(--accent);border-top:1px solid #A14E2B;padding-top:.8em;margin:1.2em 0 .4em}
+  .postcard .ptext h3:first-child,.pbody h3:first-child{border-top:0;padding-top:0}
+  .postcard .ptext hr,.pbody hr{border-top-color:#A14E2B}
+  .postcard .ptext blockquote,.pbody blockquote{font-style:italic;color:var(--muted);border-left:3px solid var(--line-strong);
+    margin:.6em 0;padding:2px 0 2px 16px}
+  .postcard .ptext img,.pbody img{display:block;max-width:100%;height:auto;border-radius:10px;margin:.6em 0}
+  .postcard .ptext figure,.pbody figure{display:inline-block;vertical-align:top;width:calc(50% - 8px);margin:.4em 8px .6em 0}
+  .postcard .ptext figure:nth-of-type(2n),.pbody figure:nth-of-type(2n){margin-right:0}
+  .postcard .ptext figure img,.pbody figure img{margin:0 0 6px}
+  .postcard .ptext figcaption,.pbody figcaption{font-size:.88em;line-height:1.45}
+  .pbody{white-space:normal}
   .ppin.on{color:var(--accent);font-weight:640}
   /* Open in its own window: quieter here, with a mark saying where it went. */
   .card.elsewhere,.row.elsewhere{opacity:.55}
@@ -3101,7 +3122,8 @@ function visible(){
   list.sort(function(a,b){
     var p=pinnedHere(b)-pinnedHere(a);
     if(p) return p;
-    if(S.view==="newsletter"&&a.issue&&b.issue) return b.issue.n-a.issue.n;
+    if(S.view==="newsletter"&&a.issue&&b.issue)
+      return (issueKey(a)===issueKey(b))?b.issue.n-a.issue.n:(issueKey(a)==="tisymvainei"?-1:1);
     if(how==="due"){
       if(a.due!=null&&b.due!=null) return a.due-b.due;
       if(a.due!=null) return -1;
@@ -3389,8 +3411,29 @@ function nlImagePrefix(){
 }
 function nlImageOk(src){
   var pre=nlImagePrefix();
-  return src.indexOf(pre)===0&&/^[A-Za-z0-9._\/-]{1,200}$/.test(src.slice(pre.length))
-    &&src.indexOf("..")<0;
+  if(src.indexOf(pre)===0) return /^[A-Za-z0-9._\/-]{1,200}$/.test(src.slice(pre.length))&&src.indexOf("..")<0;
+  /* A video's own thumbnail, as YouTube and Vimeo serve it — used only when
+     the thumbnail could not be copied into the folder. Exact shapes only. */
+  return VIDEO_THUMB_OK.some(function(re){ return re.test(src) });
+}
+var VIDEO_THUMB_OK=[
+  /^https:\/\/i\.ytimg\.com\/vi\/[A-Za-z0-9_-]{11}\/(maxresdefault|hqdefault|sddefault|mqdefault)\.jpg$/,
+  /^https:\/\/i\.vimeocdn\.com\/video\/[A-Za-z0-9_-]{1,120}(\.jpg|\.webp)?$/
+];
+/* The video a link points to, if it is one we can show. */
+function parseVideo(url){
+  var u; try{ u=new URL(String(url||"").trim()) }catch(e){ return null }
+  if(!/^https?:$/.test(u.protocol)) return null;
+  var h=u.hostname.replace(/^(www|m)\./,""), m=null;
+  if(h==="youtu.be") m=/^\/([A-Za-z0-9_-]{11})/.exec(u.pathname);
+  else if(h==="youtube.com"||h==="music.youtube.com")
+    m=u.searchParams.get("v")?[0,u.searchParams.get("v")]:/^\/(?:shorts|embed|live|v)\/([A-Za-z0-9_-]{11})/.exec(u.pathname);
+  if(m&&/^[A-Za-z0-9_-]{11}$/.test(m[1]))
+    return { kind:"youtube", id:m[1], url:"https://www.youtube.com/watch?v="+m[1],
+             thumbs:["https://i.ytimg.com/vi/"+m[1]+"/maxresdefault.jpg","https://i.ytimg.com/vi/"+m[1]+"/hqdefault.jpg"] };
+  if(h==="vimeo.com"&&(m=/^\/(\d{5,12})/.exec(u.pathname)))
+    return { kind:"vimeo", id:m[1], url:"https://vimeo.com/"+m[1], thumbs:[] };
+  return null;
 }
 
 /* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
@@ -3688,7 +3731,7 @@ function cardHTML(i){
     var dn=checkDone(i), tot=i.checks.length;
     foot.push('<span class="ckprog'+(dn===tot?" all":"")+'">'+dn+'/'+tot+'</span>');
   }
-  if(i.issue) foot.push('<span class="tag docmark">✉ γράμμα '+i.issue.n+'</span>');
+  if(i.issue) foot.push('<span class="tag docmark">✉ '+esc(issueLabel(i))+'</span>');
   if(i.compiled) foot.push('<button class="tag docmark" data-auto="compiled" '
       +'title="See every compiled document">⇥ compiled</button>');
   if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+'">◔ '+fmtDue(i.due,i.timed)+'</span>');
@@ -3976,9 +4019,8 @@ function render(){
 
   if(S.view==="newsletter"&&!S.q&&!S.tag){
     var nl=nextIssueNumber();
-    board.innerHTML='<div class="issuehead"><button class="btn" id="newissue">＋ New issue'
-      +(nl?' · γράμμα '+nl:'')+'</button><span>'
-      +(list.length?"Starts from the last issue: header sections and cards carry over, the editorial and the links start empty."
+    board.innerHTML='<div class="issuehead"><button class="btn" id="newissue">＋ New issue</button><span>'
+      +(list.length?"Choose the newsletter. A new issue starts from that newsletter's last one: its sections and cards carry over, the editorial and the links start empty."
                    :"The first issue here. You will be asked for its number; the next ones count on from it.")
       +'</span></div>'+(list.length?pinSplit(shown,"Issues"):"");
   } else if(!list.length){
@@ -5460,22 +5502,22 @@ function issueFromEditor(i){
    and add or remove boxes. Saving joins the boxes back into one body;
    the email and every other part of the app see exactly what they saw
    before. */
-function issueBoxesHTML(html){
+function issueBoxesHTML(html,label){
   var parts=issueSections(html), out="";
   parts.forEach(function(p,ix){
     var holder=inertDiv();
     (ix===0?p.nodes:p.nodes.slice(1)).forEach(function(n){ holder.appendChild(n.cloneNode(true)) });
     var inner=sanitizeRich(holder.innerHTML);
-    if(ix===0) out+=boxHTML(null,inner);
+    if(ix===0) out+=boxHTML(null,inner,label);
     else out+=boxHTML(p.head||"",inner);
   });
   if(parts.length<2) out+="";   // an issue with no sections is just its editorial
   return out;
 }
-function boxHTML(title,inner){
+function boxHTML(title,inner,label){
   var ed=title===null;
   return '<section class="nlbox'+(ed?" ed":"")+'">'
-    +(ed?'<div class="nlhead"><span class="nllab">Editorial</span></div>'
+    +(ed?'<div class="nlhead"><span class="nllab">'+esc(label||"Editorial")+'</span></div>'
         :'<div class="nlhead"><span class="grip nlgrip" title="Drag to move this box"></span>'
           +'<div class="nlt" contenteditable="true" spellcheck="true" data-ph="Section title">'+esc(title)+'</div>'
           +'<button type="button" class="nldup" title="Duplicate this box">⧉</button>'
@@ -5611,11 +5653,15 @@ function moveBox(container,bx,target,after){
   boxChanged(container);
 }
 
-function latestIssue(){
-  return S.items.filter(function(i){ return i.issue })
+/* Each newsletter counts on its own. Without a name, the main one: the
+   one Compile feeds and the one the button names. */
+function issueKey(i){ return (i.issue&&NL_TEMPLATES[i.issue.template])?i.issue.template:"tisymvainei" }
+function latestIssue(tpl){
+  tpl=tpl||"tisymvainei";
+  return S.items.filter(function(i){ return i.issue&&issueKey(i)===tpl })
     .sort(function(a,b){ return b.issue.n-a.issue.n })[0]||null;
 }
-function nextIssueNumber(){ var l=latestIssue(); return l?l.issue.n+1:0 }
+function nextIssueNumber(tpl){ var l=latestIssue(tpl); return l?l.issue.n+1:0 }
 function todayISO(){
   var d=new Date(), pad=function(n){ return (n<10?"0":"")+n };
   return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
@@ -5639,9 +5685,9 @@ function joinSections(parts){
   return sanitizeRich(root.innerHTML);
 }
 function isLinksHead(h){ return /λινξ|links/i.test(h||"") }
-function carryOver(body){
+function carryOver(body,T){
   var parts=issueSections(body);
-  if(parts.length<2) return ISSUE_TEMPLATE;          // no sections to carry
+  if(parts.length<2) return "<br>"+((T&&T.sections)||"");   // no sections to carry
   parts[0].nodes=[document.createElement("br")];      // a fresh editorial
   parts.forEach(function(p){
     if(p.head!==null&&isLinksHead(p.head)){
@@ -5649,6 +5695,81 @@ function carryOver(body){
     }
   });
   return joinSections(parts);
+}
+/* ---- video ----
+   An email cannot play a video; every newsletter shows its picture with a
+   play button, linked to the video. The picture is taken from YouTube or
+   Vimeo, the play button drawn onto it, and the result put in the
+   newsletter folder like any other picture. If the video site will not
+   let the picture be copied, its own address is used instead, without the
+   button; the "▶" line under it says what it is either way. */
+function videoInfo(vid){
+  var api=vid.kind==="vimeo"?"https://vimeo.com/api/oembed.json?url="+encodeURIComponent(vid.url)
+                            :"https://www.youtube.com/oembed?format=json&url="+encodeURIComponent(vid.url);
+  return fetch(api).then(function(r){ return r.ok?r.json():{} }).catch(function(){ return {} })
+    .then(function(j){
+      var thumbs=vid.thumbs.slice();
+      if(j&&j.thumbnail_url&&VIDEO_THUMB_OK.some(function(re){ return re.test(j.thumbnail_url) })) thumbs.push(j.thumbnail_url);
+      return { title:String((j&&j.title)||"").slice(0,200), thumbs:thumbs };
+    });
+}
+function loadCorsImage(src){
+  return new Promise(function(res,rej){
+    var im=new Image(); im.crossOrigin="anonymous";
+    im.onload=function(){ (im.naturalWidth>200)?res(im):rej("small") };   // YouTube's "no thumbnail" is 120px
+    im.onerror=function(){ rej("load") };
+    im.src=src;
+  });
+}
+function playOverlay(im){
+  var w=Math.min(1200,im.naturalWidth), h=Math.round(w*im.naturalHeight/im.naturalWidth);
+  var c=document.createElement("canvas"); c.width=w; c.height=h;
+  var g=c.getContext("2d"); g.drawImage(im,0,0,w,h);
+  var r=Math.round(Math.min(w,h)*0.12), cx=w/2, cy=h/2;
+  g.fillStyle="rgba(0,0,0,.55)"; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fill();
+  g.fillStyle="#ffffff"; g.beginPath();
+  g.moveTo(cx-r*0.32,cy-r*0.5); g.lineTo(cx+r*0.55,cy); g.lineTo(cx-r*0.32,cy+r*0.5); g.closePath(); g.fill();
+  return dataUrlToBlob(c.toDataURL("image/jpeg",0.85));   // throws if the picture would not let itself be copied
+}
+function videoBlock(vid){
+  return videoInfo(vid).then(function(info){
+    var cap='<br><i>▶ '+esc(info.title||"Βίντεο")+'</i>';
+    function linked(src){ return '<a href="'+esc(vid.url)+'"><img src="'+esc(src)+'" alt="'+esc("▶ "+(info.title||"Βίντεο"))+'"></a>' }
+    var tries=info.thumbs.slice();
+    function next(){
+      if(!tries.length) return Promise.reject("No picture for that video");
+      var src=tries.shift();
+      return loadCorsImage(src).then(function(im){
+        var blob=null; try{ blob=playOverlay(im) }catch(e){ blob=null }
+        if(blob&&SYNC.session) return uploadNewsletterBlob(blob).then(function(u){ return linked(u)+cap },
+                                                                       function(){ return linked(src)+cap });
+        return linked(src)+cap;
+      },function(){ return next() });
+    }
+    return next().catch(function(){
+      // could not even load it here: still offer the site's own picture
+      var s=info.thumbs.filter(function(t){ return /hqdefault|vimeocdn/.test(t) })[0];
+      if(!s) throw "No picture for that video";
+      return linked(s)+cap;
+    });
+  });
+}
+function uploadNewsletterBlob(blob){
+  if(!SYNC.session) return Promise.reject("Sign in first — pictures are kept on the server");
+  return withFreshSession().then(function(){
+    var path="issues/"+uid()+(/png/.test(blob.type)?".png":".jpg");
+    return fetch(SUPA.url+"/storage/v1/object/newsletter/"+path,{
+      method:"POST",
+      headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token,
+                "Content-Type":blob.type, "x-upsert":"false" },
+      body:blob
+    }).then(function(r){
+      if(r.status===400||r.status===403||r.status===404)
+        throw "The server would not take the picture. Has the newsletter-images step been run in Supabase?";
+      if(!r.ok) throw "Upload failed ("+r.status+")";
+      return nlImagePrefix()+path;
+    });
+  });
 }
 /* A file picker of its own: the shared one is wired to attach photos to
    the note, and a newsletter picture is not one of those. */
@@ -5661,12 +5782,6 @@ function pickImageFiles(multiple,cb){
   });
   inp.click();
 }
-function dataUrlToBlob(u){
-  var m=/^data:([^;]+);base64,(.*)$/.exec(u||""); if(!m) return null;
-  var bin=atob(m[2]), arr=new Uint8Array(bin.length);
-  for(var k=0;k<bin.length;k++) arr[k]=bin.charCodeAt(k);
-  return new Blob([arr],{type:m[1]});
-}
 /* Into the newsletter's public folder, made the same size as any picture
    added to a note (1200px on the long side: sharp at the email's 600px on
    a high-density screen). Resolves to the public addresses, in order. */
@@ -5678,37 +5793,35 @@ function uploadNewsletterImages(files){
       return readImage(file).then(function(p){
         var blob=p&&dataUrlToBlob(p.src);
         if(!blob) throw "That file is not a picture";
-        var path="issues/"+uid()+(/png/.test(blob.type)?".png":".jpg");
-        return fetch(SUPA.url+"/storage/v1/object/newsletter/"+path,{
-          method:"POST",
-          headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token,
-                    "Content-Type":blob.type, "x-upsert":"false" },
-          body:blob
-        }).then(function(r){
-          if(r.status===400||r.status===403||r.status===404)
-            throw "The server would not take the picture. Has the newsletter-images step been run in Supabase?";
-          if(!r.ok) throw "Upload failed ("+r.status+")";
-          return nlImagePrefix()+path;
-        });
+        return uploadNewsletterBlob(blob);
       });
     }));
   });
 }
 
-function newIssue(){
-  var last=latestIssue();
+function newIssue(tpl){
+  if(!tpl){
+    /* Two newsletters: ask which. */
+    return askChoice("A new issue of…","Each newsletter keeps its own numbers and its own look.",
+      [{label:"Cancel",value:null,kind:"sec"},{label:"360º",value:"360"},
+       {label:"τι συμβαίνει",value:"tisymvainei"}],
+      function(v){ if(v) newIssue(v) });
+  }
+  var last=latestIssue(tpl), T=NL_TEMPLATES[tpl];
   function make(n){
     var now=Date.now();
-    var item=normalizeItem({ id:uid(), title:"", body:last?carryOver(last.body):ISSUE_TEMPLATE,
-      created:now, modified:now, issue:{ n:n, date:todayISO(), subject:"", preheader:"" } });
+    var issue={ n:n, date:todayISO(), subject:"", preheader:"" };
+    if(tpl!=="tisymvainei") issue.template=tpl;
+    var item=normalizeItem({ id:uid(), title:"", body:last?carryOver(last.body,T):("<br>"+(T.sections||"")),
+      created:now, modified:now, issue:issue });
     S.items.unshift(item);
     S.view="newsletter"; S.tag=null; S.q=""; S.sel={};
     save(); render();
     openEditor(item.id);
-    toast("γράμμα "+n+" started");
+    toast(issueLabel(item)+" started");
   }
   if(last) return make(last.issue.n+1);
-  askText("The first issue","Which number is it? The ones after it count on from here.","641","Start",
+  askText("The first issue of "+T.name,"Which number is it? The ones after it count on from here.",tpl==="360"?"1":"641","Start",
     function(v){
       var n=parseInt(v,10);
       if(!(n>0)) return toast("A number, please");
@@ -5781,8 +5894,35 @@ var NL_TEMPLATES={
     legal:'Copyright © *|CURRENT_YEAR|* georgakopoulos.org. '
       +'<a href="*|UPDATE_PROFILE|*">Αλλάξτε τις επιλογές σας</a> ή '
       +'<a href="*|UNSUB|*">σβηστείτε από τη λίστα</a>.<br>*|LIST:ADDRESSLINE|*'
+  },
+  /* 360º, the column for Η Καθημερινή. Deliberately plain: the paper copies
+     the text into its own system, so this needs to read well and paste
+     cleanly, not carry a design of its own. Centred date, byline and title,
+     then the text in a plain sans, as the paper sets it. */
+  "360":{
+    name:"360º",
+    short:"360º",
+    layout:"column",
+    body:"sans",
+    byline:"Θοδωρής Γεωργακόπουλος",
+    links:"#A14E2B", titles:"#161A19", ink:"#161A19", read:"#2B2F2E", muted:"#6B7774",
+    line:"#E6E1DA", bg:"#F4F4F2", radius:6,
+    sections:"",
+    recommend:"", social:[],
+    legal:'<a href="*|UPDATE_PROFILE|*">Επιλογές</a> · <a href="*|UNSUB|*">Διαγραφή από τη λίστα</a><br>*|LIST:ADDRESSLINE|*'
   }
 };
+NL_TEMPLATES.tisymvainei.short="γράμμα";
+NL_TEMPLATES.tisymvainei.sections="<h3>τα λινξ της εβδομάδας</h3><br>"
+  +"<h3>το Σαββατοκύριακο στην Καθημερινή</h3><br>"
+  +"<h3>-τέλος, product placement-</h3><br>"
+  +"<h3>και ακόμη</h3><br>";
+var NL_MONTHS=["Ιανουαρίου","Φεβρουαρίου","Μαρτίου","Απριλίου","Μαΐου","Ιουνίου","Ιουλίου",
+  "Αυγούστου","Σεπτεμβρίου","Οκτωβρίου","Νοεμβρίου","Δεκεμβρίου"];
+function issueLabel(i){
+  var T=issueTemplate(i);
+  return T===NL_TEMPLATES["360"]?"360º · "+i.issue.n:"γράμμα "+i.issue.n;
+}
 var NL_SERIF="Georgia, 'Times New Roman', Times, serif";
 var NL_SANS="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif";
 
@@ -5823,9 +5963,10 @@ function issueToEmail(item){
     var h=a&&a.getAttribute("href");
     return h&&SAFE_HREF.test(h)?'<a href="'+attr(h)+'" target="_blank">'+tag+'</a>':tag;
   }
+  var BODYFACE=T.body==="sans"?NL_SANS:NL_SERIF;
   function para(html,o){
     o=o||{};
-    return '<p style="margin:'+(o.mt||0)+'px 0 '+(o.mb==null?16:o.mb)+'px;font-family:'+(o.font||NL_SERIF)
+    return '<p style="margin:'+(o.mt||0)+'px 0 '+(o.mb==null?16:o.mb)+'px;font-family:'+(o.font||BODYFACE)
       +';font-size:'+(o.size||17)+'px;line-height:'+(o.lh||1.62)+';color:'+(o.color||T.read)+';'+(o.style||"")+'">'+html+'</p>';
   }
   function row(inner,pad){ return '<tr><td class="pad" style="padding:'+(pad||"0 40px")+'">'+inner+'</td></tr>' }
@@ -5907,11 +6048,12 @@ function issueToEmail(item){
 
   var d=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iss.date||"");
   var when=d?d[3]+"/"+d[2]+"/"+d[1]:"";
+  var longDate=d?(+d[3])+" "+NL_MONTHS[+d[2]-1]+" "+d[1]:"";
   var meta='<strong style="color:'+T.ink+'">γράμμα '+esc(String(iss.n))+'</strong>'
     +(when?' &nbsp;·&nbsp; '+when:"")+(T.subtitle?' &nbsp;·&nbsp; '+esc(T.subtitle):"");
-  var foot=para(T.recommend.replace(/<a /g,'<a style="'+A+'" '),{size:15,mb:14})
-    +para(T.social.map(function(s){ return '<a href="'+attr(s[1])+'" target="_blank" style="'+A+'">'+esc(s[0])+'</a>' }).join(" &nbsp;·&nbsp; "),
-          {size:14,font:NL_SANS,mb:22})
+  var foot=(T.recommend?para(T.recommend.replace(/<a /g,'<a style="'+A+'" '),{size:15,mb:14}):"")
+    +(T.social.length?para(T.social.map(function(s){ return '<a href="'+attr(s[1])+'" target="_blank" style="'+A+'">'+esc(s[0])+'</a>' }).join(" &nbsp;·&nbsp; "),
+          {size:14,font:NL_SANS,mb:22}):"")
     +para(T.legal.replace(/<a /g,'<a style="'+A+'" '),{size:12.5,color:T.muted,font:NL_SANS,mb:0});
 
   var subject=issueSubject(item);
@@ -5927,16 +6069,23 @@ function issueToEmail(item){
     +'<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:10px;overflow:hidden">'
     +(T.banner?row('<a href="'+attr(T.banner.href)+'" target="_blank"><img src="'+attr(T.banner.src)+'" width="600" alt="'+attr(T.banner.alt)
        +'" style="display:block;width:100%;height:auto;border:0"></a>',"0"):"")
-    +row(para(meta,{size:13.5,color:T.muted,font:NL_SANS,mt:30,mb:24,lh:1.5}))
-    +row('<h1 style="margin:0 0 22px;font-family:'+NL_SANS+';font-size:30px;line-height:1.2;font-weight:600;letter-spacing:-.02em;color:'
-       +T.ink+'">'+esc(item.title||"")+'</h1>')
+    +(T.layout==="column"
+      ? row(para(esc(longDate),{size:15,color:T.muted,font:NL_SERIF,mt:34,mb:6,style:"text-align:center"}))
+        +row(para(esc(T.byline||""),{size:15,color:T.ink,font:NL_SERIF,mb:26,style:"text-align:center"}))
+        +row('<h1 style="margin:0 0 26px;font-family:'+NL_SANS+';font-size:27px;line-height:1.25;font-weight:700;letter-spacing:-.015em;'
+           +'text-align:center;color:'+T.ink+'">'+esc(item.title||"")+'</h1>')
+      : row(para(meta,{size:13.5,color:T.muted,font:NL_SANS,mt:30,mb:24,lh:1.5}))
+        +row('<h1 style="margin:0 0 22px;font-family:'+NL_SANS+';font-size:30px;line-height:1.2;font-weight:600;letter-spacing:-.02em;color:'
+           +T.ink+'">'+esc(item.title||"")+'</h1>'))
     +rows.join("")
     +'<tr><td class="pad" style="padding:34px 40px 40px;border-top:1px solid '+T.line+'">'+foot+'</td></tr>'
     +'</table></td></tr></table></body></html>';
 }
 
 /* ---- preview and copy ---- */
-function copyText(text,done){
+/* Named apart from the older copyText further down, which takes one
+   argument and would silently win if these shared a name. */
+function copyToClipboard(text,done){
   function fallback(){
     var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
     document.body.appendChild(ta); ta.select();
@@ -5949,8 +6098,20 @@ function copyText(text,done){
     else fallback();
   }catch(e){ fallback() }
 }
-function copyIssueHtml(item){
-  copyText(issueToEmail(item),function(ok){
+/* A button that was pressed should say so. Pressed, it flashes and reads
+   what happened — "✓ Copied" — for a moment, then goes back. */
+function flashBtn(b,text,bad){
+  if(!b) return;
+  if(!b.dataset.label) b.dataset.label=b.innerHTML;
+  clearTimeout(b.__flash);
+  b.innerHTML=esc(text);
+  b.classList.remove("done","fail"); void b.offsetWidth;
+  b.classList.add(bad?"fail":"done");
+  b.__flash=setTimeout(function(){ b.innerHTML=b.dataset.label; b.classList.remove("done","fail") },1800);
+}
+function copyIssueHtml(item,btn){
+  copyToClipboard(issueToEmail(item),function(ok){
+    flashBtn(btn,ok?"✓ Copied":"Couldn't copy",!ok);
     toast(ok?"Copied — in Mailchimp: Code your own → Paste in code":"Couldn't copy — try again");
   });
 }
@@ -5986,7 +6147,9 @@ function showIssuePreview(item){
     }
     var x=e.target.closest("[data-px]");
     if(!x) return;
-    if(x.dataset.px==="copy") copyText(html,function(ok){ toast(ok?"Copied — in Mailchimp: Code your own → Paste in code":"Couldn't copy — try again") });
+    if(x.dataset.px==="copy") copyToClipboard(html,function(ok){
+      flashBtn(x,ok?"✓ Copied":"Couldn't copy",!ok);
+      toast(ok?"Copied — in Mailchimp: Code your own → Paste in code":"Couldn't copy — try again") });
     else box.classList.remove("on");
   };
 }
@@ -6171,7 +6334,7 @@ function openEditor(id){
     +'<input class="etitle" id="e-title" placeholder="'+(i.issue?"The issue's title":"Title")+'" value="'+esc(i.title)+'">'
     +ctx
     +(i.issue
-      ? '<div class="ebody boxes" id="e-body">'+issueBoxesHTML(i.body)+'</div>'
+      ? '<div class="ebody boxes" id="e-body">'+issueBoxesHTML(i.body,issueKey(i)==="360"?"Text":"Editorial")+'</div>'
       : '<div class="ebody" id="e-body" contenteditable="true" spellcheck="true" '
         +'data-ph="Write something…">'+sanitizeRich(i.body)+'</div>')
     +'<div class="fmtbar">'
@@ -6190,6 +6353,7 @@ function openEditor(id){
         :'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
         +'aria-label="Heading">T</button>')
       +(i.issue?'<button class="facet fmt nlb" id="e-nlimg" title="Image — full width, with a link if you like">▭ Image</button>'
+        +'<button class="facet fmt nlb" id="e-nlvid" title="Video — paste a YouTube or Vimeo address; its picture goes in, with a play button">▶ Video</button>'
         +'<button class="facet fmt nlb" id="e-nlcards" title="Two pictures side by side, each with a title, a caption and a link">▥ Cards</button>':"")
       +'<span class="wc" id="e-wc"></span>'
       +'<span class="edat" id="e-when" title="When this note last changed"></span>'
@@ -6263,7 +6427,7 @@ function openEditor(id){
      other note is one editor. These two are the only places that know. */
   function bodyHtml(){ return i.issue?boxesToHtml(body):body.innerHTML }
   function setBodyHtml(h){
-    if(i.issue){ body.innerHTML=issueBoxesHTML(h) } else body.innerHTML=sanitizeRich(h);
+    if(i.issue){ body.innerHTML=issueBoxesHTML(h,issueKey(i)==="360"?"Text":"Editorial") } else body.innerHTML=sanitizeRich(h);
   }
   /* Where typing and the toolbar go: in an issue, the box you were last in. */
   var lastEditable=null;
@@ -6427,14 +6591,23 @@ function openEditor(id){
   function issueNow(){
     return { id:i.id, title:q("#e-title").value.trim(), body:sanitizeRich(bodyHtml()), issue:issueFromEditor(i) };
   }
-  if(q("#e-iprev")) q("#e-iprev").addEventListener("click",function(){ showIssuePreview(issueNow()) });
-  if(q("#e-icopy")) q("#e-icopy").addEventListener("click",function(){ copyIssueHtml(issueNow()) });
+  if(q("#e-iprev")) q("#e-iprev").addEventListener("click",function(){ flashBtn(q("#e-iprev"),"Opening…"); showIssuePreview(issueNow()) });
+  if(q("#e-icopy")) q("#e-icopy").addEventListener("click",function(){ copyIssueHtml(issueNow(),q("#e-icopy")) });
   if(q("#e-nlimg")) q("#e-nlimg").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
     pickImageFiles(false,function(files){
       uploadNewsletterImages(files).then(function(urls){
         nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>") });
       },function(err){ toast(String(err)) });
+    });
+  });
+  if(q("#e-nlvid")) q("#e-nlvid").addEventListener("mousedown",function(e){
+    e.preventDefault(); nlRemember();
+    askText("A video","Paste its address — YouTube or Vimeo.","https://","Add",function(v){
+      var vid=parseVideo(v);
+      if(!vid) return toast("That isn't a YouTube or Vimeo address");
+      toast("Fetching the video's picture…");
+      videoBlock(vid).then(function(html){ nlInsert(html+"<br>") },function(err){ toast(String(err)) });
     });
   });
   if(q("#e-nlcards")) q("#e-nlcards").addEventListener("mousedown",function(e){
@@ -10025,7 +10198,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="82";
+var BUILD="83";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
