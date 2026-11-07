@@ -766,6 +766,10 @@
   .cbody blockquote,.ebody blockquote,.ptext blockquote,.pbody blockquote{
     margin:6px 0;padding:2px 0 2px 14px;border-left:2px solid var(--line-strong);
     color:var(--read)}
+  /* In the editor a quotation looks as it will in the email: italic, quieter,
+     behind its rule — so you can see at a glance which lines are quoted. */
+  .ebody blockquote{font-style:italic;color:var(--muted);border-left-width:3px;margin:10px 0;padding-left:16px}
+  .fmt.qt{font-family:Georgia,serif;font-size:17px;line-height:1}
   .cbody h3,.ebody h3,.ptext h3,.pbody h3{
     font-size:1.24em;font-weight:650;line-height:1.3;letter-spacing:-.014em;
     color:var(--ink);margin:.75em 0 .3em}
@@ -2091,6 +2095,7 @@ function startInline(card,ev){
       +'<button type="button" class="facet fmt" data-if="link" title="Link the selected text — ⌘K">⚭</button>'
       +'<button type="button" class="facet fmt li" data-if="ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button type="button" class="facet fmt li" data-if="ol" title="Numbered list" aria-label="Numbered list">1.</button>'
+      +'<button type="button" class="facet fmt qt" data-if="quote" title="Quotation" aria-label="Quotation">❝</button>'
       +'<button type="button" class="facet fmt hd" data-if="h" title="Heading — turns this line into a heading" aria-label="Heading">T</button>'
     +'</span>'
     +'<span class="isaved"></span>'
@@ -2177,6 +2182,7 @@ function inlineFormat(k,b){
   }
   try{
     if(k==="h") document.execCommand("formatBlock",false,inHeading()?"<div>":"<h3>");
+    else if(k==="quote") document.execCommand("formatBlock",false,inQuote()?"<div>":"<blockquote>");
     else document.execCommand({bold:"bold",italic:"italic",strike:"strikethrough",
       ul:"insertUnorderedList",ol:"insertOrderedList"}[k],false,null);
   }catch(e){}
@@ -3381,6 +3387,22 @@ function nlImageOk(src){
 /* Where the caret is, in block terms. queryCommandValue("formatBlock") is the
    obvious way to ask and disagrees between browsers — Safari answers "h3",
    Chrome sometimes "H3", sometimes nothing at all — so walk up instead. */
+/* Is the caret inside a quotation? Same walk as inHeading, stopping at the
+   field it belongs to. */
+function inQuote(){
+  try{
+    var sel=getSelection();
+    if(!sel||!sel.rangeCount) return false;
+    var n=sel.getRangeAt(0).startContainer;
+    while(n&&n.nodeType!==1) n=n.parentNode;
+    while(n&&n.tagName){
+      if(n.tagName==="BLOCKQUOTE") return true;
+      if(n.getAttribute&&n.getAttribute("contenteditable")) return false;
+      n=n.parentNode;
+    }
+  }catch(e){}
+  return false;
+}
 function inHeading(){
   try{
     var sel=getSelection();
@@ -6154,6 +6176,7 @@ function openEditor(id){
          every other control. */
       +'<button class="facet fmt li" id="e-ul" title="Bulleted list" aria-label="Bulleted list">•</button>'
       +'<button class="facet fmt li" id="e-ol" title="Numbered list" aria-label="Numbered list">1.</button>'
+      +'<button class="facet fmt qt" id="e-quote" title="Quotation — sets this paragraph apart; press again to undo" aria-label="Quotation">❝</button>'
       +(i.issue?'<button class="facet fmt nlb" id="e-nlbox" title="A new box at the end — a section of its own">＋ Box</button>'
         :'<button class="facet fmt hd" id="e-h" title="Heading — turns this line into a heading" '
         +'aria-label="Heading">T</button>')
@@ -6350,6 +6373,13 @@ function openEditor(id){
   q("#e-link").addEventListener("mousedown",function(e){ e.preventDefault(); linkSelection() });
   q("#e-ul").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertUnorderedList") });
   q("#e-ol").addEventListener("mousedown",function(e){ e.preventDefault(); fmt("insertOrderedList") });
+  /* A quotation: a paragraph set apart from the text around it — indented
+     behind a thin rule, in italics, quieter than the writing. It is not a
+     title and never becomes one: in an issue it stays inside its box. */
+  q("#e-quote").addEventListener("mousedown",function(e){
+    e.preventDefault();
+    fmt("formatBlock", inQuote()?"<div>":"<blockquote>");
+  });
   if(q("#e-h")) q("#e-h").addEventListener("mousedown",function(e){
     e.preventDefault();
     /* A toggle, not a one-way trip. formatBlock has no "undo" of its own, so
@@ -9986,7 +10016,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="79";
+var BUILD="80";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
