@@ -1278,6 +1278,8 @@
   body.on-posts #compilebtn{display:none}
   .etitle{font-size:calc(25px*var(--tscale));font-weight:660;letter-spacing:-.025em;line-height:1.25;
     color:var(--ink);margin-bottom:12px}
+  textarea.etitle{display:block;resize:none;overflow:hidden;font-family:inherit;padding:0;min-height:1.25em;
+    overflow-wrap:anywhere}
   /* the note body is the point of this window — give it room, weight and contrast */
   .ebody{font-size:calc(16px*var(--tscale));line-height:1.72;min-height:46vh;width:100%;
     color:var(--ink);font-family:var(--content);margin-bottom:4px;
@@ -1677,15 +1679,35 @@
        now at least 16px, which is the threshold, not a style choice. */
     .ebody{font-size:max(16px,calc(15.5px*var(--tscale)));min-height:32vh}
     .cap textarea{font-size:max(16px,calc(14.5px*var(--tscale)))}
-    input:not([type=checkbox]):not([type=radio]),textarea,select{font-size:16px!important}
+    input:not([type=checkbox]):not([type=radio]),textarea:not(.etitle),select{font-size:16px!important}
     /* An app shell never scrolls sideways. If something is too wide it
        should be fixed, but it must not move the whole screen meanwhile. */
     html,body{overflow-x:clip;overscroll-behavior-x:none}
     /* The page moves up and down and nowhere else: a sideways swipe on the
        notes does nothing, so the screen cannot drift or bounce to the side. */
     .board,.topbar{touch-action:pan-y pinch-zoom}
-    .imgstrip .t,.addimg{width:70px;height:70px}
+    .imgstrip .t{width:70px;height:70px}
+    /* The note on a phone, from the top down: the title clear of the bar
+       above it and wrapping; room for the writing without a screen of
+       blank page under it; the two dashed buttons side by side, each its
+       own half; the pills in an even grid; the colours in one row that
+       fits, whatever the width of the phone. */
+    #scrim .etitle{font-size:22px!important;line-height:1.28;margin:24px 0 12px}
+    #scrim .egalbar{margin-top:12px}
+    #scrim .ebody{min-height:24vh}
+    #scrim .egalbar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    #scrim .egalbar .addimg{width:auto;height:auto;min-height:44px;padding:8px 10px;font-size:14px;
+      white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:6px}
+    #scrim .facetbar{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+    #scrim .facetbar .facet{justify-content:center;min-height:42px;padding:6px 8px;font-size:14px;white-space:nowrap}
+    #scrim .facetbar .swatches{grid-column:1 / -1;margin:6px 0 0!important;width:100%;
+      display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+    #scrim .facetbar .sw{width:auto;height:auto;aspect-ratio:1;max-width:34px;justify-self:center;width:100%}
     .facetbar .swatches{margin-left:0!important;width:100%;margin-top:4px}
+    @media (max-width:360px){
+      #scrim .facetbar{grid-template-columns:1fr 1fr}
+      #scrim .egalbar .addimg{font-size:13px}
+    }
     /* On a phone the capture box went: it took a band of the screen that
        belonged to your notes, all the time, to do something you do a few
        times a day. The + in the bottom bar does the same job and costs
@@ -6500,7 +6522,9 @@ function openEditor(id){
       +'<div class="issueacts"><button class="btn sec" id="e-iprev">◱ Preview</button>'
       +'<button class="btn sec" id="e-icopy">Copy HTML</button></div>'
       +'</div>':"")
-    +'<input class="etitle" id="e-title" placeholder="'+(i.issue?"The issue's title":"Title")+'" value="'+esc(i.title)+'">'
+    /* A title that wraps. As a one-line field a long title scrolled sideways
+       and showed its own end, first letters cut off at the edge. */
+    +'<textarea class="etitle" id="e-title" rows="1" spellcheck="true" placeholder="'+(i.issue?"The issue's title":"Title")+'">'+esc(i.title)+'</textarea>'
     +ctx
     +(i.issue
       ? '<div class="ebody boxes" id="e-body">'+issueBoxesHTML(i.body,issueKey(i)==="360"?"Text":"Editorial")+'</div>'
@@ -6943,6 +6967,19 @@ function openEditor(id){
   });
 
   attachSmartQuotes(q("#e-title"),false);
+  (function(){
+    var t=q("#e-title");
+    function fit(){ t.style.height="auto"; t.style.height=t.scrollHeight+"px" }
+    t.addEventListener("input",function(){
+      if(/[\r\n]/.test(t.value)){ var at=t.selectionStart; t.value=t.value.replace(/[\r\n]+/g," "); try{ t.selectionStart=t.selectionEnd=at }catch(e){} }
+      fit();
+    });
+    /* Return in the title goes on to the writing, as it always did. */
+    t.addEventListener("keydown",function(e){
+      if(e.key==="Enter"&&!e.isComposing){ e.preventDefault(); var w=writingIn(); if(w) w.focus() }
+    });
+    fit(); setTimeout(fit,0); setTimeout(fit,120);
+  })();
   attachSmartQuotes(body,true);
 
   q("#f-link").addEventListener("click",function(){
@@ -10380,7 +10417,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="88";
+var BUILD="89";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
