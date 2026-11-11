@@ -7,7 +7,7 @@
    Calls to Supabase are never cached. Sync must always hit the network or it
    would happily show you yesterday's library and call it success. */
 
-const VERSION = "everything-v3";
+const VERSION = "everything-v4";
 const SHELL = [
   "./",
   "./index.html",
@@ -39,6 +39,10 @@ self.addEventListener("fetch", e => {
   // anything that isn't this site — Supabase above all — goes straight out
   if (url.origin !== self.location.origin) return;
   if (e.request.method !== "GET") return;
+
+  /* The app asking which version is current: always the network, never
+     a copy — and nothing kept. */
+  if (url.searchParams.has("fresh")) return;
 
   /* The public page is not part of the app and must never be cached.
      This worker is registered at the app's scope, which also covers /p/, so
