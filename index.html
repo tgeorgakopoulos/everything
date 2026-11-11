@@ -1508,6 +1508,10 @@
   .btn.quiet{background:none;border:0;color:var(--faint);font-weight:500}
   .btn.quiet:hover{color:var(--ink)}
 
+  .newver{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:98;display:flex;gap:12px;
+    align-items:center;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:12px;
+    font-size:13px;font-weight:560;box-shadow:var(--shadow-lg);max-width:calc(100vw - 24px)}
+  .newver .btn{height:30px;padding:0 14px;background:var(--make);border-color:var(--make);color:#fff}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
     background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:11px;font-size:12.5px;
     font-weight:540;opacity:0;transition:.22s;pointer-events:none;z-index:99;box-shadow:var(--shadow-lg)}
@@ -1640,6 +1644,10 @@
        browser actually shows (dvh, which leaves out its bars), with the
        notch and the home bar respected. */
     .scrim:not(#ask):not(#pscrim){padding:0;place-items:stretch}
+    /* Above the task page, which covers the whole screen on a phone: a task
+       tapped there used to open its note underneath it, out of sight. */
+    .scrim{z-index:86}
+    #ask{z-index:97}
     #scrim .sheet{width:100%;max-width:none;height:100vh;height:100dvh;max-height:none;border-radius:0;
       padding:0 16px calc(120px + env(safe-area-inset-bottom));animation:none}
     .mtop{display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:9;
@@ -10372,7 +10380,31 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="87";
+var BUILD="88";
+
+/* Every device on the same version. A device that has not been reloaded
+   since a new version went up is running the old one — and a feature the
+   others have (a "Done today" list, say) is simply missing on it, which
+   looks like data that failed to sync. So the app asks the site, now and
+   then, which version is current, and if it is newer than this one says
+   so, with a button to reload. */
+function checkForNewVersion(){
+  if(!/^\d+$/.test(BUILD)||!window.fetch) return;
+  fetch("./index.html?fresh="+Date.now(),{cache:"no-store"}).then(function(r){ return r.ok?r.text():"" })
+    .then(function(t){
+      var m=/var BUILD="(\d+)";/.exec(t||"");
+      if(!m||+m[1]<=+BUILD||document.getElementById("newver")) return;
+      var bar=document.createElement("div");
+      bar.id="newver"; bar.className="newver";
+      bar.innerHTML='Everything has been updated to version '+(+m[1])+'.'
+        +'<button class="btn">Reload</button>';
+      bar.querySelector("button").addEventListener("click",function(){ location.reload() });
+      document.body.appendChild(bar);
+    }).catch(function(){});
+}
+setTimeout(checkForNewVersion,4000);
+setInterval(checkForNewVersion,20*60*1000);
+document.addEventListener("visibilitychange",function(){ if(!document.hidden) checkForNewVersion() });
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
