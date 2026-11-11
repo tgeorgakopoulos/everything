@@ -163,6 +163,16 @@
   .tbmeta .past{color:var(--red);font-weight:650}
   .tbmeta .today{color:var(--accent);font-weight:650}
   .tbempty{padding:34px 12px;text-align:center;color:var(--muted);font-size:14px}
+  .tbgroup.done{color:var(--muted)}
+  /* "→ Today": on an overdue task, on hover; always there on a touch screen. */
+  .totoday{flex:none;align-self:center;font-size:11.5px;font-weight:680;color:#fff;background:var(--make);
+    border-radius:99px;padding:4px 10px;white-space:nowrap;opacity:0;transition:opacity .12s;position:relative;z-index:3}
+  .totoday:hover{filter:brightness(1.08)}
+  @media (hover:hover){ .tbrow:hover .totoday,.card:hover .totoday,.row-item:hover .totoday{opacity:1} }
+  @media (hover:none){ .totoday{opacity:1} }
+  .foot .totoday{align-self:auto;padding:2px 9px;font-size:10.5px}
+  .card.done .ctitle,.card.done .cbody,.row-item.done .rtitle{text-decoration:line-through;color:var(--muted)}
+  .card.done,.row-item.done{opacity:.65}
 
   /* Not enough room for three columns: stop pushing, start floating. The
      sidebar already does this on a phone; below 1100 the column joins it. */
@@ -2811,6 +2821,35 @@ function fmtDue(ts,timed){
   return label+(time?" · "+time:"");
 }
 function dueClass(ts){ var d=dayOf(ts), t=todayKey(); return d<t?"past":d===t?"today":"later" }
+/* Ticked today: still shown, crossed out, at the foot of each task list,
+   until midnight takes it away. */
+function doneToday(i){ return !!(i.done&&i.completedAt&&dayOf(i.completedAt)===todayKey()) }
+/* Would this task be in that list, if it were not ticked? */
+function wouldShowIn(lens,i){
+  var t=(LENS[lens]||LENS.tasks).test;
+  return t(Object.assign({},i,{done:false}));
+}
+function isOverdue(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)<todayKey() }
+/* "→ Today": the same time of day if it had one, otherwise just today. */
+function moveToToday(i){
+  if(!i) return;
+  remember(i,"before moving it to today");
+  var t=new Date();
+  if(i.timed&&i.due!=null){ var d=new Date(i.due); t.setHours(d.getHours(),d.getMinutes(),0,0) }
+  else t.setHours(0,0,0,0);
+  i.due=t.getTime(); i.modified=Date.now();
+  save(); render();
+  toast("Moved to today");
+}
+function setDone(i,on){
+  i.done=!!on; i.completedAt=on?Date.now():null; if(!on) delete i.completedAt;
+  i.modified=Date.now();
+}
+/* At midnight the day's ticked tasks leave the lists, without a reload. */
+(function atMidnight(){
+  var n=new Date(); n.setHours(24,0,5,0);
+  setTimeout(function(){ try{ render() }catch(e){} atMidnight() }, n.getTime()-Date.now());
+})();
 
 /* =========================================================================
    CAPTURE PARSER — returns facets, never a single type.
@@ -3138,6 +3177,7 @@ var LENS={
               test:function(i){ return !!i.issue } }
 };
 
+var TASKLENS={tasks:1,today:1,overdue:1,upcoming:1,someday:1};
 // Where a newly saved item most naturally lives.
 function homeLens(i){ return hasLink(i)?"links" : hasAction(i)?"tasks" : "notes" }
 
@@ -3152,6 +3192,7 @@ function visible(){
       return hay.indexOf(q)>=0;
     }
     if(i.issue&&S.view!=="newsletter") return false;   // issues live on their own page
+    if(!S.tag&&TASKLENS[S.view]&&doneToday(i)&&!i.archived) return wouldShowIn(S.view,i);
     if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && !i.done;
     return (LENS[S.view]||LENS.all).test(i);
   });
@@ -3166,6 +3207,7 @@ function visible(){
   function made(i){ return i.created||i.modified||0 }
   function touched(i){ return i.modified||i.created||0 }
   list.sort(function(a,b){
+    if(TASKLENS[S.view]&&!S.tag&&!q){ var dn=(a.done?1:0)-(b.done?1:0); if(dn) return dn }   // ticked today: at the bottom
     var p=pinnedHere(b)-pinnedHere(a);
     if(p) return p;
     if(S.view==="newsletter"&&a.issue&&b.issue)
@@ -3781,6 +3823,7 @@ function cardHTML(i){
   if(i.compiled) foot.push('<button class="tag docmark" data-auto="compiled" '
       +'title="See every compiled document">⇥ compiled</button>');
   if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+'">◔ '+fmtDue(i.due,i.timed)+'</span>');
+  if(isOverdue(i)) foot.push('<button class="totoday" data-totoday="'+i.id+'" title="Move it to today">→ Today</button>');
   if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
 
@@ -3832,7 +3875,8 @@ function rowHTML(i){
   if(text) exc.push(esc(text));
 
   var due="";
-  if(A&&i.due!=null) due='<span class="due '+dueClass(i.due)+'">'+fmtDue(i.due,i.timed)+'</span>';
+  if(A&&i.due!=null) due='<span class="due '+dueClass(i.due)+'">'+fmtDue(i.due,i.timed)+'</span>'
+    +(isOverdue(i)?'<button class="totoday" data-totoday="'+i.id+'" title="Move it to today">→ Today</button>':"");
   else if(A&&!i.done) due='<span class="due later">Someday</span>';
 
   var tags=(i.tags||[]).slice(0,3).map(function(t){ return '<span class="tag">#'+esc(t)+'</span>' }).join("");
@@ -4183,7 +4227,8 @@ function paintTaskbar(){
   document.getElementById("tbtitle").textContent=TBVIEWS[TB.filter]||"Tasks";
   document.getElementById("tbcount").textContent=list.length||"";
   document.getElementById("tball").style.display=TB.filter==="tasks"?"none":"";
-  if(!list.length){
+  var goneAny=TB.filter!=="done"&&S.items.some(function(i){ return !i.archived&&doneToday(i)&&wouldShowIn(TB.filter,i) });
+  if(!list.length&&!goneAny){
     box.innerHTML='<div class="tbempty">'
       +(TB.filter==="tasks"?"Nothing due.<br>Add one above, or tick ☑ on any note."
         :"Nothing in "+esc(TBVIEWS[TB.filter])+".")+'</div>';
@@ -4197,11 +4242,15 @@ function paintTaskbar(){
   }
   var order=["Overdue","Today","Tomorrow","This week","Later","Someday"], groups={};
   list.forEach(function(i){ (groups[bucket(i)]=groups[bucket(i)]||[]).push(i) });
+  var gone=S.items.filter(function(i){ return !i.archived&&doneToday(i)&&wouldShowIn(TB.filter,i) })
+    .sort(function(a,b){ return a.completedAt-b.completedAt });
   box.innerHTML=order.filter(function(k){ return groups[k] }).map(function(k){
     return '<div class="tbgroup'+(k==="Overdue"?" late":k==="Today"?" now":"")+'">'+k
       +' <span style="opacity:.6">'+groups[k].length+'</span></div>'
       +groups[k].map(taskRowHTML).join("");
-  }).join("");
+  }).join("")
+  +(gone.length?'<div class="tbgroup done">Done today <span style="opacity:.6">'+gone.length+'</span></div>'
+      +gone.map(taskRowHTML).join(""):"");
 }
 function taskRowHTML(i){
   var meta=[];
@@ -4214,7 +4263,9 @@ function taskRowHTML(i){
       +(i.done?"Not done after all":"Done")+'">✓</span>'
     +'<span class="tbtx"><span class="tbttl">'+esc(label)+'</span>'
     +(meta.length?'<span class="tbmeta">'+meta.join("")+'</span>':"")
-    +'</span></div>';
+    +'</span>'
+    +(isOverdue(i)?'<button class="totoday" data-totoday="'+i.id+'" title="Move it to today">→ Today</button>':"")
+    +'</div>';
 }
 
 (function wireTaskbar(){
@@ -4224,13 +4275,15 @@ function taskRowHTML(i){
   document.getElementById("tball").addEventListener("click",function(){ setTaskFilter("tasks") });
 
   bar.addEventListener("click",function(e){
+    var mt=e.target.closest("[data-totoday]");
+    if(mt){ e.stopPropagation(); moveToToday(byId(mt.dataset.totoday)); return }
     var d=e.target.closest("[data-tbdone]");
     if(d){
       e.stopPropagation();
       var t=byId(d.dataset.tbdone);
       if(t){
-        t.done=!t.done; t.modified=Date.now();
-        save(); render(); toast(t.done?"Done":"Back on the list");
+        setDone(t,!t.done);
+        save(); render(); toast(t.done?"Done — it stays here, crossed out, until tonight":"Back on the list");
       }
       return;
     }
@@ -5219,6 +5272,9 @@ function normalizeItem(o){
     if(typeof o.issue.template==="string"&&/^[a-z0-9_-]{1,40}$/.test(o.issue.template))
       out.issue.template=o.issue.template;
   }
+  /* When a task was ticked: what lets it stay, crossed out, until the
+     day is over. Kept only on ticked tasks. */
+  if(o.done&&typeof o.completedAt==="number") out.completedAt=o.completedAt;
   /* Per-page pins, carried only when present so that a note nobody has
      pinned this way fingerprints exactly as before. */
   if(Array.isArray(o.pins)){
@@ -7756,6 +7812,8 @@ board.addEventListener("click",function(e){
     return;
   }
   if(e.target.closest("[data-grip]")) return;
+  var mt=e.target.closest("[data-totoday]");
+  if(mt){ e.stopPropagation(); moveToToday(byId(mt.dataset.totoday)); return }
   // a link written inside a note goes where it points, not to the editor
   var inline=e.target.closest(".cbody a[href],.rexc a[href]");
   if(inline){ e.stopPropagation(); return }
@@ -7822,7 +7880,7 @@ board.addEventListener("click",function(e){
   if(chk){
     e.stopPropagation();
     var c=byId(chk.dataset.check);
-    if(c){ c.done=!c.done; c.completedAt=c.done?Date.now():null; save(); render(); if(c.done) toast("Nice.") }
+    if(c){ setDone(c,!c.done); save(); render(); if(c.done) toast("Nice.") }
     return;
   }
 
@@ -10252,7 +10310,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="85";
+var BUILD="86";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
