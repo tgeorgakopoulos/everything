@@ -127,6 +127,16 @@
   .tbn{font-size:12.5px;font-weight:700;color:#fff;background:var(--make);border-radius:99px;
     padding:1px 9px;min-width:22px;text-align:center;font-variant-numeric:tabular-nums}
   .tbn:empty{display:none}
+  .tbn.all{background:var(--accent)}
+  .tbmenu{display:none;width:34px;height:34px;border-radius:10px;place-items:center;font-size:18px;
+    color:var(--ink);margin-right:2px}
+  /* The lists, as a row of tabs under the heading: every one of them a tap
+     away, from any of them. Scrolls sideways if the column is narrow. */
+  .tbtabs{display:flex;gap:6px;padding:0 14px 12px;overflow-x:auto;flex:none;scrollbar-width:none}
+  .tbtabs::-webkit-scrollbar{display:none}
+  .tbtabs button{flex:none;font-size:12.5px;font-weight:620;color:var(--ui);padding:5px 11px;border-radius:99px;
+    border:1px solid var(--line-strong);background:var(--surface)}
+  .tbtabs button.on{background:var(--ink);border-color:var(--ink);color:var(--surface)}
   .tball{margin-left:auto;font-size:12px;font-weight:660;letter-spacing:.02em;
     color:var(--make);padding:5px 10px;border-radius:9px;border:1px solid transparent}
   .tball:hover{background:var(--make-soft);border-color:var(--make)}
@@ -182,7 +192,12 @@
       box-shadow:var(--shadow-lg);border-right:1px solid var(--line-strong)}
   }
   @media (max-width:820px){
-    .app.tb .taskbar{left:0;width:min(310px,88vw)}
+    /* On a phone the tasks are a page of their own, the full width, like a
+       tag or Notes. ☰ opens the sidebar over it; ✕ goes back to the notes. */
+    .app.tb .taskbar{left:0;right:0;width:100%;z-index:80;border-right:0;box-shadow:none;
+      padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+    .tbmenu{display:grid!important}
+    .tbin{font-size:16px}
   }
   .sidebar{border-right:1px solid var(--line);display:flex;flex-direction:column;
     padding:14px 10px 10px;gap:2px;overflow-y:auto}
@@ -1672,10 +1687,19 @@
        sidebar, and the room is better spent on notes. What stays is the +,
        large and clay, floating at the right — above the browser's own
        buttons in Safari, nearer the edge once the app is on the home screen. */
-    .mobtabs{display:block!important;position:fixed;left:auto!important;right:18px;
+    .mobtabs{display:flex!important;justify-content:space-between;align-items:flex-end;position:fixed;left:18px!important;right:18px;
       bottom:calc(88px + env(safe-area-inset-bottom));background:none!important;border:0!important;
       padding:0!important;z-index:40;pointer-events:none}
-    .mobtabs button:not(.mobnew){display:none!important}
+    .mobtabs button:not(.mobnew):not(.mobtask){display:none!important}
+    .mobtabs .mobtask{pointer-events:auto;position:relative;width:62px;height:62px;border-radius:50%;
+      background:var(--surface);display:grid;place-items:center;padding:0;
+      box-shadow:0 10px 26px -8px rgba(0,0,0,.45)}
+    .mobtask .ring{position:absolute;inset:4px;border-radius:50%;
+      background:conic-gradient(var(--accent) calc(var(--p,0)*1%),var(--line-strong) 0);
+      -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
+              mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px))}
+    .mobtask .mt{position:relative;font-size:13.5px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums}
+    .mobtask:active{transform:scale(.94)}
     @media (display-mode:standalone){ .mobtabs{bottom:calc(22px + env(safe-area-inset-bottom))} }
     .mobtabs .mobnew{pointer-events:auto;flex:none;width:62px;height:62px;border-radius:50%;
       background:var(--make);color:#fff;display:grid;place-items:center;
@@ -1754,10 +1778,16 @@
        its own so opening it narrows the board rather than covering it. -->
   <section class="taskbar" id="taskbar" aria-label="Tasks">
     <div class="tbhead">
-      <span class="tbt" id="tbtitle">Tasks</span><span class="tbn" id="tbcount"></span>
-      <button class="tball" id="tball" title="Show every task">all</button>
+      <button class="tbmenu" id="tbmenu" title="Menu" aria-label="Menu">☰</button>
+      <span class="tbt" id="tbtitle">Tasks</span><span class="tbn" id="tbcount" title="Done today, out of the day's tasks in this list"></span>
+      <button class="tball" id="tball" title="Show every task" hidden>all</button>
       <button class="tbx" id="tbclose" title="Close — ⌘J">✕</button>
     </div>
+    <nav class="tbtabs" id="tbtabs">
+      <button data-tbf="tasks">All</button><button data-tbf="today">Today</button>
+      <button data-tbf="overdue">Overdue</button><button data-tbf="upcoming">Upcoming</button>
+      <button data-tbf="someday">Someday</button><button data-tbf="done">Completed</button>
+    </nav>
     <input class="tbin" id="tbin" placeholder="Add a task, with a date…" autocomplete="off">
     <div class="tblist" id="tblist"></div>
   </section>
@@ -1824,6 +1854,8 @@
 </div>
 
 <nav class="mobtabs">
+  <!-- Your day: today's progress as a ring, and one tap to the tasks. -->
+  <button class="mobtask" id="mobtask" aria-label="Today's tasks" title="Today's tasks"><span class="ring"></span><span class="mt" id="mobtaskn"></span></button>
   <button data-view="all" class="on"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></svg></span>All</button>
   <button data-view="today"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.3"/><path d="M12 7.4V12l3.1 1.9"/></svg></span>Today</button>
   <button class="mobnew" id="mobnew" aria-label="New note" title="New note"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -4200,6 +4232,17 @@ function setTaskbar(on){
   paintSidebar();
 }
 function toggleTaskbar(){ setTaskbar(!taskbarOpen()) }
+function isPhone(){ return !!(window.matchMedia&&matchMedia("(max-width:820px)").matches) }
+/* The home-screen task button: today's progress as a ring and "3/8". */
+function paintMobTask(){
+  var el=document.getElementById("mobtask"); if(!el) return;
+  var open=S.items.filter(function(i){ return !i.archived&&LENS.today.test(i) }).length;
+  var done=S.items.filter(function(i){ return !i.archived&&doneToday(i)&&wouldShowIn("today",i) }).length;
+  var all=open+done;
+  el.style.setProperty("--p",all?Math.round(done*100/all):0);
+  document.getElementById("mobtaskn").textContent=all?done+"/"+all:"✓";
+  el.title=all?(done+" of "+all+" done today"):"Today's tasks";
+}
 
 function openTasks(){
   var test=(LENS[TB.filter]||LENS.tasks).test;
@@ -4225,8 +4268,13 @@ function paintTaskbar(){
   if(!taskbarOpen()) return;
   var list=openTasks(), box=document.getElementById("tblist");
   document.getElementById("tbtitle").textContent=TBVIEWS[TB.filter]||"Tasks";
-  document.getElementById("tbcount").textContent=list.length||"";
-  document.getElementById("tball").style.display=TB.filter==="tasks"?"none":"";
+  /* Progress, not a count: done today out of everything this list holds
+     today — what is left plus what was ticked. 8/14. */
+  var doneN=TB.filter==="done"?0:S.items.filter(function(i){ return !i.archived&&doneToday(i)&&wouldShowIn(TB.filter,i) }).length;
+  var cnt=document.getElementById("tbcount");
+  cnt.textContent=TB.filter==="done"?(list.length||""):((list.length+doneN)?doneN+"/"+(list.length+doneN):"");
+  cnt.classList.toggle("all",TB.filter!=="done"&&doneN>0&&!list.length);
+  document.querySelectorAll("#tbtabs [data-tbf]").forEach(function(b){ b.classList.toggle("on",b.dataset.tbf===TB.filter) });
   var goneAny=TB.filter!=="done"&&S.items.some(function(i){ return !i.archived&&doneToday(i)&&wouldShowIn(TB.filter,i) });
   if(!list.length&&!goneAny){
     box.innerHTML='<div class="tbempty">'
@@ -4273,6 +4321,11 @@ function taskRowHTML(i){
 
   document.getElementById("tbclose").addEventListener("click",function(){ setTaskbar(false) });
   document.getElementById("tball").addEventListener("click",function(){ setTaskFilter("tasks") });
+  /* Every list, one tap from every other. */
+  document.getElementById("tbtabs").addEventListener("click",function(e){
+    var b=e.target.closest("[data-tbf]"); if(b) setTaskFilter(b.dataset.tbf);
+  });
+  document.getElementById("tbmenu").addEventListener("click",function(e){ e.stopPropagation(); openDrawer(true) });
 
   bar.addEventListener("click",function(e){
     var mt=e.target.closest("[data-totoday]");
@@ -4407,6 +4460,7 @@ function paintSidebar(){
     b.classList.toggle("on", !S.tag&&b.dataset.view===S.view);
   });
 
+  paintMobTask();
   // Posts counts what is on the web, which is a different table
   paintAdminBits();
   var cp=document.getElementById("c-posts");
@@ -10019,6 +10073,10 @@ document.getElementById("drawerscrim").addEventListener("click",function(){ open
 document.querySelector(".sidebar").addEventListener("click",function(e){
   // picking a destination closes the drawer; fiddling with settings doesn't
   if(e.target.closest("[data-view],[data-tag]")) openDrawer(false);
+  /* On a phone the tasks page covers the board, so going anywhere that is
+     not a task list leaves it. */
+  var dest=e.target.closest("[data-view],[data-tag]");
+  if(dest&&isPhone()&&taskbarOpen()&&!(dest.dataset.view&&TBVIEWS[dest.dataset.view])) setTaskbar(false);
 
   // the disclosure arrow folds the group; the row itself still navigates
   var tog=e.target.closest("[data-toggle]");
@@ -10152,6 +10210,10 @@ document.getElementById("taglist").addEventListener("contextmenu",function(e){
 
 document.getElementById("mobnew").addEventListener("click",function(e){
   e.stopPropagation(); newNote();
+});
+document.getElementById("mobtask").addEventListener("click",function(e){
+  e.stopPropagation();
+  TB.filter="today"; setTaskbar(true);
 });
 document.querySelector(".mobtabs").addEventListener("click",function(e){
   var v=e.target.closest("[data-view]");
@@ -10310,7 +10372,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="86";
+var BUILD="87";
 
 var DOC_DATE="19 October 2026";
 var DOCS={};
@@ -10702,7 +10764,9 @@ else setTimeout(paintSidebar,0);
 BOOTED=true;   // from here on, a save means a person did something
 if(DIAG.on){ diagPanel(); diagLog("first screen drawn, "+S.items.length+" notes") }
 // the column is a per-screen preference, so it stays on this device
-try{ if(localStorage.getItem(TBKEY)) setTaskbar(true) }catch(e){}
+/* A phone opens on your notes, never on a full-screen task list left open
+   last time. */
+try{ if(localStorage.getItem(TBKEY)&&!isPhone()) setTaskbar(true) }catch(e){}
 // tasks are not a page any more; a stored one would show a board nothing points at
 if(TBVIEWS[S.view]){ S.view="all"; setTaskbar(true); setTaskFilter("tasks") }
 
