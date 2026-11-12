@@ -274,6 +274,44 @@
   .tag.docmark{cursor:pointer}
   .tag.docmark:hover{border-color:var(--accent);color:var(--accent)}
   /* settings sit above a fence; the footer hangs below it */
+  /* The day's words: the one number in the sidebar's foot, and a door to
+     the Writing page. */
+  .wordstoday{width:100%;text-align:left;padding:8px 8px 10px;margin:0 0 6px;border-radius:10px;
+    font-size:12.5px;color:var(--muted);border-bottom:1px solid var(--line)}
+  .wordstoday b{display:block;font-size:26px;line-height:1.1;font-weight:720;letter-spacing:-.02em;color:var(--make);
+    font-variant-numeric:tabular-nums}
+  .wordstoday.zero b{color:var(--faint)}
+  .wordstoday:hover{background:var(--line)}
+  .bkmark{color:var(--make);margin-right:6px}
+  .bkdot{width:14px;flex:none;color:var(--make);font-size:12px;margin-right:2px;text-align:center}
+  .bkw b{color:var(--ink)} .bkwk{color:var(--make);font-weight:600}
+  .bktgt{display:inline-flex;align-items:center;gap:6px;margin-left:10px;font-size:11.5px;color:var(--faint)}
+  .bkbar{width:60px;height:3px;border-radius:2px;background:var(--line-strong);overflow:hidden;display:inline-block}
+  .bkbar span{display:block;height:100%;background:var(--accent)}
+  .stats{max-width:680px}
+  .stnums{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:6px 0 24px}
+  .stnums div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .stnums b{display:block;font-size:30px;font-weight:720;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .stnums div:first-child b{color:var(--make)}
+  .stnums span{font-size:12.5px;color:var(--muted)}
+  .sth{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
+  .stchart{width:100%;height:auto;display:block}
+  .stchart rect{fill:color-mix(in srgb,var(--make) 45%,transparent)} .stchart rect.now{fill:var(--make)}
+  .stchart .base{stroke:var(--line-strong)} .stchart text{font-size:11px;fill:var(--faint)}
+  .stchart .mx{font-weight:650;fill:var(--muted)}
+  .stmonths{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:110px;align-items:end}
+  .stmonths div{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+  .stmonths i{display:block;width:100%;min-height:2px;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--accent) 55%,transparent)}
+  .stmonths span{font-size:10.5px;color:var(--faint)}
+  .stbooks{display:flex;flex-direction:column;gap:8px}
+  .stbook{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr 1fr auto;gap:10px;align-items:center;text-align:left;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--ui)}
+  .stbook:hover{border-color:var(--make)}
+  .stbt{font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stbook .bktgt{margin:0}
+  .stnone,.stfoot{font-size:13.5px;color:var(--muted);line-height:1.6}
+  .stfoot{margin-top:26px}
+  @media (max-width:620px){ .stnums{grid-template-columns:1fr 1fr} .stbook{grid-template-columns:1fr 1fr} }
   .sidefoot{margin-top:auto;padding:11px 4px 12px;display:flex;gap:3px;align-items:center;
     flex-wrap:wrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .sidefooter{padding:11px 8px 4px;color:var(--faint);font-size:10px;
@@ -1764,6 +1802,7 @@
     <div class="navsec">Tags</div>
     <div id="taglist"></div>
     <div class="sidefoot">
+      <button class="wordstoday zero" id="wordstoday" data-view="stats" title="Your writing, day by day"><b>0</b> words today</button>
       <button class="ghost" id="themebtn">◐ Theme</button>
       <button class="ghost" id="fontbtn" title="Typeface for note text only">Aa System</button>
       <button class="ghost" id="quotebtn">« » Greek</button>
@@ -1831,6 +1870,7 @@
         <div class="titlerow">
           <div class="title" id="viewtitle">All</div>
           <button class="ghost tagedit" id="tagedit" style="display:none">✎ Rename tag</button>
+          <button class="ghost tagedit" id="bookbtn" style="display:none" title="A book counts its words and keeps its own stats">▤ Make this a book</button>
         </div>
         <div class="lensnote" id="lensnote"></div>
 
@@ -2634,6 +2674,7 @@ function fillFromServerNow(){
 
 var SAVE_BROKEN=false;
 function save(){
+  try{ tallyWords() }catch(e){}
   // the first save after startup is a real edit, so this stops being a demo
   // every write is local first; syncing notices afterwards and never blocks it
   if(typeof stampChanges==="function") setTimeout(stampChanges,0);
@@ -3253,6 +3294,7 @@ function visible(){
       var hay=(i.title+" "+richToText(i.body)+" "+i.url+" "+i.desc+" "+(i.tags||[]).join(" ")).toLowerCase();
       return hay.indexOf(q)>=0;
     }
+    if(isSys(i)) return false;                          // a book's or a device's record, not a note
     if(i.issue&&S.view!=="newsletter") return false;   // issues live on their own page
     if(!S.tag&&TASKLENS[S.view]&&doneToday(i)&&!i.archived) return wouldShowIn(S.view,i);
     if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && !i.done;
@@ -4136,6 +4178,13 @@ function render(){
   }
 
   /* Connect is the same shape: a different table, not a lens over yours. */
+  if(S.view==="stats"&&!S.q&&!S.tag){
+    document.getElementById("viewtitle").textContent="Writing";
+    document.getElementById("lensnote").textContent="What you have written, day by day";
+    board.innerHTML=renderStats();
+    paintSidebar(); paintTaskbar();
+    return;
+  }
   if(S.view==="connect"&&!S.q&&!S.tag){
     document.getElementById("viewtitle").textContent="Connect";
     document.getElementById("lensnote").textContent=
@@ -4151,11 +4200,12 @@ function render(){
     /* The dot beside a tag in the sidebar is the only colour in the chrome.
        Carrying it onto the page the tag opens costs nothing and makes the
        two obviously the same thing. */
-    vt.innerHTML='<span class="tdot" style="background:'+tagHue(S.tag)+'"></span>#'+esc(S.tag);
+    vt.innerHTML=(bookFor(S.tag)?'<span class="bkmark">▤</span>':'<span class="tdot" style="background:'+tagHue(S.tag)+'"></span>')+'#'+esc(S.tag);
   } else {
     vt.textContent = S.q?'"'+S.q+'"' : lens.title;
   }
   document.getElementById("lensnote").textContent = (S.q||S.tag)?"" : lens.note;
+  if(S.tag&&!S.q&&bookFor(S.tag)) document.getElementById("lensnote").innerHTML=bookLine(S.tag);
 
   if(renderTimer){ clearTimeout(renderTimer); renderTimer=null }
 
@@ -4414,7 +4464,7 @@ var SOURCE_TAG={}; SOURCE_TAGS.forEach(function(s){ SOURCE_TAG[s.tag]=s });
 function paintSidebar(){
   var all=S.items;
   function count(v){ return all.filter(function(i){
-    return (v==="newsletter"||!i.issue)&&LENS[v].test(i) }).length }
+    return !isSys(i)&&(v==="newsletter"||!i.issue)&&LENS[v].test(i) }).length }
   ["all","today","overdue","upcoming","someday","notes","links","tasks","done","archived","compiled"].forEach(function(v){
     var e=document.getElementById("c-"+v); if(e) e.textContent=count(v)||"";
   });
@@ -4431,6 +4481,9 @@ function paintSidebar(){
 
   // the tag page gets a rename control; nothing else does
   document.getElementById("tagedit").style.display=S.tag?"":"none";
+  var bkb=document.getElementById("bookbtn");
+  if(bkb){ bkb.style.display=S.tag&&!S.q?"":"none"; bkb.textContent=bookFor(S.tag)?"▤ Book…":"▤ Make this a book" }
+  paintWordsToday();
   paintSortRow();
 
   var counts={};
@@ -4469,7 +4522,7 @@ function paintSidebar(){
     .map(function(k){
       return '<button class="nav'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'"'
         +' title="Right-click to rename #'+esc(k)+' everywhere">'
-        +'<span class="dot" style="background:'+tcol[k]+'"></span>'
+        +(bookFor(k)?'<span class="bkdot" title="A book">▤</span>':'<span class="dot" style="background:'+tcol[k]+'"></span>')
         +esc(k)+'<span class="n">'+counts[k]+'</span></button>';
     }).join("");
 
@@ -5175,7 +5228,7 @@ function applyIncoming(rows){
     if(!here){
       /* Arrive at the top, not the bottom. Array order is the manual order,
          and the device that made this put it at the front. */
-      S.items.unshift(incoming); rebuildIndex(); changed++;
+      S.items.unshift(incoming); rebuildIndex(); changed++; primeWords(incoming);
       SYNC.shadow[row.id]=sig(incoming);
       return;
     }
@@ -5203,7 +5256,7 @@ function applyIncoming(rows){
       // nothing of ours is at stake; take theirs
       if(sig(incoming)!==mine){
         remember(here,"replaced by a newer copy from another device");
-        S.items[ix]=incoming; changed++;
+        S.items[ix]=incoming; changed++; primeWords(incoming);
       }
       SYNC.shadow[row.id]=sig(incoming);
       return;
@@ -5212,7 +5265,7 @@ function applyIncoming(rows){
     /* Both sides moved. Someone has to win, but nobody gets erased. */
     if((incoming.modified||0)>(here.modified||0)){
       remember(here,"your edit, overtaken by a newer one elsewhere");
-      S.items[ix]=incoming; changed++;
+      S.items[ix]=incoming; changed++; primeWords(incoming);
       SYNC.shadow[row.id]=sig(incoming);
       toast("A note changed on another device — your copy is in its history");
     } else {
@@ -5356,6 +5409,22 @@ function normalizeItem(o){
     if(typeof o.issue.template==="string"&&/^[a-z0-9_-]{1,40}$/.test(o.issue.template))
       out.issue.template=o.issue.template;
   }
+  /* Two kinds of record that are not notes and are never listed as notes:
+     a book (a tag that has been made one) and a device's writing record. */
+  if(o.book&&typeof o.book==="object"&&typeof o.book.tag==="string"&&o.book.tag){
+    var tg=parseInt(o.book.target,10);
+    out.book={ tag:o.book.tag.slice(0,100), target:(tg>0&&tg<10000000)?tg:0,
+               created:typeof o.book.created==="number"?o.book.created:(out.created||Date.now()) };
+  }
+  if(o.stats&&typeof o.stats==="object"&&o.stats.days&&typeof o.stats.days==="object"){
+    var days={}, keys=Object.keys(o.stats.days).filter(function(k){ return /^\d{4}-\d{2}-\d{2}$/.test(k) }).sort().slice(-1000);
+    keys.forEach(function(k){
+      var dd=o.stats.days[k]||{}, b={};
+      Object.keys(dd.b||{}).slice(0,60).forEach(function(t){ var v=parseInt(dd.b[t],10); if(v) b[String(t).slice(0,100)]=v });
+      days[k]={ w:parseInt(dd.w,10)||0, b:b };
+    });
+    out.stats={ days:days };
+  }
   /* When a task was ticked: what lets it stay, crossed out, until the
      day is over. Kept only on ticked tasks. */
   if(o.done&&typeof o.completedAt==="number") out.completedAt=o.completedAt;
@@ -5441,6 +5510,7 @@ function exportLibrary(){
 
 function applyImport(data,mode){
   var incoming=(data.items||[]).map(normalizeItem).filter(Boolean);
+  incoming.forEach(primeWords);          // imported words were written elsewhere, not today
   if(!incoming.length) return toast("Nothing to import");
 
   if(mode==="replace"){
@@ -5640,7 +5710,7 @@ function compileToNote(){
     url:"",image:"",desc:"",logo:"",site:"",metaState:null,titleAuto:false,
     actionable:false,due:null,done:false,tint:"doc",compiled:true,tags:[],photos:[],
     checks:[],archived:false,pin:false,created:now,modified:now};
-  S.items.unshift(item);
+  S.items.unshift(item); primeWords(item);   // gathered, not written
   /* The selection has been used, so it is over. Leaving it ticked while
      the view changes to Notes means a set of cards selected on a page you
      are no longer looking at, which is how the next Archive or Delete
@@ -5842,6 +5912,204 @@ function moveBox(container,bx,target,after){
 /* Each newsletter counts on its own. Without a name, the main one: the
    one Compile feeds and the one the button names. */
 function issueKey(i){ return (i.issue&&NL_TEMPLATES[i.issue.template])?i.issue.template:"tisymvainei" }
+/* =========================================================================
+   BOOKS AND WRITING STATS
+
+   A book is a tag that has been made one: a small record says so (and
+   holds an optional word target), and the tag's page shows the book's
+   words. Every note under the tag is a part of it.
+
+   Words written are counted as they are saved, per day and per book. Each
+   device keeps its own record and sends it up like a note; the numbers on
+   screen are the sum of every device's record, so every device shows the
+   same. What is counted is the net change in words of the notes you write
+   in: a paragraph written and another deleted cancel out. Words that
+   arrive rather than being written (from another device, an import, a
+   compile, last week's issue carried over) are noted, not counted.
+   ========================================================================= */
+var DEVICE_ID=(function(){
+  try{
+    var d=localStorage.getItem("trove.device");
+    if(!d){ d=Date.now().toString(36)+Math.random().toString(36).slice(2,10); localStorage.setItem("trove.device",d) }
+    return d;
+  }catch(e){ return "here" }
+})();
+function isSys(i){ return !!(i&&(i.book||i.stats)) }
+function wordsOf(i){ return words(i.title||"")+words(richToText(i.body||"")) }
+function bookFor(tag){ return S.items.filter(function(i){ return i.book&&i.book.tag===tag })[0]||null }
+function bookNotes(tag){ return S.items.filter(function(i){ return !isSys(i)&&(i.tags||[]).indexOf(tag)>=0 }) }
+function bookWords(tag){ return bookNotes(tag).reduce(function(n,i){ return n+wordsOf(i) },0) }
+function libraryWords(){ return S.items.reduce(function(n,i){ return isSys(i)||hasLink(i)?n:n+wordsOf(i) },0) }
+
+/* What each note held the last time it was saved, here. */
+var WC={};
+try{ WC=JSON.parse(localStorage.getItem("trove.wordcache")||"{}")||{} }catch(e){ WC={} }
+function saveWC(){ try{ localStorage.setItem("trove.wordcache",JSON.stringify(WC)) }catch(e){} }
+function primeWords(i){ if(i&&!isSys(i)) WC[i.id]={ n:wordsOf(i), m:i.modified||0 } }
+function myStats(){
+  var id="stats-"+DEVICE_ID, st=byId(id);
+  if(!st){
+    var now=Date.now();
+    st=normalizeItem({ id:id, title:"", body:"", created:now, modified:now, stats:{days:{}} });
+    S.items.push(st);
+  }
+  return st;
+}
+function tallyWords(){
+  var seen={}, delta=0, perBook={}, books={};
+  S.items.forEach(function(i){ if(i.book) books[i.book.tag]=1 });
+  S.items.forEach(function(i){
+    if(isSys(i)||FRESH[i.id]) return;
+    seen[i.id]=1;
+    var c=WC[i.id];
+    if(c&&c.m===(i.modified||0)) return;            // untouched since last time
+    var n=wordsOf(i), d=n-(c?c.n:0);
+    WC[i.id]={ n:n, m:i.modified||0 };
+    if(!d) return;
+    delta+=d;
+    (i.tags||[]).forEach(function(t){ if(books[t]) perBook[t]=(perBook[t]||0)+d });
+  });
+  Object.keys(WC).forEach(function(id){ if(!seen[id]&&!FRESH[id]) delete WC[id] });   // deleted: forgotten, not subtracted
+  saveWC();
+  if(!delta) return;
+  var st=myStats(), k=todayISO(), day=st.stats.days[k]||(st.stats.days[k]={w:0,b:{}});
+  day.w+=delta;
+  Object.keys(perBook).forEach(function(t){ day.b[t]=(day.b[t]||0)+perBook[t] });
+  st.modified=Date.now();
+  paintWordsToday();
+}
+/* Every device's record, added up: { "2026-11-12": {w, b:{tag:n}} }. */
+function allDays(){
+  var out={};
+  S.items.forEach(function(i){
+    if(!i.stats) return;
+    Object.keys(i.stats.days).forEach(function(k){
+      var src=i.stats.days[k], o=out[k]||(out[k]={w:0,b:{}});
+      o.w+=src.w||0;
+      Object.keys(src.b||{}).forEach(function(t){ o.b[t]=(o.b[t]||0)+src.b[t] });
+    });
+  });
+  return out;
+}
+function isoDaysBack(n){
+  var d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-n);
+  var pad=function(x){ return (x<10?"0":"")+x };
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+}
+function wordsOn(days,k,tag){ var d=days[k]; if(!d) return 0; return tag?(d.b[tag]||0):d.w }
+function sumDays(days,n,tag){ var t=0; for(var k=0;k<n;k++) t+=wordsOn(days,isoDaysBack(k),tag); return t }
+function streak(days){
+  var k=wordsOn(days,isoDaysBack(0))>0?0:1, n=0;     // today not started yet does not break it
+  while(wordsOn(days,isoDaysBack(k))>0){ n++; k++ }
+  return n;
+}
+function fmtN(n){ return Math.max(0,Math.round(n)).toLocaleString() }
+function paintWordsToday(){
+  var el=document.getElementById("wordstoday"); if(!el) return;
+  var n=wordsOn(allDays(),isoDaysBack(0));
+  el.innerHTML='<b>'+fmtN(n)+'</b> word'+(Math.max(0,n)===1?"":"s")+' today';
+  el.classList.toggle("zero",n<=0);
+}
+function makeBook(tag){
+  if(!tag||bookFor(tag)) return;
+  var now=Date.now();
+  S.items.push(normalizeItem({ id:"book-"+uid(), title:"", body:"", created:now, modified:now,
+    book:{ tag:tag, target:0, created:now } }));
+  save(); render();
+  toast("#"+tag+" is now a book");
+}
+function unBook(tag){
+  var b=bookFor(tag); if(!b) return;
+  S.items=S.items.filter(function(i){ return i!==b });
+  save(); render();
+  toast("#"+tag+" is a tag again — its notes are untouched");
+}
+function bookMenu(tag){
+  var b=bookFor(tag);
+  if(!b) return makeBook(tag);
+  askChoice("The book #"+tag,
+    b.book.target?("Its target is "+fmtN(b.book.target)+" words."):"It has no word target. You don't need one.",
+    [{label:"Cancel",value:null,kind:"sec"},
+     {label:b.book.target?"Change the target":"Set a target",value:"target"},
+     b.book.target?{label:"Remove the target",value:"notarget",kind:"sec"}:null,
+     {label:"Make it a tag again",value:"unbook",kind:"dan"}].filter(Boolean),
+    function(v){
+      if(v==="unbook") return unBook(tag);
+      if(v==="notarget"){ b.book.target=0; b.modified=Date.now(); save(); render(); return }
+      if(v==="target") askText("A target for #"+tag,"In words. Leave it empty for none.",
+        b.book.target?String(b.book.target):"","Set",function(x){
+          var n=parseInt(String(x).replace(/[^0-9]/g,""),10)||0;
+          b.book.target=n>0?n:0; b.modified=Date.now(); save(); render();
+        });
+    });
+}
+/* The line under a book's name: its size, this week, and (only if one
+   was set) the target, small. */
+function bookLine(tag){
+  var b=bookFor(tag); if(!b) return "";
+  var total=bookWords(tag), days=allDays(), wk=sumDays(days,7,tag), n=bookNotes(tag).length;
+  var line='<span class="bkw"><b>'+fmtN(total)+'</b> words</span> · '+n+' part'+(n===1?"":"s")
+    +(wk>0?' · <span class="bkwk">+'+fmtN(wk)+' this week</span>':"");
+  if(b.book.target){
+    var pc=Math.min(100,Math.round(total*100/b.book.target));
+    line+='<span class="bktgt" title="'+fmtN(total)+' of '+fmtN(b.book.target)+' words">'
+      +'<span class="bkbar"><span style="width:'+pc+'%"></span></span>'+pc+'% of '+fmtN(b.book.target)+'</span>';
+  }
+  return line;
+}
+/* The Writing page: today, the week, the month, the streak; thirty days as
+   bars; twelve months; and every book with its size. */
+function renderStats(){
+  var days=allDays(), today=wordsOn(days,isoDaysBack(0)), st=streak(days);
+  var bars=[], max=1;
+  for(var k=29;k>=0;k--){ var v=Math.max(0,wordsOn(days,isoDaysBack(k))); bars.push(v); if(v>max) max=v }
+  var W=600, H=150, bw=W/30;
+  var svg='<svg class="stchart" viewBox="0 0 '+W+' '+(H+22)+'" role="img" aria-label="Words written each day, the last thirty days">'
+    +bars.map(function(v,ix){
+      var h=v?Math.max(3,Math.round(v*H/max)):0, x=ix*bw+3;
+      return '<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-6).toFixed(1)+'" height="'+h+'" rx="3" class="'+(ix===29?"now":"")+'"><title>'
+        +isoDaysBack(29-ix)+': '+fmtN(v)+' words</title></rect>';
+    }).join("")
+    +'<line x1="0" x2="'+W+'" y1="'+H+'" y2="'+H+'" class="base"/>'
+    +'<text x="0" y="'+(H+16)+'">'+isoDaysBack(29).slice(5).split("-").reverse().join("/")+'</text>'
+    +'<text x="'+W+'" y="'+(H+16)+'" text-anchor="end">today</text>'
+    +'<text x="0" y="12" class="mx">'+fmtN(max)+'</text></svg>';
+  var months=[];
+  for(var m=11;m>=0;m--){
+    var d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-m);
+    var pre=d.getFullYear()+"-"+(d.getMonth()<9?"0":"")+(d.getMonth()+1);
+    var tot=Object.keys(days).filter(function(k){ return k.indexOf(pre)===0 }).reduce(function(a,k){ return a+days[k].w },0);
+    months.push({ label:d.toLocaleDateString([], {month:"short"}), v:Math.max(0,tot) });
+  }
+  var mmax=Math.max.apply(null,months.map(function(x){ return x.v }).concat([1]));
+  var books=S.items.filter(function(i){ return i.book }).map(function(b){ return b.book.tag })
+    .sort(function(a,b){ return a.localeCompare(b) });
+  return '<div class="stats">'
+    +'<div class="stnums">'
+      +'<div><b>'+fmtN(today)+'</b><span>today</span></div>'
+      +'<div><b>'+fmtN(sumDays(days,7))+'</b><span>this week</span></div>'
+      +'<div><b>'+fmtN(sumDays(days,30))+'</b><span>last 30 days</span></div>'
+      +'<div><b>'+st+'</b><span>day'+(st===1?"":"s")+' in a row</span></div>'
+    +'</div>'
+    +'<h3 class="sth">The last thirty days</h3>'+svg
+    +'<h3 class="sth">The last twelve months</h3><div class="stmonths">'
+      +months.map(function(x){ return '<div title="'+fmtN(x.v)+' words"><i style="height:'+Math.round(x.v*100/mmax)+'%"></i><span>'+esc(x.label)+'</span></div>' }).join("")
+    +'</div>'
+    +'<h3 class="sth">Books</h3>'
+    +(books.length?'<div class="stbooks">'+books.map(function(t){
+        var tot=bookWords(t), b=bookFor(t), pc=b.book.target?Math.min(100,Math.round(tot*100/b.book.target)):0;
+        return '<button class="stbook" data-tag="'+esc(t)+'"><span class="stbt">▤ '+esc(t)+'</span>'
+          +'<span><b>'+fmtN(tot)+'</b> words</span>'
+          +'<span>+'+fmtN(sumDays(days,7,t))+' this week</span>'
+          +(b.book.target?'<span class="bktgt"><span class="bkbar"><span style="width:'+pc+'%"></span></span>'+pc+'%</span>':'<span></span>')
+          +'</button>';
+      }).join("")+'</div>'
+      :'<p class="stnone">No books yet. Open any tag and choose <b>▤ Make this a book</b>.</p>')
+    +'<p class="stfoot">Your whole library holds <b>'+fmtN(libraryWords())+'</b> words of your own, links not counted. '
+      +'Words are counted as you save, on every device, and added up here.</p>'
+    +'</div>';
+}
+
 function latestIssue(tpl){
   tpl=tpl||"tisymvainei";
   return S.items.filter(function(i){ return i.issue&&issueKey(i)===tpl })
@@ -6000,6 +6268,7 @@ function newIssue(tpl){
     if(tpl!=="tisymvainei") issue.template=tpl;
     var item=normalizeItem({ id:uid(), title:"", body:last?carryOver(last.body,T):("<br>"+(T.sections||"")),
       created:now, modified:now, issue:issue });
+    primeWords(item);    // carried over from last week, not written today
     S.items.unshift(item);
     S.view="newsletter"; S.tag=null; S.q=""; S.sel={};
     save(); render();
@@ -7911,6 +8180,9 @@ board.addEventListener("click",function(e){
     return;
   }
   if(e.target.closest("[data-grip]")) return;
+  /* a book on the Writing page opens the book */
+  var sb=e.target.closest(".stbook");
+  if(sb){ S.tag=sb.dataset.tag; S.view="all"; S.q=""; S.sel={}; render(); return }
   var mt=e.target.closest("[data-totoday]");
   if(mt){ e.stopPropagation(); moveToToday(byId(mt.dataset.totoday)); return }
   // a link written inside a note goes where it points, not to the editor
@@ -9436,6 +9708,7 @@ function addTutorial(){
     tags:[], photos:[], checks:[], archived:false, pin:true, postId:"",
     created:now, modified:now
   });
+  primeWords(S.items[0]);      // the app wrote it, not you
   save();
 }
 
@@ -10235,6 +10508,13 @@ function renameTag(old){
         x.modified=Date.now(); n++;
       });
       if(S.tag===old) S.tag=next;
+      var bk=bookFor(old); if(bk&&!bookFor(next)){ bk.book.tag=next; bk.modified=Date.now() }
+      S.items.forEach(function(st){
+        if(!st.stats) return; var moved=false;
+        Object.keys(st.stats.days).forEach(function(k){ var b=st.stats.days[k].b;
+          if(b[old]){ b[next]=(b[next]||0)+b[old]; delete b[old]; moved=true } });
+        if(moved) st.modified=Date.now();
+      });
       if(S.layouts["tag:"+old]){                   // the page keeps its layout
         S.layouts["tag:"+next]=S.layouts["tag:"+old];
         delete S.layouts["tag:"+old];
@@ -10247,6 +10527,7 @@ function renameTag(old){
 document.getElementById("tagedit").addEventListener("click",function(){
   if(S.tag) renameTag(S.tag);
 });
+document.getElementById("bookbtn").addEventListener("click",function(){ if(S.tag) bookMenu(S.tag) });
 document.getElementById("taglist").addEventListener("contextmenu",function(e){
   var t=e.target.closest("[data-tag]"); if(!t) return;
   e.preventDefault();
@@ -10417,7 +10698,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="89";
+var BUILD="90";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
@@ -10797,6 +11078,7 @@ if(stored){
 } else {
   S.items=[];
 }
+S.items.forEach(function(i){ if(!WC[i.id]) primeWords(i) }); saveWC();
 
 /* The library and the record of what the server holds are two separate
    files, and the small one survives when the big one fails to write. That
