@@ -299,6 +299,9 @@
   .stchart rect{fill:color-mix(in srgb,var(--make) 45%,transparent)} .stchart rect.now{fill:var(--make)}
   .stchart .base{stroke:var(--line-strong)} .stchart text{font-size:11px;fill:var(--faint)}
   .stchart .mx{font-weight:650;fill:var(--muted)}
+  .stchart rect.hit{fill:transparent;cursor:pointer} .stchart rect.hit:hover{fill:color-mix(in srgb,var(--make) 8%,transparent)}
+  .stfix{font-size:11.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px;padding:0}
+  .stfix:hover{color:var(--make)}
   .stmonths{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:110px;align-items:end}
   .stmonths div{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
   .stmonths i{display:block;width:100%;min-height:2px;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--accent) 55%,transparent)}
@@ -310,6 +313,13 @@
   .stbt{font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .stbook .bktgt{margin:0}
   .stnone,.stfoot{font-size:13.5px;color:var(--muted);line-height:1.6}
+  .stwheres{display:grid;grid-template-columns:3fr 2fr;gap:22px}
+  .stwhere h4{font-size:12px;font-weight:650;color:var(--faint);margin:0 0 8px}
+  .stw{display:grid;grid-template-columns:minmax(0,1.2fr) 2fr auto;gap:10px;align-items:center;font-size:13.5px;margin:0 0 7px}
+  .stwn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+  .stwb{height:8px;border-radius:4px;background:var(--line)} .stwb i{display:block;height:100%;border-radius:4px;background:var(--make)}
+  .stwv{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12.5px}
+  @media (max-width:620px){ .stwheres{grid-template-columns:1fr} }
   .stfoot{margin-top:26px}
   @media (max-width:620px){ .stnums{grid-template-columns:1fr 1fr} .stbook{grid-template-columns:1fr 1fr} }
   .sidefoot{margin-top:auto;padding:11px 4px 12px;display:flex;gap:3px;align-items:center;
@@ -2323,6 +2333,7 @@ function startInline(card,ev){
     var html=e.clipboardData.getData("text/html"), txt=e.clipboardData.getData("text/plain");
     e.preventDefault();
     var clean=html?sanitizeRich(html):"";
+    notePaste(id,clean&&richToText(clean).trim()?richToText(clean):(txt||""));
     try{
       if(clean&&richToText(clean).trim()) document.execCommand("insertHTML",false,clean);
       else document.execCommand("insertText",false,txt||"");
@@ -5135,6 +5146,7 @@ function pullChanges(){
     SYNC.pulledOnce=true;                  // only as far as it actually got
     SYNC.pullFailed=false;
     if(first) releaseCatchup(false);
+    if(WC_FRESH) WC_FRESH=false;           // the library has arrived; from here on, arrivals are writing
     /* The boot call to hydratePhotos ran before the session was restored, so
        its server fallback could not have asked for anything. Now that we are
        signed in, give any picture this browser is missing one more chance —
@@ -5228,7 +5240,7 @@ function applyIncoming(rows){
     if(!here){
       /* Arrive at the top, not the bottom. Array order is the manual order,
          and the device that made this put it at the front. */
-      S.items.unshift(incoming); rebuildIndex(); changed++; primeWords(incoming);
+      S.items.unshift(incoming); rebuildIndex(); changed++; noteArrival(incoming);
       SYNC.shadow[row.id]=sig(incoming);
       return;
     }
@@ -5256,7 +5268,7 @@ function applyIncoming(rows){
       // nothing of ours is at stake; take theirs
       if(sig(incoming)!==mine){
         remember(here,"replaced by a newer copy from another device");
-        S.items[ix]=incoming; changed++; primeWords(incoming);
+        S.items[ix]=incoming; changed++; noteArrival(incoming);
       }
       SYNC.shadow[row.id]=sig(incoming);
       return;
@@ -5265,7 +5277,7 @@ function applyIncoming(rows){
     /* Both sides moved. Someone has to win, but nobody gets erased. */
     if((incoming.modified||0)>(here.modified||0)){
       remember(here,"your edit, overtaken by a newer one elsewhere");
-      S.items[ix]=incoming; changed++; primeWords(incoming);
+      S.items[ix]=incoming; changed++; noteArrival(incoming);
       SYNC.shadow[row.id]=sig(incoming);
       toast("A note changed on another device — your copy is in its history");
     } else {
@@ -5420,11 +5432,17 @@ function normalizeItem(o){
     var days={}, keys=Object.keys(o.stats.days).filter(function(k){ return /^\d{4}-\d{2}-\d{2}$/.test(k) }).sort().slice(-1000);
     keys.forEach(function(k){
       var dd=o.stats.days[k]||{}, b={};
-      Object.keys(dd.b||{}).slice(0,60).forEach(function(t){ var v=parseInt(dd.b[t],10); if(v) b[String(t).slice(0,100)]=v });
-      days[k]={ w:parseInt(dd.w,10)||0, b:b };
+      Object.keys(dd.b||{}).slice(0,200).forEach(function(t){ var v=parseInt(dd.b[t],10); if(v) b[String(t).slice(0,100)]=v });
+      var c={};
+      Object.keys(dd.c||{}).forEach(function(t){ if(/^(notes|links|tasks|newsletter)$/.test(t)){ var v=parseInt(dd.c[t],10); if(v) c[t]=v } });
+      days[k]={ w:parseInt(dd.w,10)||0, b:b, c:c };
     });
     out.stats={ days:days };
   }
+  /* Which device of this app last edited it, and at which version — so a
+     newer version without that stamp is known to come from elsewhere: the
+     extension, the writing machine, the phone's share sheet. */
+  if(typeof o.ed==="string"&&/^[a-z0-9]{1,40}$/.test(o.ed)&&typeof o.edm==="number"){ out.ed=o.ed; out.edm=o.edm }
   /* When a task was ticked: what lets it stay, crossed out, until the
      day is over. Kept only on ticked tasks. */
   if(o.done&&typeof o.completedAt==="number") out.completedAt=o.completedAt;
@@ -5935,7 +5953,73 @@ var DEVICE_ID=(function(){
   }catch(e){ return "here" }
 })();
 function isSys(i){ return !!(i&&(i.book||i.stats)) }
-function wordsOf(i){ return words(i.title||"")+words(richToText(i.body||"")) }
+/* Your words in a note. A link's title and summary come from the page,
+   so a link counts only what you wrote about it. */
+function wordsOf(i){
+  /* a space at every block's edge, or "title</h3>Next" would count as one word */
+  var html=String(i.body||"").replace(/<\/?(h3|li|p|div|blockquote|figure|figcaption|ul|ol|hr|br)\b[^>]*>/gi," $& ");
+  return (hasLink(i)?0:words(i.title||""))+words(richToText(html));
+}
+function kindOf(i){ return i.issue?"newsletter":hasLink(i)?"links":hasAction(i)?"tasks":"notes" }
+/* Into this device's record, on that day: the total, each tag, the kind. */
+function recordWords(dayKey,d,i){
+  var st=myStats(), day=st.stats.days[dayKey]||(st.stats.days[dayKey]={w:0,b:{},c:{}});
+  day.c=day.c||{};
+  day.w+=d;
+  (i.tags||[]).forEach(function(t){ day.b[t]=(day.b[t]||0)+d });
+  var k=kindOf(i); day.c[k]=(day.c[k]||0)+d;
+  st.modified=Date.now();
+}
+/* Words that arrive already written — from the extension, the writing
+   machine, the phone — are yours too, and count on the day they were
+   written. Exactly one device counts them, or every device would: the
+   one with the first name among those that have kept a record lately.
+   A device starting from nothing counts none of what it first receives:
+   that is the library arriving, not writing. */
+var WC_FRESH=null;
+/* Words pasted into a note, waiting to be taken off its count when it is
+   saved: pasting brings in writing done elsewhere, it is not writing. */
+var PASTED={}, CAP_PASTED=0;
+function notePaste(id,text){ var n=words(text||""); if(id&&n) PASTED[id]=(PASTED[id]||0)+n }
+/* Correcting a day by hand — for anything counted that should not have
+   been. The tags and kinds of that day are scaled to match. */
+function correctDay(key){
+  var days=allDays(), cur=Math.max(0,wordsOn(days,key));
+  askText("Words written on "+key.split("-").reverse().join("/"),
+    "The count is "+fmtN(cur)+". Type what it should be — for example, without text you pasted in.",
+    String(cur),"Correct",function(v){
+      var want=parseInt(String(v).replace(/[^0-9]/g,""),10);
+      if(isNaN(want)||want===cur) return;
+      var st=myStats(), day=st.stats.days[key]||(st.stats.days[key]={w:0,b:{},c:{}}), all=days[key]||{w:0,b:{},c:{}};
+      day.c=day.c||{};
+      var f=cur?want/cur:0;
+      day.w+=want-cur;
+      Object.keys(all.b||{}).forEach(function(t){ day.b[t]=(day.b[t]||0)+Math.round(all.b[t]*f)-all.b[t] });
+      Object.keys(all.c||{}).forEach(function(t){ day.c[t]=(day.c[t]||0)+Math.round(all.c[t]*f)-all.c[t] });
+      st.modified=Date.now();
+      save(); render(); toast("Corrected");
+    });
+}
+function countsArrivals(){
+  var me="stats-"+DEVICE_ID, now=Date.now();
+  var ids=S.items.filter(function(i){ return i.stats&&(now-(i.modified||0))<14*864e5 }).map(function(i){ return i.id });
+  if(ids.indexOf(me)<0) ids.push(me);
+  return ids.sort()[0]===me;
+}
+function fromElsewhere(i){ return !(i.ed&&i.edm===i.modified) }
+function noteArrival(i){
+  if(!i||isSys(i)) return;
+  if(WC_FRESH===null) WC_FRESH=!Object.keys(WC).length;
+  var c=WC[i.id], n=wordsOf(i);
+  if(!WC_FRESH&&fromElsewhere(i)&&countsArrivals()){
+    var d=n-(c?c.n:0);
+    if(d){
+      var when=new Date(i.modified||Date.now()), pad=function(x){ return (x<10?"0":"")+x };
+      recordWords(when.getFullYear()+"-"+pad(when.getMonth()+1)+"-"+pad(when.getDate()),d,i);
+    }
+  }
+  WC[i.id]={ n:n, m:i.modified||0 };
+}
 function bookFor(tag){ return S.items.filter(function(i){ return i.book&&i.book.tag===tag })[0]||null }
 function bookNotes(tag){ return S.items.filter(function(i){ return !isSys(i)&&(i.tags||[]).indexOf(tag)>=0 }) }
 function bookWords(tag){ return bookNotes(tag).reduce(function(n,i){ return n+wordsOf(i) },0) }
@@ -5956,27 +6040,22 @@ function myStats(){
   return st;
 }
 function tallyWords(){
-  var seen={}, delta=0, perBook={}, books={};
-  S.items.forEach(function(i){ if(i.book) books[i.book.tag]=1 });
+  var seen={}, any=false, k=todayISO();
   S.items.forEach(function(i){
     if(isSys(i)||FRESH[i.id]) return;
     seen[i.id]=1;
     var c=WC[i.id];
     if(c&&c.m===(i.modified||0)) return;            // untouched since last time
     var n=wordsOf(i), d=n-(c?c.n:0);
+    if(PASTED[i.id]){ d-=PASTED[i.id]; delete PASTED[i.id] }   // pasted in, not written
+    i.ed=DEVICE_ID; i.edm=i.modified||0;             // edited here: this device has counted it
     WC[i.id]={ n:n, m:i.modified||0 };
     if(!d) return;
-    delta+=d;
-    (i.tags||[]).forEach(function(t){ if(books[t]) perBook[t]=(perBook[t]||0)+d });
+    recordWords(k,d,i); any=true;
   });
   Object.keys(WC).forEach(function(id){ if(!seen[id]&&!FRESH[id]) delete WC[id] });   // deleted: forgotten, not subtracted
   saveWC();
-  if(!delta) return;
-  var st=myStats(), k=todayISO(), day=st.stats.days[k]||(st.stats.days[k]={w:0,b:{}});
-  day.w+=delta;
-  Object.keys(perBook).forEach(function(t){ day.b[t]=(day.b[t]||0)+perBook[t] });
-  st.modified=Date.now();
-  paintWordsToday();
+  if(any) paintWordsToday();
 }
 /* Every device's record, added up: { "2026-11-12": {w, b:{tag:n}} }. */
 function allDays(){
@@ -5984,9 +6063,10 @@ function allDays(){
   S.items.forEach(function(i){
     if(!i.stats) return;
     Object.keys(i.stats.days).forEach(function(k){
-      var src=i.stats.days[k], o=out[k]||(out[k]={w:0,b:{}});
+      var src=i.stats.days[k], o=out[k]||(out[k]={w:0,b:{},c:{}});
       o.w+=src.w||0;
       Object.keys(src.b||{}).forEach(function(t){ o.b[t]=(o.b[t]||0)+src.b[t] });
+      Object.keys(src.c||{}).forEach(function(t){ o.c[t]=(o.c[t]||0)+src.c[t] });
     });
   });
   return out;
@@ -6059,6 +6139,29 @@ function bookLine(tag){
 }
 /* The Writing page: today, the week, the month, the streak; thirty days as
    bars; twelve months; and every book with its size. */
+/* Where the last thirty days' words went: tags, and kinds of note. */
+function whereWords(days){
+  var tags={}, kinds={};
+  for(var k=0;k<30;k++){
+    var d=days[isoDaysBack(k)]; if(!d) continue;
+    Object.keys(d.b||{}).forEach(function(t){ tags[t]=(tags[t]||0)+d.b[t] });
+    Object.keys(d.c||{}).forEach(function(t){ kinds[t]=(kinds[t]||0)+d.c[t] });
+  }
+  function bars(map,label,limit){
+    var rows=Object.keys(map).filter(function(t){ return map[t]>0 }).sort(function(a,b){ return map[b]-map[a] }).slice(0,limit);
+    if(!rows.length) return "";
+    var top=map[rows[0]];
+    return '<div class="stwhere"><h4>'+label+'</h4>'+rows.map(function(t){
+      return '<div class="stw"><span class="stwn">'+esc(t)+'</span><span class="stwb"><i style="width:'
+        +Math.max(2,Math.round(map[t]*100/top))+'%"></i></span><span class="stwv">'+fmtN(map[t])+'</span></div>';
+    }).join("")+'</div>';
+  }
+  var KIND={notes:"Notes",links:"Notes on links",tasks:"Tasks",newsletter:"Newsletter"}, named={};
+  Object.keys(kinds).forEach(function(k){ named[KIND[k]||k]=kinds[k] });
+  var a=bars(tags,"Tags",8), b=bars(named,"Kinds",4);
+  if(!a&&!b) return "";
+  return '<h3 class="sth">Where the words went — last 30 days</h3><div class="stwheres">'+a+b+'</div>';
+}
 function renderStats(){
   var days=allDays(), today=wordsOn(days,isoDaysBack(0)), st=streak(days);
   var bars=[], max=1;
@@ -6068,7 +6171,8 @@ function renderStats(){
     +bars.map(function(v,ix){
       var h=v?Math.max(3,Math.round(v*H/max)):0, x=ix*bw+3;
       return '<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-6).toFixed(1)+'" height="'+h+'" rx="3" class="'+(ix===29?"now":"")+'"><title>'
-        +isoDaysBack(29-ix)+': '+fmtN(v)+' words</title></rect>';
+        +isoDaysBack(29-ix)+': '+fmtN(v)+' words — click to correct</title></rect>'
+        +'<rect x="'+(ix*bw).toFixed(1)+'" y="0" width="'+bw.toFixed(1)+'" height="'+H+'" class="hit" data-fixday="'+isoDaysBack(29-ix)+'"/>';
     }).join("")
     +'<line x1="0" x2="'+W+'" y1="'+H+'" y2="'+H+'" class="base"/>'
     +'<text x="0" y="'+(H+16)+'">'+isoDaysBack(29).slice(5).split("-").reverse().join("/")+'</text>'
@@ -6086,7 +6190,7 @@ function renderStats(){
     .sort(function(a,b){ return a.localeCompare(b) });
   return '<div class="stats">'
     +'<div class="stnums">'
-      +'<div><b>'+fmtN(today)+'</b><span>today</span></div>'
+      +'<div><b>'+fmtN(today)+'</b><span>today · <button class="stfix" data-fixday="'+isoDaysBack(0)+'">correct</button></span></div>'
       +'<div><b>'+fmtN(sumDays(days,7))+'</b><span>this week</span></div>'
       +'<div><b>'+fmtN(sumDays(days,30))+'</b><span>last 30 days</span></div>'
       +'<div><b>'+st+'</b><span>day'+(st===1?"":"s")+' in a row</span></div>'
@@ -6095,6 +6199,7 @@ function renderStats(){
     +'<h3 class="sth">The last twelve months</h3><div class="stmonths">'
       +months.map(function(x){ return '<div title="'+fmtN(x.v)+' words"><i style="height:'+Math.round(x.v*100/mmax)+'%"></i><span>'+esc(x.label)+'</span></div>' }).join("")
     +'</div>'
+    +whereWords(days)
     +'<h3 class="sth">Books</h3>'
     +(books.length?'<div class="stbooks">'+books.map(function(t){
         var tot=bookWords(t), b=bookFor(t), pc=b.book.target?Math.min(100,Math.round(tot*100/b.book.target)):0;
@@ -6105,8 +6210,8 @@ function renderStats(){
           +'</button>';
       }).join("")+'</div>'
       :'<p class="stnone">No books yet. Open any tag and choose <b>▤ Make this a book</b>.</p>')
-    +'<p class="stfoot">Your whole library holds <b>'+fmtN(libraryWords())+'</b> words of your own, links not counted. '
-      +'Words are counted as you save, on every device, and added up here.</p>'
+    +'<p class="stfoot">Your whole library holds <b>'+fmtN(libraryWords())+'</b> words of your own; a link counts only what you wrote about it. '
+      +'Words are counted as you write them, on every device and in the extension and the writing machine, and added up here.</p>'
     +'</div>';
 }
 
@@ -6307,8 +6412,13 @@ function compileIntoIssue(){
   Array.prototype.slice.call(add.childNodes).forEach(function(n){ sec.nodes.push(n) });
   sec.nodes.push(document.createElement("br"));
   remember(target,"before compiling into it");
+  /* The issue's own words count; the links compiled into it were counted
+     when you wrote them under #weekly, so they are noted, not counted twice. */
+  var wasN=wordsOf(target);
   bodyEdited(target,joinSections(parts));
   target.modified=Date.now();
+  var prior=WC[target.id];
+  WC[target.id]={ n:(prior?prior.n:wasN)+(wordsOf(target)-wasN), m:target.modified };
   var n=list.length;
   S.sel={};
   S.view="newsletter"; S.tag=null; S.q=""; document.getElementById("q").value="";
@@ -6727,6 +6837,7 @@ function commit(asTask){
     tint:"",tags:p.tags,photos:[],checks:shape.checks,archived:false,pin:false,created:now,modified:now};
   tagFromPage(item);
   S.items.unshift(item);
+  if(CAP_PASTED){ PASTED[item.id]=CAP_PASTED; CAP_PASTED=0 }
   capin.value=""; capForce=null; refreshCap(); save();
   var names=[]; if(p.url) names.push("Links"); if(act) names.push("Tasks");
   if(!names.length) names.push("Notes");
@@ -7120,6 +7231,7 @@ function openEditor(id){
     if(html==null&&txt==null) return;
     e.preventDefault();
     var clean=html?sanitizeRich(html):"";
+    notePaste(i.id,clean&&richToText(clean).trim()?richToText(clean):(txt||""));
     try{
       if(clean&&richToText(clean).trim()) document.execCommand("insertHTML",false,clean);
       else document.execCommand("insertText",false,txt||"");
@@ -7592,6 +7704,7 @@ function openEditor(id){
 }
 function close(){
   var fid=S.editing;
+  if(fid) delete PASTED[fid];         // saved: already accounted; cancelled: nothing was kept
   if(fid&&FRESH[fid]){
     delete FRESH[fid];
     var fi=byId(fid);
@@ -8125,6 +8238,8 @@ window.addEventListener("drop",function(e){
 
 // paste an image while the capture box has focus
 capin.addEventListener("paste",function(e){
+  /* pasted text is not counted as words written */
+  try{ var pt=e.clipboardData&&e.clipboardData.getData("text/plain"); if(pt) CAP_PASTED+=words(pt) }catch(err){}
   var files=imageFilesFrom(e.clipboardData);
   if(!files.length) return;
   e.preventDefault();
@@ -8181,6 +8296,8 @@ board.addEventListener("click",function(e){
   }
   if(e.target.closest("[data-grip]")) return;
   /* a book on the Writing page opens the book */
+  var fx=e.target.closest("[data-fixday]");
+  if(fx){ correctDay(fx.getAttribute("data-fixday")); return }
   var sb=e.target.closest(".stbook");
   if(sb){ S.tag=sb.dataset.tag; S.view="all"; S.q=""; S.sel={}; render(); return }
   var mt=e.target.closest("[data-totoday]");
@@ -10698,7 +10815,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="90";
+var BUILD="92";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
