@@ -299,6 +299,22 @@
   .stchart rect{fill:color-mix(in srgb,var(--make) 45%,transparent)} .stchart rect.now{fill:var(--make)}
   .stchart .base{stroke:var(--line-strong)} .stchart text{font-size:11px;fill:var(--faint)}
   .stchart .mx{font-weight:650;fill:var(--muted)}
+  /* a part's status: two states, quiet until done */
+  .pstat{font-size:11px;font-weight:620;color:var(--muted);padding:2px 9px;border-radius:99px;border:1px solid var(--line-strong);background:var(--surface)}
+  .pstat.on{color:#fff;background:var(--accent);border-color:var(--accent)}
+  .msw{font-size:11px;color:var(--faint)}
+  /* The manuscript: one column, the width of a page, parts one after another. */
+  .grid.ms{max-width:720px;margin:0 auto;counter-reset:part}
+  .grid.ms .card{border:0;border-radius:0;box-shadow:none!important;background:transparent;transform:none!important;
+    padding:34px 4px 26px;margin:0;border-top:1px solid var(--line-strong);counter-increment:part;cursor:text}
+  .grid.ms .card:first-child{border-top:0}
+  .grid.ms .card.inline{background:var(--surface);border-radius:12px;padding:34px 22px 22px}
+  .grid.ms .card::after{display:none}
+  .grid.ms .head::before{content:counter(part);display:block;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--make);margin-bottom:6px}
+  .grid.ms .card .ctitle{font-size:calc(24px*var(--tscale));font-weight:600;letter-spacing:-.015em;line-height:1.25}
+  .grid.ms .card .cbody{font-size:calc(17px*var(--tscale));line-height:1.75;color:var(--ink);display:block;-webkit-line-clamp:unset;overflow:visible}
+  .grid.ms .quick,.grid.ms .pick,.grid.ms .thumb,.grid.ms .srcline{display:none!important}
+  .grid.ms .foot{margin-top:16px}
   .stchart rect.hit{fill:transparent;cursor:pointer} .stchart rect.hit:hover{fill:color-mix(in srgb,var(--make) 8%,transparent)}
   .stfix{font-size:11.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px;padding:0}
   .stfix:hover{color:var(--make)}
@@ -1326,7 +1342,7 @@
   body.on-posts #compilebtn{display:none}
   .etitle{font-size:calc(25px*var(--tscale));font-weight:660;letter-spacing:-.025em;line-height:1.25;
     color:var(--ink);margin-bottom:12px}
-  textarea.etitle{display:block;resize:none;overflow:hidden;font-family:inherit;padding:0;min-height:1.25em;
+  textarea.etitle{display:block;resize:none;overflow:hidden;font-family:var(--content);padding:0;min-height:1.25em;
     overflow-wrap:anywhere}
   /* the note body is the point of this window — give it room, weight and contrast */
   .ebody{font-size:calc(16px*var(--tscale));line-height:1.72;min-height:46vh;width:100%;
@@ -1908,6 +1924,7 @@
           <button data-lay="cards" title="Cards">▦</button>
           <button data-lay="mood" title="Moodboard">⊞</button>
           <button data-lay="full" title="Full — whole notes, edited where they stand">▤</button>
+          <button data-lay="ms" id="lay-ms" title="Manuscript — the whole book as one text" hidden>❡</button>
         </div>
         <div class="search">
           <span class="si">⌕</span>
@@ -2880,7 +2897,12 @@ function defaultLayout(){
   if(S.tag) return "mood";
   return DEFAULT_LAYOUT[S.view]||"mood";
 }
-function layoutFor(){ return S.layouts[pageKey()]||defaultLayout() }
+function layoutFor(){
+  var l=S.layouts[pageKey()]||defaultLayout();
+  /* the manuscript is a book's view; anywhere else it falls back */
+  if(l==="ms"&&!(S.tag&&!S.q&&typeof bookFor==="function"&&bookFor(S.tag))) return defaultLayout();
+  return l;
+}
 /* A pin belongs to a page, not to the note. Pinned in Notes is not pinned
    under #books, and the other way round. pins holds the pages: "notes",
    "all", "tag:books" — whatever pageKey() calls the page.
@@ -3323,7 +3345,7 @@ function visible(){
   function touched(i){ return i.modified||i.created||0 }
   list.sort(function(a,b){
     if(TASKLENS[S.view]&&!S.tag&&!q){ var dn=(a.done?1:0)-(b.done?1:0); if(dn) return dn }   // ticked today: at the bottom
-    var p=pinnedHere(b)-pinnedHere(a);
+    var p=layoutFor()==="ms"?0:pinnedHere(b)-pinnedHere(a);   // no pinned group inside a manuscript
     if(p) return p;
     if(S.view==="newsletter"&&a.issue&&b.issue)
       return (issueKey(a)===issueKey(b))?b.issue.n-a.issue.n:(issueKey(a)==="tisymvainei"?-1:1);
@@ -3366,6 +3388,7 @@ try{ SORTBY=JSON.parse(localStorage.getItem(SORTKEY)||"{}")||{} }catch(e){ SORTB
    preference, it is a chore. */
 function sortScope(){ return S.tag?"tag":S.view }
 function sortNow(){
+  if(layoutFor()==="ms") return "mine";        // a manuscript reads in the book's own order
   var v=SORTBY[sortScope()];
   return SORTS[v]?v:"new";
 }
@@ -3935,6 +3958,11 @@ function cardHTML(i){
     foot.push('<span class="ckprog'+(dn===tot?" all":"")+'">'+dn+'/'+tot+'</span>');
   }
   if(i.issue) foot.push('<span class="tag docmark">✉ '+esc(issueLabel(i))+'</span>');
+  if(S.tag&&!S.q&&typeof bookFor==="function"&&bookFor(S.tag)){
+    foot.unshift('<button class="pstat'+(i.finished?" on":"")+'" data-pstat="'+i.id+'" title="Mark it '
+      +(i.finished?"as still being worked on":"done")+'">'+(i.finished?"● Done":"◐ Working on")+'</button>'
+      +(layoutFor()==="ms"?'<span class="msw">'+fmtN(wordsOf(i))+' words</span>':""));
+  }
   if(i.compiled) foot.push('<button class="tag docmark" data-auto="compiled" '
       +'title="See every compiled document">⇥ compiled</button>');
   if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+'">◔ '+fmtDue(i.due,i.timed)+'</span>');
@@ -3942,8 +3970,9 @@ function cardHTML(i){
   if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
 
-  var more="", inFull=layoutFor()==="full";
-  if(inFull&&i.body&&words(richToText(i.body))>FULL_WORDS){
+  var LAY=layoutFor(), inFull=LAY==="full"||LAY==="ms";
+  var more="";
+  if(LAY==="full"&&i.body&&words(richToText(i.body))>FULL_WORDS){
     cls+=" long";
     more='<div class="more300">Continues — click to read and edit the whole note</div>';
   }
@@ -4057,6 +4086,10 @@ function moodColumns(cards,n,start){
 }
 function block(list){
   var lay=layoutFor();
+  /* The manuscript: the parts one after another in a single column of
+     reading width, numbered, each still its own note. Click to write in
+     place, as in Full. */
+  if(lay==="ms") return '<div class="grid ms">'+list.map(cardHTML).join("")+'</div>';
   if(lay==="list") return '<div class="list">'+list.map(rowHTML).join("")+'</div>';
   if(lay==="cards") return '<div class="grid cards">'+list.map(cardHTML).join("")+'</div>';
   var n=moodCols();
@@ -4242,7 +4275,7 @@ function render(){
   } else if(S.view==="all"&&!S.q&&!S.tag){
     board.innerHTML=pinSplit(shown,"Recent");
   } else {
-    board.innerHTML=pinSplit(shown, S.q?"Results":S.tag?"#"+S.tag:lens.title);
+    board.innerHTML=layoutFor()==="ms"?block(shown):pinSplit(shown, S.q?"Results":S.tag?"#"+S.tag:lens.title);
   }
   if(list.length>shown.length){
     board.insertAdjacentHTML("beforeend",
@@ -4254,6 +4287,8 @@ function render(){
   document.querySelectorAll("#layoutseg button").forEach(function(b){
     b.classList.toggle("on", b.dataset.lay===lay);
   });
+  var lms=document.getElementById("lay-ms");
+  if(lms) lms.hidden=!(S.tag&&!S.q&&bookFor(S.tag));
   /* Shown whenever the page holds anything worth gathering — notes as well
      as links, since a tag is a subject rather than a list of addresses. */
   var cb=document.getElementById("compilebtn"), ncomp=S.view==="newsletter"&&!S.q&&!S.tag?0:compileList().length;
@@ -5443,6 +5478,8 @@ function normalizeItem(o){
      newer version without that stamp is known to come from elsewhere: the
      extension, the writing machine, the phone's share sheet. */
   if(typeof o.ed==="string"&&/^[a-z0-9]{1,40}$/.test(o.ed)&&typeof o.edm==="number"){ out.ed=o.ed; out.edm=o.edm }
+  /* A part of a book marked done. Working on it is simply the absence. */
+  if(o.finished===true) out.finished=true;
   /* When a task was ticked: what lets it stay, crossed out, until the
      day is over. Kept only on ticked tasks. */
   if(o.done&&typeof o.completedAt==="number") out.completedAt=o.completedAt;
@@ -6110,11 +6147,13 @@ function bookMenu(tag){
   askChoice("The book #"+tag,
     b.book.target?("Its target is "+fmtN(b.book.target)+" words."):"It has no word target. You don't need one.",
     [{label:"Cancel",value:null,kind:"sec"},
+     {label:"Export the book…",value:"export"},
      {label:b.book.target?"Change the target":"Set a target",value:"target"},
      b.book.target?{label:"Remove the target",value:"notarget",kind:"sec"}:null,
      {label:"Make it a tag again",value:"unbook",kind:"dan"}].filter(Boolean),
     function(v){
       if(v==="unbook") return unBook(tag);
+      if(v==="export") return exportBook(tag);
       if(v==="notarget"){ b.book.target=0; b.modified=Date.now(); save(); render(); return }
       if(v==="target") askText("A target for #"+tag,"In words. Leave it empty for none.",
         b.book.target?String(b.book.target):"","Set",function(x){
@@ -6128,7 +6167,9 @@ function bookMenu(tag){
 function bookLine(tag){
   var b=bookFor(tag); if(!b) return "";
   var total=bookWords(tag), days=allDays(), wk=sumDays(days,7,tag), n=bookNotes(tag).length;
+  var fin=bookNotes(tag).filter(function(i){ return i.finished }).length;
   var line='<span class="bkw"><b>'+fmtN(total)+'</b> words</span> · '+n+' part'+(n===1?"":"s")
+    +(fin?' · '+fin+' done':"")
     +(wk>0?' · <span class="bkwk">+'+fmtN(wk)+' this week</span>':"");
   if(b.book.target){
     var pc=Math.min(100,Math.round(total*100/b.book.target));
@@ -6213,6 +6254,255 @@ function renderStats(){
     +'<p class="stfoot">Your whole library holds <b>'+fmtN(libraryWords())+'</b> words of your own; a link counts only what you wrote about it. '
       +'Words are counted as you write them, on every device and in the extension and the writing machine, and added up here.</p>'
     +'</div>';
+}
+
+/* =========================================================================
+   A BOOK, OUT
+
+   The parts of a book, in your order, as one manuscript: Word (.docx),
+   EPUB, PDF (through the browser's own print-to-PDF) or Markdown. Each
+   part's title becomes a chapter heading on a new page; what you wrote
+   keeps its paragraphs, italics, bold, quotations, lists and section
+   breaks. Pictures and links' addresses stay in Everything.
+
+   One reading of each part's text feeds all four formats, so they never
+   disagree about where a paragraph ends.
+   ========================================================================= */
+function bookParts(tag){
+  return S.items.filter(function(i){ return !isSys(i)&&!i.archived&&(i.tags||[]).indexOf(tag)>=0 });
+}
+function partTitle(i,ix){ return (i.title||"").trim()||("Μέρος "+(ix+1)) }
+/* A part's text as blocks: {k:"p"|"h"|"q"|"li"|"oli"|"hr", r:[{t,b,i,u,s}]} */
+function textBlocks(html){
+  var root=inertDiv(); root.innerHTML=sanitizeRich(html||"");
+  var out=[], cur=[];
+  function flush(){
+    while(cur.length&&cur[cur.length-1].br) cur.pop();
+    if(cur.some(function(r){ return !r.br&&r.t.trim() })) out.push({k:"p",r:cur});
+    cur=[];
+  }
+  function runs(node,st,into){
+    [].forEach.call(node.childNodes,function(n){
+      if(n.nodeType===3){ if(n.data) into.push({t:n.data.replace(/\s+/g," "),b:st.b,i:st.i,u:st.u,s:st.s}); return }
+      if(n.nodeType!==1) return;
+      var t=n.nodeName;
+      if(t==="BR"){ into.push({br:true,t:""}); return }
+      if(t==="IMG"||t==="FIGURE") return;
+      runs(n,{ b:st.b||t==="B"||t==="STRONG", i:st.i||t==="I"||t==="EM", u:st.u||t==="U",
+               s:st.s||t==="S"||t==="STRIKE"||t==="DEL" },into);
+    });
+  }
+  var lastBr=false;
+  [].forEach.call(root.childNodes,function(n){
+    var t=n.nodeType===1?n.nodeName:"";
+    if(t==="H3"){ flush(); var r=[]; runs(n,{},r); out.push({k:"h",r:r}); return }
+    if(t==="HR"){ flush(); out.push({k:"hr",r:[]}); return }
+    if(t==="BLOCKQUOTE"){ flush(); var q=[]; runs(n,{},q); out.push({k:"q",r:q}); return }
+    if(t==="UL"||t==="OL"){ flush(); [].forEach.call(n.children,function(li,ix){ var r=[]; runs(li,{},r);
+      out.push({k:t==="OL"?"oli":"li",n:ix+1,r:r}) }); return }
+    if(t==="FIGURE"||t==="IMG") return;
+    if(t==="BR"){
+      if(lastBr){ flush(); lastBr=false; return }     // a blank line ends a paragraph
+      lastBr=true; cur.push({br:true,t:""}); return;
+    }
+    lastBr=false;
+    runs(n.nodeType===1?n:{childNodes:[n]},{b:t==="B"||t==="STRONG",i:t==="I"||t==="EM",u:t==="U",s:t==="S"||t==="STRIKE"||t==="DEL"},cur);
+  });
+  flush();
+  out.forEach(function(b){ b.r=b.r.filter(function(r,ix,a){ return !(r.br&&(ix===0||ix===a.length-1)) }) });
+  return out;
+}
+function xmlEsc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;") }
+function fileSafe(s){ return String(s).replace(/[\/\\:*?"<>|]+/g,"-").slice(0,80)||"book" }
+function bookAuthor(){ return (POSTS.profile&&POSTS.profile.display_name)||"" }
+
+/* ---- a small zip, stored, no compression: what .docx and .epub are ---- */
+var CRCT=null;
+function crc32(bytes){
+  if(!CRCT){ CRCT=new Uint32Array(256);
+    for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1; CRCT[n]=c>>>0 } }
+  var crc=0xFFFFFFFF;
+  for(var i=0;i<bytes.length;i++) crc=CRCT[(crc^bytes[i])&0xFF]^(crc>>>8);
+  return (crc^0xFFFFFFFF)>>>0;
+}
+function makeZip(files){
+  var enc=new TextEncoder(), parts=[], central=[], offset=0;
+  function u16(v){ return [v&255,(v>>>8)&255] }
+  function u32(v){ return [v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255] }
+  files.forEach(function(f){
+    var name=enc.encode(f.name), data=typeof f.data==="string"?enc.encode(f.data):f.data, crc=crc32(data);
+    var head=[].concat(u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(data.length),u32(data.length),u16(name.length),u16(0));
+    parts.push(new Uint8Array(head),name,data);
+    central.push([].concat(u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(data.length),u32(data.length),
+      u16(name.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(offset)),name);
+    offset+=head.length+name.length+data.length;
+  });
+  var cdStart=offset, cdLen=0, out=parts.slice();
+  for(var k=0;k<central.length;k+=2){ var h=new Uint8Array(central[k]); out.push(h,central[k+1]); cdLen+=h.length+central[k+1].length }
+  out.push(new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(cdLen),u32(cdStart),u16(0))));
+  return out;
+}
+function download(name,chunks,type){
+  try{
+    var blob=new Blob(chunks,{type:type});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href) },3000);
+    return true;
+  }catch(e){ toast("Couldn't build the file"); return false }
+}
+
+/* ---- Word ---- */
+function bookDocx(tag){
+  var parts=bookParts(tag), author=bookAuthor();
+  function runsX(rs){
+    return rs.map(function(r){
+      if(r.br) return '<w:r><w:br/></w:r>';
+      var pr=(r.b?'<w:b/>':'')+(r.i?'<w:i/>':'')+(r.u?'<w:u w:val="single"/>':'')+(r.s?'<w:strike/>':'');
+      return '<w:r>'+(pr?'<w:rPr>'+pr+'</w:rPr>':'')+'<w:t xml:space="preserve">'+xmlEsc(r.t)+'</w:t></w:r>';
+    }).join("");
+  }
+  function para(style,inner){ return '<w:p>'+(style?'<w:pPr><w:pStyle w:val="'+style+'"/></w:pPr>':'')+inner+'</w:p>' }
+  var body=para("Title",runsX([{t:tag}]))+(author?para("Subtitle",runsX([{t:author}])):"");
+  parts.forEach(function(i,ix){
+    body+=para("Heading1",runsX([{t:partTitle(i,ix)}]));
+    textBlocks(i.body).forEach(function(b){
+      if(b.k==="hr") body+=para("Break",runsX([{t:"*  *  *"}]));
+      else if(b.k==="h") body+=para("Heading2",runsX(b.r));
+      else if(b.k==="q") body+=para("Quote",runsX(b.r));
+      else if(b.k==="li") body+=para("ListParagraph",runsX([{t:"•  "}].concat(b.r)));
+      else if(b.k==="oli") body+=para("ListParagraph",runsX([{t:b.n+".  "}].concat(b.r)));
+      else body+=para("",runsX(b.r));
+    });
+  });
+  var W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  var font='<w:rFonts w:ascii="Georgia" w:hAnsi="Georgia" w:cs="Georgia" w:eastAsia="Georgia"/>';
+  var styles='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'>'
+    +'<w:docDefaults><w:rPrDefault><w:rPr>'+font+'<w:sz w:val="24"/><w:lang w:val="el-GR"/></w:rPr></w:rPrDefault>'
+    +'<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="360" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
+    +'<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:before="2400" w:after="240"/></w:pPr><w:rPr><w:sz w:val="56"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Subtitle"><w:name w:val="Subtitle"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:i/><w:sz w:val="28"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:pageBreakBefore/><w:spacing w:before="1200" w:after="480"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:before="360" w:after="120"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:right="720"/></w:pPr><w:rPr><w:i/></w:rPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720" w:hanging="360"/></w:pPr></w:style>'
+    +'<w:style w:type="paragraph" w:styleId="Break"><w:name w:val="Scene break"/><w:basedOn w:val="Normal"/><w:pPr><w:jc w:val="center"/><w:spacing w:before="240" w:after="240"/></w:pPr></w:style>'
+    +'</w:styles>';
+  var doc='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+body
+    +'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>';
+  var files=[
+    {name:"[Content_Types].xml",data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      +'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+      +'<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>'},
+    {name:"_rels/.rels",data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'},
+    {name:"word/_rels/document.xml.rels",data:'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      +'<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'},
+    {name:"word/document.xml",data:doc},
+    {name:"word/styles.xml",data:styles}
+  ];
+  return makeZip(files);
+}
+
+/* ---- EPUB ---- */
+function blocksXhtml(bs){
+  function rx(rs){ return rs.map(function(r){
+    if(r.br) return "<br/>";
+    var t=xmlEsc(r.t);
+    if(r.s) t="<del>"+t+"</del>"; if(r.u) t="<u>"+t+"</u>"; if(r.i) t="<em>"+t+"</em>"; if(r.b) t="<strong>"+t+"</strong>";
+    return t; }).join("") }
+  var out="", list=null;
+  bs.forEach(function(b){
+    var want=b.k==="li"?"ul":b.k==="oli"?"ol":null;
+    if(list&&list!==want){ out+="</"+list+">"; list=null }
+    if(want&&!list){ out+="<"+want+">"; list=want }
+    if(want) out+="<li>"+rx(b.r)+"</li>";
+    else if(b.k==="hr") out+='<p class="brk">*  *  *</p>';
+    else if(b.k==="h") out+="<h2>"+rx(b.r)+"</h2>";
+    else if(b.k==="q") out+="<blockquote><p>"+rx(b.r)+"</p></blockquote>";
+    else out+="<p>"+rx(b.r)+"</p>";
+  });
+  if(list) out+="</"+list+">";
+  return out;
+}
+function bookEpub(tag){
+  var parts=bookParts(tag), author=bookAuthor(), id="urn:uuid:"+uid()+uid();
+  function page(title,body){ return '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="el" lang="el">'
+    +'<head><meta charset="UTF-8"/><title>'+xmlEsc(title)+'</title><link rel="stylesheet" type="text/css" href="style.css"/></head><body>'+body+'</body></html>' }
+  var files=[{name:"mimetype",data:"application/epub+zip"},
+    {name:"META-INF/container.xml",data:'<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>'},
+    {name:"OEBPS/style.css",data:"body{font-family:Georgia,serif;line-height:1.55;margin:0 5%}h1{text-align:center;margin:3em 0 1.5em;font-weight:normal}h2{margin:1.6em 0 .5em}p{margin:0 0 .8em}blockquote{margin:1em 2em;font-style:italic}.brk{text-align:center;margin:1.4em 0}.title{text-align:center;margin-top:30%}.author{text-align:center;font-style:italic}"},
+    {name:"OEBPS/title.xhtml",data:page(tag,'<h1 class="title">'+xmlEsc(tag)+'</h1>'+(author?'<p style="text-align:center;font-style:italic">'+xmlEsc(author)+'</p>':""))}];
+  parts.forEach(function(i,ix){
+    files.push({name:"OEBPS/p"+(ix+1)+".xhtml",data:page(partTitle(i,ix),'<section epub:type="chapter"><h1>'+xmlEsc(partTitle(i,ix))+'</h1>'+blocksXhtml(textBlocks(i.body))+'</section>')});
+  });
+  files.push({name:"OEBPS/nav.xhtml",data:page("Περιεχόμενα",'<nav epub:type="toc" id="toc"><h1>Περιεχόμενα</h1><ol>'
+    +parts.map(function(i,ix){ return '<li><a href="p'+(ix+1)+'.xhtml">'+xmlEsc(partTitle(i,ix))+'</a></li>' }).join("")+'</ol></nav>')});
+  var now=new Date().toISOString().replace(/\.\d+Z$/,"Z");
+  files.push({name:"OEBPS/content.opf",data:'<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bid" xml:lang="el">'
+    +'<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="bid">'+id+'</dc:identifier><dc:title>'+xmlEsc(tag)+'</dc:title><dc:language>el</dc:language>'
+    +(author?'<dc:creator>'+xmlEsc(author)+'</dc:creator>':'')+'<meta property="dcterms:modified">'+now+'</meta></metadata><manifest>'
+    +'<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="css" href="style.css" media-type="text/css"/>'
+    +'<item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>'
+    +parts.map(function(i,ix){ return '<item id="p'+(ix+1)+'" href="p'+(ix+1)+'.xhtml" media-type="application/xhtml+xml"/>' }).join("")
+    +'</manifest><spine><itemref idref="title"/>'+parts.map(function(i,ix){ return '<itemref idref="p'+(ix+1)+'"/>' }).join("")+'</spine></package>'});
+  return makeZip(files);   // "mimetype" first and stored, as EPUB requires
+}
+
+/* ---- Markdown ---- */
+function bookMarkdown(tag){
+  var parts=bookParts(tag), author=bookAuthor();
+  function rm(rs){ return rs.map(function(r){ if(r.br) return "  \n"; var t=r.t;
+    if(!t.trim()) return t; var lead=t.match(/^\s*/)[0], tail=t.match(/\s*$/)[0]; t=t.trim();
+    if(r.b) t="**"+t+"**"; if(r.i) t="*"+t+"*"; if(r.s) t="~~"+t+"~~"; return lead+t+tail; }).join("") }
+  var out="# "+tag+"\n\n"+(author?"*"+author+"*\n\n":"");
+  parts.forEach(function(i,ix){
+    out+="\n## "+partTitle(i,ix)+"\n\n";
+    textBlocks(i.body).forEach(function(b){
+      if(b.k==="hr") out+="* * *\n\n";
+      else if(b.k==="h") out+="### "+rm(b.r)+"\n\n";
+      else if(b.k==="q") out+="> "+rm(b.r)+"\n\n";
+      else if(b.k==="li") out+="- "+rm(b.r)+"\n";
+      else if(b.k==="oli") out+=b.n+". "+rm(b.r)+"\n";
+      else out+=rm(b.r)+"\n\n";
+    });
+  });
+  return out.replace(/\n{3,}/g,"\n\n");
+}
+
+/* ---- PDF, through the browser's own Print → Save as PDF ---- */
+function bookPrint(tag){
+  var parts=bookParts(tag), author=bookAuthor();
+  var html='<!DOCTYPE html><html lang="el"><head><meta charset="utf-8"><title>'+xmlEsc(tag)+'</title><style>'
+    +'@page{size:A4;margin:25mm 22mm}body{font-family:Georgia,serif;font-size:12pt;line-height:1.55;color:#111}'
+    +'.t{text-align:center;margin-top:35%;font-size:28pt;font-weight:normal}.a{text-align:center;font-style:italic}'
+    +'section{page-break-before:always}section h1{font-size:20pt;font-weight:normal;margin:30mm 0 12mm}'
+    +'h2{font-size:14pt;margin:1.4em 0 .4em}p{margin:0 0 .7em;orphans:2;widows:2}blockquote{margin:1em 2em;font-style:italic}'
+    +'.brk{text-align:center;margin:1.2em 0}</style></head><body>'
+    +'<h1 class="t">'+xmlEsc(tag)+'</h1>'+(author?'<p class="a">'+xmlEsc(author)+'</p>':"")
+    +parts.map(function(i,ix){ return '<section><h1>'+xmlEsc(partTitle(i,ix))+'</h1>'+blocksXhtml(textBlocks(i.body))+'</section>' }).join("")
+    +'<script>window.onload=function(){ setTimeout(function(){ window.print() },300) }<\/script></body></html>';
+  var w=window.open("","_blank");
+  if(!w){ toast("Allow pop-ups for this site to make a PDF"); return false }
+  w.document.open(); w.document.write(html); w.document.close();
+  return true;
+}
+function exportBook(tag){
+  var n=bookParts(tag).length;
+  if(!n) return toast("This book has no parts yet");
+  askChoice("Export #"+tag,"All "+n+" part"+(n===1?"":"s")+", in the book's order, each starting on a new page.",
+    [{label:"Cancel",value:null,kind:"sec"},{label:"Word (.docx)",value:"docx"},{label:"EPUB",value:"epub"},
+     {label:"PDF",value:"pdf"},{label:"Markdown",value:"md"}],
+    function(v){
+      var name=fileSafe(tag);
+      if(v==="docx"&&download(name+".docx",bookDocx(tag),"application/vnd.openxmlformats-officedocument.wordprocessingml.document")) toast("Exported for Word");
+      if(v==="epub"&&download(name+".epub",bookEpub(tag),"application/epub+zip")) toast("Exported as an EPUB");
+      if(v==="md"&&download(name+".md",[bookMarkdown(tag)],"text/markdown")) toast("Exported as Markdown");
+      if(v==="pdf"&&bookPrint(tag)) toast("Choose Save as PDF in the print window");
+    });
 }
 
 function latestIssue(tpl){
@@ -8296,6 +8586,9 @@ board.addEventListener("click",function(e){
   }
   if(e.target.closest("[data-grip]")) return;
   /* a book on the Writing page opens the book */
+  var ps=e.target.closest("[data-pstat]");
+  if(ps){ e.stopPropagation(); var pi=byId(ps.dataset.pstat);
+    if(pi){ pi.finished=!pi.finished; if(!pi.finished) delete pi.finished; pi.modified=Date.now(); save(); render() } return }
   var fx=e.target.closest("[data-fixday]");
   if(fx){ correctDay(fx.getAttribute("data-fixday")); return }
   var sb=e.target.closest(".stbook");
@@ -8399,7 +8692,7 @@ board.addEventListener("click",function(e){
   if(selCount()) togglePick(row.dataset.id);
   /* In Full, a note opens where it stands. Its pictures still open the
      whole editor, which is where pictures are handled. */
-  else if(layoutFor()==="full"&&row.classList.contains("card")
+  else if((layoutFor()==="full"||layoutFor()==="ms")&&row.classList.contains("card")
           &&!e.target.closest(".photos,.thumb")&&!(byId(row.dataset.id)||{}).issue) startInline(row,e);
   else openEditor(row.dataset.id);
 });
@@ -10815,7 +11108,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="92";
+var BUILD="93";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
