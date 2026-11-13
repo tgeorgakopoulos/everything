@@ -451,13 +451,20 @@
     font-size:15px;font-weight:560;outline:none}
   .askin:focus{border-color:var(--accent)}
 
-  /* On a laptop the tools on the right take their full width and the title
-     gets what is left. Squeezed, the buttons beside it broke into a word per
-     line ("Make / this / a / book"). Now nothing in the row breaks: when it
-     does not fit, the buttons drop under the title, on one line. */
-  .titlerow{display:flex;align-items:center;gap:6px 9px;flex-wrap:wrap}
-  .titlerow .title{min-width:0;overflow-wrap:anywhere}
-  .tagedit{font-size:11.5px;padding:4px 9px;white-space:nowrap}
+  /* The page's name and its two tag tools. On a computer the tools are
+     small icons right after the name (the words appear on hover), so they
+     cost no width; on a phone, where there is no hover, the words show.
+     The name's column takes the room that is left but never less than
+     180px — squeezed below that, "All" broke into "A / ll" — and when the
+     tools on the right need more than that leaves, they move to a line of
+     their own underneath instead of crushing the name. */
+  .topbar{flex-wrap:wrap;row-gap:10px}
+  .topbar>.tcol{flex:1 1 180px;min-width:0}
+  .titlerow{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+  .titlerow .title{margin-right:4px}
+  .tagedit{font-size:15px;line-height:1;padding:6px 7px;white-space:nowrap;color:var(--faint)}
+  .tagedit:hover{color:var(--ink)}
+  .tagedit .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   .search{position:relative;display:flex;align-items:center}
   .search input{width:210px;height:34px;padding:0 11px 0 30px;border-radius:10px;
     border:1px solid var(--line-strong);background:var(--surface);outline:none;
@@ -1683,6 +1690,9 @@
        full width, the rest beneath it. In one row it ran off the side of
        the screen. */
     .topbar{flex-wrap:wrap;row-gap:10px}
+    /* no hover on a phone: the tag tools say what they are */
+    .tagedit{font-size:11.5px;padding:4px 9px;color:var(--ui)}
+    .tagedit .lbl{position:static;width:auto;height:auto;clip:auto}
     /* Two rows of equal shape, so the tools take two lines rather than
        half the screen:
 
@@ -1897,11 +1907,11 @@
       <button class="menubtn" id="menubtn" title="Menu">
         <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
-      <div>
+      <div class="tcol">
         <div class="titlerow">
           <div class="title" id="viewtitle">All</div>
-          <button class="ghost tagedit" id="tagedit" style="display:none">✎ Rename tag</button>
-          <button class="ghost tagedit" id="bookbtn" style="display:none" title="A book counts its words and keeps its own stats">▤ Make this a book</button>
+          <button class="ghost tagedit" id="tagedit" style="display:none" title="Rename tag"><span aria-hidden="true">✎</span><span class="lbl"> Rename tag</span></button>
+          <button class="ghost tagedit" id="bookbtn" style="display:none" title="Make this a book — it counts its words and keeps its own stats"><span aria-hidden="true">▤</span><span class="lbl"> Make this a book</span></button>
         </div>
         <div class="lensnote" id="lensnote"></div>
 
@@ -4556,7 +4566,12 @@ function paintSidebar(){
   // the tag page gets a rename control; nothing else does
   document.getElementById("tagedit").style.display=S.tag?"":"none";
   var bkb=document.getElementById("bookbtn");
-  if(bkb){ bkb.style.display=S.tag&&!S.q?"":"none"; bkb.textContent=bookFor(S.tag)?"▤ Book…":"▤ Make this a book" }
+  if(bkb){
+    bkb.style.display=S.tag&&!S.q?"":"none";
+    var bl=bookFor(S.tag)?"Book…":"Make this a book";
+    bkb.querySelector(".lbl").textContent=" "+bl;
+    bkb.title=bookFor(S.tag)?"Book: export, target, or make it a tag again":"Make this a book — it counts its words and keeps its own stats";
+  }
   paintWordsToday();
   paintSortRow();
 
@@ -11159,7 +11174,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="95";
+var BUILD="96";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
