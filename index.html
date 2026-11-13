@@ -451,8 +451,13 @@
     font-size:15px;font-weight:560;outline:none}
   .askin:focus{border-color:var(--accent)}
 
-  .titlerow{display:flex;align-items:center;gap:9px}
-  .tagedit{font-size:11.5px;padding:4px 9px}
+  /* On a laptop the tools on the right take their full width and the title
+     gets what is left. Squeezed, the buttons beside it broke into a word per
+     line ("Make / this / a / book"). Now nothing in the row breaks: when it
+     does not fit, the buttons drop under the title, on one line. */
+  .titlerow{display:flex;align-items:center;gap:6px 9px;flex-wrap:wrap}
+  .titlerow .title{min-width:0;overflow-wrap:anywhere}
+  .tagedit{font-size:11.5px;padding:4px 9px;white-space:nowrap}
   .search{position:relative;display:flex;align-items:center}
   .search input{width:210px;height:34px;padding:0 11px 0 30px;border-radius:10px;
     border:1px solid var(--line-strong);background:var(--surface);outline:none;
@@ -1883,7 +1888,7 @@
       <button data-tbf="overdue">Overdue</button><button data-tbf="upcoming">Upcoming</button>
       <button data-tbf="someday">Someday</button><button data-tbf="done">Completed</button>
     </nav>
-    <input class="tbin" id="tbin" placeholder="Add a task, with a date…" autocomplete="off">
+    <input class="tbin" id="tbin" placeholder="Add a task, with a date…" autocomplete="off" enterkeyhint="done">
     <div class="tblist" id="tblist"></div>
   </section>
 
@@ -4488,7 +4493,19 @@ function taskRowHTML(i){
       input.blur();
       return;
     }
-    if(e.key!=="Enter") return;
+    if(e.key!=="Enter"||e.isComposing) return;
+    e.preventDefault();
+    addTyped();
+  });
+  /* On a phone the keyboard's own ✓ (above the keys, on iPhone) does not
+     press Enter: it only puts the keyboard away. What you typed then sat
+     in the field with no way to send it. So on a touch screen, putting
+     the keyboard away with something typed adds it. With a mouse, leaving
+     the field leaves it alone — clicking elsewhere is not saying "add". */
+  input.addEventListener("blur",function(){
+    if(isTouchOnly()&&input.value.trim()) addTyped();
+  });
+  function addTyped(){
     var text=input.value.trim();
     if(!text) return;
     /* Same parser as the main capture box, so "call Elena friday" lands on
@@ -4503,8 +4520,11 @@ function taskRowHTML(i){
     input.value="";
     save(); render();
     if(p.url) fetchMeta(S.items[0]);
-  });
+  }
 })();
+function isTouchOnly(){
+  try{ return window.matchMedia("(hover:none)").matches }catch(e){ return false }
+}
 
 /* Lenses, counts, tags and which nav row is lit. Split out of render because
    the Posts page needs all of it and none of the item machinery above. */
@@ -11139,7 +11159,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="94";
+var BUILD="95";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
