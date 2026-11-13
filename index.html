@@ -3155,8 +3155,16 @@ function applyMeta(item,meta){
   if(meta.site) item.site=meta.site;
 }
 var mqueue=[], mactive=0;
+/* A link to an email is private to its owner. Asking a preview service
+   about it would hand that service your address and the message's id, and
+   all it could ever see is a sign-in page. So mail links are never looked
+   up: the subject is the title. */
+function isMailLink(u){
+  return /^https:\/\/(mail\.google\.com|outlook\.(office|live)\.com|outlook\.office365\.com)\//i.test(String(u||""));
+}
 function fetchMeta(item,force){
   if(!item||!item.url) return;
+  if(isMailLink(item.url)){ renderSoon(); return }
   if(!force&&(item.metaState==="ok"||item.metaState==="loading"||item.metaState==="fail")) return;
   if(item.metaState==="loading") return;
   mqueue.push(item); pump();
@@ -5977,8 +5985,10 @@ function issueKey(i){ return (i.issue&&NL_TEMPLATES[i.issue.template])?i.issue.t
    Words written are counted as they are saved, per day and per book. Each
    device keeps its own record and sends it up like a note; the numbers on
    screen are the sum of every device's record, so every device shows the
-   same. What is counted is the net change in words of the notes you write
-   in: a paragraph written and another deleted cancel out. Words that
+   same. What is counted is new words: the words you add. Deleting never
+   takes anything off — cutting a paragraph from an old note is not
+   un-writing it — and a paragraph deleted and written again counts the
+   new one. Words that
    arrive rather than being written (from another device, an import, a
    compile, last week's issue carried over) are noted, not counted.
    ========================================================================= */
@@ -6018,6 +6028,11 @@ var WC_FRESH=null;
    saved: pasting brings in writing done elsewhere, it is not writing. */
 var PASTED={}, CAP_PASTED=0;
 function notePaste(id,text){ var n=words(text||""); if(id&&n) PASTED[id]=(PASTED[id]||0)+n }
+/* The most words taken out of a note while it was open, below where it
+   started. A save counts what was added after the lowest point, so cutting
+   a paragraph and writing a new one counts the new one, not the difference. */
+var DROP={};
+function noteDrop(id,start,now){ if(id&&start-now>(DROP[id]||0)) DROP[id]=start-now }
 /* Correcting a day by hand — for anything counted that should not have
    been. The tags and kinds of that day are scaled to match. */
 function correctDay(key){
@@ -6050,7 +6065,7 @@ function noteArrival(i){
   var c=WC[i.id], n=wordsOf(i);
   if(!WC_FRESH&&fromElsewhere(i)&&countsArrivals()){
     var d=n-(c?c.n:0);
-    if(d){
+    if(d>0){                       // added; what was deleted there is not subtracted
       var when=new Date(i.modified||Date.now()), pad=function(x){ return (x<10?"0":"")+x };
       recordWords(when.getFullYear()+"-"+pad(when.getMonth()+1)+"-"+pad(when.getDate()),d,i);
     }
@@ -6083,8 +6098,10 @@ function tallyWords(){
     seen[i.id]=1;
     var c=WC[i.id];
     if(c&&c.m===(i.modified||0)) return;            // untouched since last time
-    var n=wordsOf(i), d=n-(c?c.n:0);
+    var n=wordsOf(i), d=n-Math.max(0,(c?c.n:0)-(DROP[i.id]||0));
+    delete DROP[i.id];
     if(PASTED[i.id]){ d-=PASTED[i.id]; delete PASTED[i.id] }   // pasted in, not written
+    if(d<0) d=0;                                     // deleting is not un-writing
     i.ed=DEVICE_ID; i.edm=i.modified||0;             // edited here: this device has counted it
     WC[i.id]={ n:n, m:i.modified||0 };
     if(!d) return;
@@ -7311,6 +7328,7 @@ function openEditor(id){
   });
   function countWords(){
     var n=words(richToText(bodyHtml()));
+    if(wcStart==null) wcStart=n; else noteDrop(i.id,wcStart,n);
     q("#e-wc").textContent = n ? n.toLocaleString()+" word"+(n===1?"":"s") : "";
   }
   function paintWhen(){
@@ -7364,6 +7382,7 @@ function openEditor(id){
     if(rect.bottom>box.bottom-pad) sheet.scrollTop+=rect.bottom-(box.bottom-pad)+28;
     else if(allowUp&&rect.top<box.top+16) sheet.scrollTop-=box.top+16-rect.top+28;
   }
+  var wcStart=null;
   countWords();
   // typing only ever pushes the view down; never yank it upwards mid-sentence
   body.addEventListener("input",function(){ countWords(); keepCaretVisible(false) });
@@ -7994,7 +8013,7 @@ function openEditor(id){
 }
 function close(){
   var fid=S.editing;
-  if(fid) delete PASTED[fid];         // saved: already accounted; cancelled: nothing was kept
+  if(fid){ delete PASTED[fid]; delete DROP[fid] }   // saved: already accounted; cancelled: nothing was kept
   if(fid&&FRESH[fid]){
     delete FRESH[fid];
     var fi=byId(fid);
@@ -10436,8 +10455,10 @@ function sha256Hex(s){
 var KEYS={ list:[], busy:false, err:"" };
 
 function loadKeys(){
-  return rest("/api_keys?select=id,name,prefix,can_write,created_at,last_used_at"
-              +"&order=created_at.desc")
+  var cols="id,name,prefix,can_write,created_at,last_used_at";
+  /* add_only arrives with key-scopes.sql; until that has run, ask the old way. */
+  return rest("/api_keys?select="+cols+",add_only&order=created_at.desc")
+    .catch(function(){ return rest("/api_keys?select="+cols+"&order=created_at.desc") })
     .then(function(r){ KEYS.list=r||[]; KEYS.err=""; })
     .catch(function(e){ KEYS.err=(e&&e.msg)||"could not reach the server" });
 }
@@ -10478,7 +10499,7 @@ function paintKeys(){
                     deliberately tabbed to the checkbox. */
                  focusedId:(sheet.contains(document.activeElement)
                             &&document.activeElement.id)||"",
-                 write:(document.getElementById("k-write")||{}).checked };
+                 kind:(document.getElementById("k-kind")||{}).value };
 
   var rows;
   if(KEYS.busy&&!KEYS.list.length) rows='<div class="hempty">Loading…</div>';
@@ -10493,7 +10514,7 @@ function paintKeys(){
         +esc(agoText(new Date(k.created_at).getTime()))
         +(k.last_used_at?' · last used '+esc(agoText(new Date(k.last_used_at).getTime()))
                         :' · never used')
-        +(k.can_write?"":" · read only")+'</span></div>'
+        +(k.add_only?" · add only":k.can_write?" · read and write":" · read only")+'</span></div>'
       +'<button class="btn quiet" data-krev="'+esc(k.id)+'">Revoke</button>'
       +'</div>';
   }).join("");
@@ -10507,8 +10528,13 @@ function paintKeys(){
     +'<div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">'
       +'<input class="field" id="k-name" style="flex:1;min-width:170px" '
         +'placeholder="what is it for? e.g. the netbook" maxlength="60">'
-      +'<label class="krw"><input type="checkbox" id="k-write" checked> '
-        +'may write</label>'
+      /* What the key may do. Add only is first and the default: it is all a
+         phone or the Gmail add-on needs, and a key that cannot read gives
+         nothing away if it leaks. */
+      +'<select class="field krw" id="k-kind" style="flex:0 0 auto" aria-label="what the key may do">'
+        +'<option value="add">add only — phone, Gmail</option>'
+        +'<option value="rw">read and write — writing machine</option>'
+        +'<option value="ro">read only</option></select>'
       +'<button class="btn" id="k-make">Make a key</button>'
     +'</div>'
     +'<div class="row sticky" style="justify-content:flex-end">'
@@ -10517,8 +10543,8 @@ function paintKeys(){
   var nameEl=sheet.querySelector("#k-name");
   if(keep&&nameEl){
     nameEl.value=keep.value;
-    var wEl=sheet.querySelector("#k-write");
-    if(wEl&&keep.write!==undefined) wEl.checked=keep.write;
+    var wEl=sheet.querySelector("#k-kind");
+    if(wEl&&keep.kind) wEl.value=keep.kind;
     if(keep.focusedId==="k-name"){
       nameEl.focus();
       try{ nameEl.setSelectionRange(keep.start,keep.end) }catch(e){}
@@ -10573,16 +10599,17 @@ function makeKey(){
      UPDATE policy, deliberately. So: a default rather than a refusal. */
   var name=(nameEl&&nameEl.value||"").trim()
     || ("key made "+new Date().toLocaleDateString([], {day:"numeric",month:"long"}));
-  var writeEl=document.getElementById("k-write");
-  var canWrite=!writeEl||writeEl.checked;
+  var kindEl=document.getElementById("k-kind");
+  var kind=(kindEl&&kindEl.value)||"add";
+  var row={ owner:myUid(), name:name, can_write:kind!=="ro" };
+  if(kind==="add") row.add_only=true;
   var key=makeKeyString();
   var btn=document.getElementById("k-make");
   if(btn) btn.disabled=true;
 
   sha256Hex(key).then(function(hash){
-    return rest("/api_keys",{ method:"POST", prefer:"return=minimal",
-      body:{ owner:myUid(), name:name, prefix:key.slice(0,8),
-             hash:hash, can_write:canWrite } });
+    row.prefix=key.slice(0,8); row.hash=hash;
+    return rest("/api_keys",{ method:"POST", prefer:"return=minimal", body:row });
   }).then(function(){
     return loadKeys();
   }).then(function(){
@@ -10601,7 +10628,11 @@ function makeKey(){
       });
   }).catch(function(e){
     if(btn) btn.disabled=false;
-    toast((e&&e.msg)||"could not make a key");
+    /* Never quietly fall back to a key that can read: if the server does
+       not know "add only" yet, say so and make nothing. */
+    if(row.add_only&&/add_only/.test((e&&e.msg)||""))
+      toast("Add-only keys need the key-scopes step in Supabase first");
+    else toast((e&&e.msg)||"could not make a key");
   });
 }
 
@@ -11108,7 +11139,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="93";
+var BUILD="94";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
