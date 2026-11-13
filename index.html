@@ -5863,11 +5863,14 @@ function issueBoxesHTML(html,label){
     (ix===0?p.nodes:p.nodes.slice(1)).forEach(function(n){ holder.appendChild(n.cloneNode(true)) });
     var inner=sanitizeRich(holder.innerHTML);
     if(ix===0) out+=boxHTML(null,inner,label);
-    else out+=boxHTML(p.head||"",inner);
+    else out+=boxHTML(noPlaceholder(p.head),inner);
   });
   if(parts.length<2) out+="";   // an issue with no sections is just its editorial
   return out;
 }
+/* Earlier versions wrote "Χωρίς τίτλο" into a box left without a title.
+   It was never meant: such boxes now open, and are sent, without one. */
+function noPlaceholder(h){ h=String(h||"").trim(); return /^χωρίς τίτλο$/i.test(h)?"":h }
 function boxHTML(title,inner,label){
   var ed=title===null;
   return '<section class="nlbox'+(ed?" ed":"")+'">'
@@ -5887,7 +5890,10 @@ function boxesToHtml(container){
     var inner=c?c.innerHTML:"";
     if(bx.classList.contains("ed")) out+=inner;
     else{
-      var title=(t?t.textContent:"").replace(/\s+/g," ").trim()||"Χωρίς τίτλο";
+      /* A box left without a title has none. Its heading is still stored,
+         empty, because that is where one box ends and the next begins —
+         but nothing is printed: the email draws only the dividing line. */
+      var title=(t?t.textContent:"").replace(/\s+/g," ").trim();
       out+="<h3>"+esc(title)+"</h3>"+inner;
     }
   });
@@ -6878,6 +6884,8 @@ function issueToEmail(item){
   }
   function row(inner,pad){ return '<tr><td class="pad" style="padding:'+(pad||"0 40px")+'">'+inner+'</td></tr>' }
   function section(label){
+    if(!label) return '<tr><td class="pad" style="padding:30px 40px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+      +'<td style="border-top:1px solid '+T.links+';font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>';
     return '<tr><td class="pad" style="padding:30px 40px 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
       +'<td style="border-top:1px solid '+T.links+';padding-top:22px;font-family:'+NL_SANS+';font-size:22px;line-height:1.3;'
       +'letter-spacing:-.01em;color:'+T.titles+';font-weight:600">'+label+'</td></tr></table></td></tr>';
@@ -6944,7 +6952,7 @@ function issueToEmail(item){
     if(t!=="FIGURE"&&figs.length&&!(t==="BR"||(n.nodeType===3&&!n.data.trim()))) flushFigs();
     if(t==="FIGURE"){ flushRun(); figs.push(n); return }
     if(figs.length&&(t==="BR"||(n.nodeType===3&&!n.data.trim()))) return;
-    if(t==="H3"){ flushRun(); inLinks=isLinksHead(n.textContent); rows.push(section(esc(n.textContent.trim()))); return }
+    if(t==="H3"){ flushRun(); inLinks=isLinksHead(n.textContent); rows.push(section(esc(noPlaceholder(n.textContent)))); return }   // an untitled box: the line only
     if(t==="HR"){ flushRun(); rows.push(row('<div style="border-top:1px solid '+T.links+';margin:10px 0 24px;height:0;line-height:0;font-size:0">&nbsp;</div>')); return }
     if(t==="BLOCKQUOTE"){ flushRun(); rows.push(row(quote([].map.call(n.childNodes,inline).join("")))); return }
     if(t==="UL"||t==="OL"){ flushRun(); rows.push(row(list(n))); return }
@@ -9253,7 +9261,7 @@ function publishDraft(d){
   return withFreshSession().then(function(){
     return Promise.all((d.photos||[]).map(function(p,ix){ return uploadPhoto(id,p,ix) }));
   }).then(function(shots){
-    var row={ body:sanitizeRich(d.body||""), photos:shots.filter(Boolean), link:d.link||null };
+    var row={ body:sanitizeRich(d.body||"").replace(/<h3>\s*Χωρίς τίτλο\s*<\/h3>/gi,"<h3></h3>"), photos:shots.filter(Boolean), link:d.link||null };
     if(isNew){
       row.id=id;
       row.author=myUid();
@@ -11174,7 +11182,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="96";
+var BUILD="97";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
