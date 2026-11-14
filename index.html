@@ -3733,6 +3733,15 @@ function inHeading(){
 }
 
 var SAFE_HREF=/^(https?:|mailto:)/i;
+/* What someone types or pastes as a link for a picture. "site.gr/x" is
+   meant as https://site.gr/x; an address pasted after the "https://" the
+   field starts with is meant once, not twice. Returns "" for no link. */
+function linkFromInput(v){
+  v=String(v||"").trim().replace(/^(https?:\/\/)+(?=https?:\/\/)/i,"");
+  if(!v||/^https?:\/\/?$/i.test(v)) return "";
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(v)&&/^[^\s\/]+\.[^\s\/]+/.test(v)) v="https://"+v.replace(/^\/+/,"");
+  return SAFE_HREF.test(v)&&!/\s/.test(v)?v:"";
+}
 // these are removed along with everything inside them, rather than unwrapped
 var RICH_DROP={SCRIPT:1,STYLE:1,NOSCRIPT:1,IFRAME:1,OBJECT:1,EMBED:1,TEMPLATE:1,
   LINK:1,META:1,HEAD:1,TITLE:1,SVG:1};
@@ -7546,7 +7555,22 @@ function openEditor(id){
   }
   function nlLink(cb){
     askText("A link for this picture","Where clicking it should take the reader. Leave it empty for none.",
-      "https://","Done",function(v){ v=(v||"").trim(); cb(SAFE_HREF.test(v)&&v!=="https://"?v:"") });
+      "https://","Done",function(v){ cb(linkFromInput(v)) });
+  }
+  /* The link goes on after the picture is in, by hand, the way clicking a
+     picture to change its link does. Handing the browser a linked picture
+     to insert lost the link: Chrome's insertHTML kept the picture and
+     dropped the <a> around it, so every link had to be entered twice. */
+  function nlLinkUp(src,href){
+    if(!href) return;
+    [].forEach.call(body.querySelectorAll("img"),function(img){
+      if(img.getAttribute("src")!==src) return;
+      var par=img.parentNode;
+      if(par&&par.nodeName==="A"){ par.setAttribute("href",href); return }
+      var a=document.createElement("a"); a.setAttribute("href",href);
+      par.insertBefore(a,img); a.appendChild(img);
+    });
+    body.dispatchEvent(new Event("input",{bubbles:true}));
   }
   function nlPicture(src,href){
     var img='<img src="'+esc(src)+'" alt="">';
@@ -7563,7 +7587,7 @@ function openEditor(id){
     e.preventDefault(); nlRemember();
     pickImageFiles(false,function(files){
       uploadNewsletterImages(files).then(function(urls){
-        nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>") });
+        nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>"); nlLinkUp(urls[0],href) });
       },function(err){ toast(String(err)) });
     });
   });
@@ -7580,10 +7604,15 @@ function openEditor(id){
     e.preventDefault(); nlRemember();
     pickImageFiles(true,function(files){
       uploadNewsletterImages(files.slice(0,2)).then(function(urls){
-        var html="", k=0;
+        var html="", k=0, hrefs=[];
         (function next(){
-          if(k>=urls.length){ nlInsert(html+"<br>"); return }
+          if(k>=urls.length){
+            nlInsert(html+"<br>");
+            urls.forEach(function(u,ix){ nlLinkUp(u,hrefs[ix]) });
+            return;
+          }
           nlLink(function(href){
+            hrefs[k]=href;
             html+='<figure>'+nlPicture(urls[k],href)
               +'<figcaption><b>Τίτλος</b><br>Λεζάντα</figcaption></figure>';
             k++; next();
@@ -8363,8 +8392,8 @@ sheet.addEventListener("click",function(e){
     var wrap=pic.parentNode&&pic.parentNode.nodeName==="A"?pic.parentNode:null;
     askText("A link for this picture","Where clicking it should take the reader. Empty it to remove the link.",
       wrap?wrap.getAttribute("href"):"https://","Done",function(v){
-        v=(v||"").trim();
-        var ok=SAFE_HREF.test(v)&&v!=="https://";
+        v=linkFromInput(v);
+        var ok=!!v;
         if(wrap&&!ok){ wrap.parentNode.insertBefore(pic,wrap); wrap.parentNode.removeChild(wrap) }
         else if(wrap) wrap.setAttribute("href",v);
         else if(ok){ var a2=document.createElement("a"); a2.setAttribute("href",v);
@@ -11229,7 +11258,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="98";
+var BUILD="97";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
