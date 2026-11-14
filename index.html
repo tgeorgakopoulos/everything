@@ -1056,6 +1056,19 @@
      begins, at 19. Any larger and a text-only card wears the ribbon through
      its own first word. On a card with a cover the ribbon lands on the
      image, which is where it looks best. */
+  /* The order a page compiles in. A moodboard reads across and down at
+     once, so the sequence is not something you can see — these say it.
+     Always on #weekly; on any page while the Compile menu is open, when
+     whatever will be left out fades back. They give way to the card's
+     buttons on hover. */
+  .seqn{position:absolute;top:calc(var(--toprow,18.5px) - 11px);right:10px;z-index:3;min-width:22px;height:22px;
+    padding:0 6px;border-radius:99px;background:var(--make);color:#fff;font-size:11.5px;font-weight:700;
+    display:grid;place-items:center;font-variant-numeric:tabular-nums;pointer-events:none;
+    box-shadow:0 1px 3px rgba(0,0,0,.15);transition:opacity .12s}
+  @media (hover:hover){ .card:hover .seqn{opacity:0} }
+  .card.inline .seqn{display:none}
+  .row-item .seqn{position:static;flex:none;order:-1}
+  .board.seqpeek .card:not(.inseq),.board.seqpeek .row-item:not(.inseq){opacity:.35}
   .pinned{position:absolute;top:0;left:0;width:30px;height:30px;overflow:hidden;
     pointer-events:none;z-index:3;transition:opacity .16s;
     /* the card's radius is on its border box; this box starts inside the
@@ -4196,7 +4209,34 @@ function showMore(){
   if(to>=list.length){ if(sent) sent.remove() }
   else if(sent){ sent.textContent=(list.length-to)+" more"; board.appendChild(sent) }
   watchMore();
+  paintSeq();
 }
+
+/* Numbers on the cards, in the order Compile will put them. Drawn onto the
+   cards already on the board rather than into cardHTML, so ticking a card
+   (which changes what is compiled, and so every number after it) only
+   renumbers rather than redraws. */
+function seqPeek(){ var m=document.getElementById("compilemenu"); return !!(m&&m.classList.contains("on")) }
+function seqOn(){
+  if(S.q||S.view==="newsletter"&&!S.tag||layoutFor()==="ms") return false;
+  return S.tag==="weekly"||seqPeek();
+}
+function paintSeq(){
+  [].forEach.call(board.querySelectorAll(".seqn"),function(n){ n.remove() });
+  [].forEach.call(board.querySelectorAll(".inseq"),function(n){ n.classList.remove("inseq") });
+  var on=seqOn();
+  board.classList.toggle("seqpeek",on&&seqPeek());
+  if(!on) return;
+  compileList().forEach(function(i,k){
+    var el=board.querySelector('.card[data-id="'+i.id+'"],.row-item[data-id="'+i.id+'"]');
+    if(!el) return;
+    el.classList.add("inseq");
+    var n=document.createElement("span"); n.className="seqn"; n.textContent=String(k+1);
+    n.title="Compiled "+ordinal(k+1);
+    el.insertBefore(n,el.firstChild);
+  });
+}
+function ordinal(n){ var s=["th","st","nd","rd"], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]) }
 
 function pinSplit(list,restLabel){
   var pins=list.filter(pinnedHere),
@@ -4305,6 +4345,7 @@ function render(){
       '<div class="moresent" id="moresent">'+(list.length-shown.length)+' more</div>');
   }
   watchMore();
+  paintSeq();
 
   var lay=layoutFor();
   document.querySelectorAll("#layoutseg button").forEach(function(b){
@@ -8772,6 +8813,7 @@ function paintSel(){
   selbar.classList.toggle("on",n>0);
   document.body.classList.toggle("selecting",n>0);
   selcnt.textContent=n+" selected";
+  paintSeq();          // a selection is what gets compiled: renumber
 }
 /* Selecting a card changes that card and nothing else.
 
@@ -10842,11 +10884,16 @@ document.addEventListener("click",function(e){
 
 var compileBtn=document.getElementById("compilebtn"),
     compileMenu=document.getElementById("compilemenu");
-function closeCompile(){ compileMenu.classList.remove("on"); compileBtn.classList.remove("on") }
+function closeCompile(){
+  var was=compileMenu.classList.contains("on");
+  compileMenu.classList.remove("on"); compileBtn.classList.remove("on");
+  if(was) paintSeq();
+}
 compileBtn.addEventListener("click",function(e){
   e.stopPropagation();
   var on=compileMenu.classList.toggle("on");
   compileBtn.classList.toggle("on",on);
+  paintSeq();          // open: show the order, and what will be left out
 });
 compileMenu.addEventListener("click",function(e){
   var b=e.target.closest("[data-comp]"); if(!b) return;
@@ -11182,7 +11229,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="97";
+var BUILD="98";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
