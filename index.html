@@ -1829,7 +1829,27 @@
     .mobtabs .mobnew svg{width:28px;height:28px;stroke:currentColor;
       stroke-width:2.4;fill:none;stroke-linecap:round}
     .mobtabs .mobnew:active{transform:scale(.94)}
+    /* held down, the + listens: no text selection or callout to fight it */
+    .mobtabs .mobnew{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;touch-action:manipulation}
   }
+  /* ---- voice note: hold + to talk ---- */
+  .voice{position:fixed;left:12px;right:12px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:95;
+    background:var(--surface);border:1px solid var(--line-strong);border-radius:18px;box-shadow:var(--shadow-lg);
+    padding:16px 16px 14px;display:none}
+  .voice.on{display:block}
+  .vtop{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .vdot{width:12px;height:12px;border-radius:50%;background:var(--make);flex:none}
+  .voice.live .vdot{animation:vpulse 1.2s ease-in-out infinite}
+  @keyframes vpulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+  .vstate{font-size:14px;font-weight:650;color:var(--ink);flex:1}
+  .vlang{display:flex;border:1px solid var(--line-strong);border-radius:99px;overflow:hidden}
+  .vlang button{font-size:12px;font-weight:700;padding:5px 11px;color:var(--ui)}
+  .vlang button.on{background:var(--ink);color:var(--surface)}
+  .vtext{font-family:var(--content);font-size:17px;line-height:1.5;color:var(--ink);min-height:52px;max-height:38vh;overflow-y:auto}
+  .vtext i{color:var(--muted);font-style:normal}
+  .vtext:empty::before{content:attr(data-ph);color:var(--faint)}
+  .vrow{display:flex;gap:8px;margin-top:12px;align-items:center}
+  .vrow .vnote{flex:1;font-size:11.5px;color:var(--faint);line-height:1.35}
 </style>
 </head>
 <body>
@@ -1843,6 +1863,11 @@
     <button class="nav" data-view="connect" id="nav-connect"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8.4" cy="8.6" r="3.3"/><circle cx="16.4" cy="15.4" r="3.3"/><path d="M10.8 11.1l3.2 2.7"/></svg></span>Connect<span class="n" id="c-connect"></span></button>
     <button class="nav" data-view="notes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="4.5" y="3.5" width="15" height="17" rx="3.2"/><path d="M8.2 9h7.6M8.2 12.8h7.6M8.2 16.6h4.6"/></svg></span>Notes<span class="n" id="c-notes"></span></button>
     <button class="nav" data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links<span class="n" id="c-links"></span></button>
+    <!-- Newsletters and Books: what you make, after what you gather. -->
+    <button class="nav" data-view="newsletter" id="nav-newsletter" style="display:none" title="Every issue of the newsletters"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M4.6 7.6l7.4 5.4 7.4-5.4"/></svg></span>Newsletters<span class="n" id="c-newsletter"></span></button>
+    <button class="nav" id="nav-books" data-toggle="books" style="display:none" title="Tags you have made into books"><span class="ico"><svg viewBox="0 0 24 24"><path d="M5.2 5.6a2.2 2.2 0 0 1 2.2-2.2h11.4v14.4H7.4a2.2 2.2 0 0 0-2.2 2.2z"/><path d="M5.2 19.8a2.2 2.2 0 0 0 2.2 0.8h11.4v-2.8"/><path d="M9.2 8h5.6"/></svg></span>Books<span class="n" id="c-books"></span>
+      <span class="caret">▾</span></button>
+    <div class="navgroup" id="grp-books"></div>
     <button class="nav" data-view="tasks"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.2"/><path d="M8.2 12.3l2.7 2.7 5-5.4"/></svg></span>Tasks<span class="n" id="c-tasks"></span>
       <span class="caret" data-toggle="tasks">▾</span></button>
     <div class="navgroup" id="grp-tasks">
@@ -4628,12 +4653,29 @@ function paintSidebar(){
   var counts={};
   all.forEach(function(i){ if(!i.done)(i.tags||[]).forEach(function(x){ counts[x]=(counts[x]||0)+1 }) });
   var ncomp=count("compiled"), nissue=count("newsletter");
-  /* The newsletter row is yours: it shows for the admin, or for anyone
-     who already has an issue. */
-  var nlRow=(nissue||isAdmin())?('<button class="nav auto'+(S.view==="newsletter"&&!S.tag&&!S.q?" on":"")
-      +'" data-view="newsletter" title="Issues of the newsletter">'
-      +'<span class="lock">✉</span>newsletter<span class="n">'+(nissue||"")+'</span></button>'):"";
-  var autoRow=nlRow+(ncomp?('<button class="nav auto'+(S.view==="compiled"?" on":"")+'" data-view="compiled"'
+  /* Newsletters: a section of its own, for the admin or anyone who already
+     has an issue. */
+  var nlNav=document.getElementById("nav-newsletter");
+  nlNav.style.display=(nissue||isAdmin())?"":"none";
+  document.getElementById("c-newsletter").textContent=nissue||"";
+  /* Books: a section of its own, opening to every tag made into one.
+     A book lives here and not again among the tags. */
+  var books=S.items.filter(function(i){ return i.book&&i.book.tag }).map(function(i){ return i.book.tag })
+    .filter(function(t,ix,a){ return a.indexOf(t)===ix })
+    .sort(function(a,b){ return a.localeCompare(b,undefined,{sensitivity:"base"}) });
+  var isBook={}; books.forEach(function(t){ isBook[t]=1 });
+  document.getElementById("nav-books").style.display=books.length?"":"none";
+  document.getElementById("c-books").textContent=books.length||"";
+  document.getElementById("grp-books").innerHTML=books.map(function(k){
+    return '<button class="nav sub'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'" title="The book #'+esc(k)+'">'
+      +'<span class="ico"><svg viewBox="0 0 24 24"><path d="M6.5 5h8.8a2.2 2.2 0 0 1 2.2 2.2V19H8.7a2.2 2.2 0 0 1-2.2-2.2z"/></svg></span>'
+      +esc(k)+'<span class="n">'+(counts[k]||"")+'</span></button>';
+  }).join("");
+  if(S.tag&&isBook[S.tag]){       // on a book: keep its group open
+    document.getElementById("grp-books").classList.remove("closed");
+    document.querySelector("#nav-books .caret").classList.remove("closed");
+  }
+  var autoRow=(ncomp?('<button class="nav auto'+(S.view==="compiled"?" on":"")+'" data-view="compiled"'
       +' title="Applied automatically — can\'t be added or removed by hand">'
       +'<span class="lock">⇥</span>compiled<span class="n">'+ncomp+'</span></button>'):"");
   /* Colours resolved against the whole set, so no two dots on screen match.
@@ -4656,7 +4698,7 @@ function paintSidebar(){
      while you reach for it. A tag should be where it was yesterday, and
      alphabetical is the only order a person can predict without looking. */
   document.getElementById("taglist").innerHTML=autoRow+srcRows+Object.keys(counts)
-    .filter(function(k){ return !SOURCE_TAG[k] })
+    .filter(function(k){ return !SOURCE_TAG[k]&&!isBook[k] })
     .sort(function(a,b){ return a.localeCompare(b,undefined,{sensitivity:"base"}) })
     .map(function(k){
       return '<button class="nav'+(S.tag===k?" on":"")+'" data-tag="'+esc(k)+'"'
@@ -10962,7 +11004,8 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
     e.stopPropagation();
     var grp=document.getElementById("grp-"+tog.dataset.toggle);
     var closed=grp.classList.toggle("closed");
-    tog.classList.toggle("closed",closed);
+    /* the arrow turns; for Books the whole row is the toggle, the arrow inside it */
+    (tog.classList.contains("caret")?tog:tog.querySelector(".caret")||tog).classList.toggle("closed",closed);
     try{ localStorage.setItem("trove.grp."+tog.dataset.toggle,closed?"0":"1") }catch(err){}
     return;
   }
@@ -11095,8 +11138,142 @@ document.getElementById("taglist").addEventListener("contextmenu",function(e){
 });
 
 document.getElementById("mobnew").addEventListener("click",function(e){
-  e.stopPropagation(); newNote();
+  e.stopPropagation();
+  if(VOICE.swallowClick){ VOICE.swallowClick=false; return }   // that was a hold, not a tap
+  newNote();
 });
+/* =========================================================================
+   VOICE NOTES — hold the + and talk.
+
+   The phone's own speech-to-text does the work (Apple's dictation on an
+   iPhone, Google's on Android), so what reaches Everything is text and
+   nothing else: no recording is made, kept or uploaded. Greek or English,
+   switchable while you talk, remembered.
+
+   It stays open after you let go, so a thought can run as long as it needs
+   to and the language can be switched mid-way; Save makes it a note on the
+   page you are on, Cancel throws it away. Where the browser has no
+   speech-to-text — reported for iPhone apps on the home screen — a hold
+   opens a new note instead, and the keyboard's own microphone does the rest.
+   ========================================================================= */
+var VOICE={ rec:null, finals:"", interim:"", lang:"el-GR", swallowClick:false, stopping:false, timer:null };
+try{ VOICE.lang=localStorage.getItem("trove.voicelang")||"el-GR" }catch(e){}
+function speechAPI(){ return window.SpeechRecognition||window.webkitSpeechRecognition||null }
+function voiceBox(){
+  var v=document.getElementById("voice");
+  if(v) return v;
+  v=document.createElement("div"); v.className="voice"; v.id="voice";
+  v.innerHTML='<div class="vtop"><span class="vdot"></span><span class="vstate" id="vstate">Listening…</span>'
+    +'<div class="vlang" id="vlang"><button data-vl="el-GR">ΕΛ</button><button data-vl="en-US">EN</button></div></div>'
+    +'<div class="vtext" id="vtext" data-ph="Speak — your words appear here"></div>'
+    +'<div class="vrow"><span class="vnote">Your phone turns speech into text. Nothing is recorded.</span>'
+    +'<button class="btn sec" id="vcancel">Cancel</button><button class="btn" id="vsave">Save</button></div>';
+  document.body.appendChild(v);
+  v.addEventListener("click",function(e){
+    e.stopPropagation();
+    var l=e.target.closest("[data-vl]");
+    if(l){ setVoiceLang(l.dataset.vl); return }
+    if(e.target.closest("#vcancel")) return endVoice(false);
+    if(e.target.closest("#vsave")) return endVoice(true);
+    if(e.target.closest("#vresume")) return listen();
+  });
+  return v;
+}
+function paintVoice(){
+  var v=voiceBox();
+  [].forEach.call(v.querySelectorAll("[data-vl]"),function(b){ b.classList.toggle("on",b.dataset.vl===VOICE.lang) });
+  document.getElementById("vtext").innerHTML=esc(VOICE.finals)+(VOICE.interim?'<i>'+(VOICE.finals?" ":"")+esc(VOICE.interim)+'</i>':"");
+}
+function setVoiceLang(l){
+  if(l===VOICE.lang) return;
+  VOICE.lang=l;
+  try{ localStorage.setItem("trove.voicelang",l) }catch(e){}
+  paintVoice();
+  if(VOICE.rec){ keepInterim(); restartVoice() }
+}
+function keepInterim(){
+  if(VOICE.interim){ VOICE.finals=(VOICE.finals+" "+VOICE.interim).trim(); VOICE.interim="" }
+}
+function restartVoice(){
+  var r=VOICE.rec; VOICE.rec=null;
+  if(r){ r.onend=null; r.onresult=null; r.onerror=null; try{ r.abort() }catch(e){} }
+  listen();
+}
+function startVoice(){
+  if(!speechAPI()){ newNote(); toast("Use the keyboard's microphone to dictate"); return }
+  VOICE.finals=""; VOICE.interim="";
+  voiceBox().classList.add("on");
+  paintVoice();
+  listen();
+}
+function listen(){
+  var R=speechAPI(); if(!R) return;
+  var r; try{ r=new R() }catch(e){ endVoice(false); newNote(); return }
+  VOICE.rec=r; VOICE.stopping=false;
+  r.lang=VOICE.lang; r.continuous=true; r.interimResults=true;
+  var v=voiceBox(), st=document.getElementById("vstate");
+  v.classList.add("live"); st.textContent="Listening…";
+  r.onresult=function(e){
+    var fin="", tmp="";
+    for(var k=e.resultIndex;k<e.results.length;k++){
+      var t=e.results[k][0].transcript;
+      if(e.results[k].isFinal) fin+=t; else tmp+=t;
+    }
+    if(fin) VOICE.finals=(VOICE.finals+" "+fin).replace(/\s+/g," ").trim();
+    VOICE.interim=tmp.trim();
+    paintVoice();
+  };
+  r.onerror=function(e){
+    var why=e&&e.error;
+    if(why==="not-allowed"||why==="service-not-allowed"){
+      VOICE.rec=null; endVoice(false);
+      newNote(); toast("No microphone here — use the keyboard's microphone to dictate");
+    }
+  };
+  r.onend=function(){
+    if(VOICE.rec!==r) return;
+    keepInterim(); VOICE.rec=null;
+    v.classList.remove("live");
+    if(VOICE.stopping) return;
+    /* The phone stopped listening on its own — after a silence, usually.
+       What was said is kept; one tap carries on. */
+    st.innerHTML='Paused <button class="btn sec" id="vresume" style="margin-left:6px;padding:3px 10px;font-size:12px">Keep talking</button>';
+    paintVoice();
+  };
+  try{ r.start() }catch(e){}
+}
+function endVoice(keep){
+  VOICE.stopping=true;
+  var r=VOICE.rec; VOICE.rec=null;
+  if(r){ r.onend=null; r.onresult=null; r.onerror=null; try{ keep?r.stop():r.abort() }catch(e){} }
+  keepInterim();
+  var text=VOICE.finals.trim();
+  VOICE.finals=""; VOICE.interim="";
+  var v=document.getElementById("voice"); if(v) v.classList.remove("on","live");
+  if(!keep) return;
+  if(!text) return toast("Nothing heard — nothing saved");
+  var now=Date.now();
+  var item=normalizeItem({ id:uid(), title:"", body:toRich(text), created:now, modified:now });
+  tagFromPage(item);
+  S.items.unshift(item);
+  save(); render();
+  toast("Voice note saved");
+}
+(function wireHold(){
+  var b=document.getElementById("mobnew"), t=null;
+  function cancel(){ clearTimeout(t); t=null }
+  b.addEventListener("pointerdown",function(){
+    cancel(); VOICE.swallowClick=false;
+    t=setTimeout(function(){
+      t=null; VOICE.swallowClick=true;
+      try{ navigator.vibrate&&navigator.vibrate(15) }catch(e){}
+      startVoice();
+    },450);
+  });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){ b.addEventListener(ev,cancel) });
+  b.addEventListener("contextmenu",function(e){ e.preventDefault() });   // no long-press menu
+  b.title="New note — hold to dictate one";
+})();
 document.getElementById("mobtask").addEventListener("click",function(e){
   e.stopPropagation();
   TB.filter="today"; setTaskbar(true);
@@ -11258,7 +11435,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="97";
+var BUILD="98";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
@@ -11629,6 +11806,10 @@ try{
   if(localStorage.getItem("trove.grp.tasks")==="0"){
     document.getElementById("grp-tasks").classList.add("closed");
     document.querySelector('[data-toggle="tasks"]').classList.add("closed");
+  }
+  if(localStorage.getItem("trove.grp.books")==="0"){
+    document.getElementById("grp-books").classList.add("closed");
+    document.querySelector('#nav-books .caret').classList.add("closed");
   }
 }catch(e){}
 attachSmartQuotes(capin,false);
