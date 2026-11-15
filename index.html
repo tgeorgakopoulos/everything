@@ -969,6 +969,13 @@
   .card.done .ctitle{text-decoration:line-through;color:var(--faint)}
   .card.done{opacity:.55}
   .card.done .thumb{filter:grayscale(1);opacity:.6}
+  /* a finished task that is a piece of writing reads as the writing */
+  .card.done.kept{opacity:1}
+  .card.done.kept .ctitle{text-decoration:none;color:var(--ink)}
+  .card.done.kept .cbody{text-decoration:none;color:var(--read)}
+  .card.done.kept .thumb,.card.done.kept .photos{filter:none;opacity:1}
+  .row-item.done.kept{opacity:1}
+  .row-item.done.kept .rtitle{text-decoration:none;color:var(--ink)}
 
   /* checklist inside an item — distinct from the item's own checkbox */
   .checks{margin-top:9px;display:flex;flex-direction:column;gap:1px}
@@ -3018,6 +3025,20 @@ function wouldShowIn(lens,i){
   var t=(LENS[lens]||LENS.tasks).test;
   return t(Object.assign({},i,{done:false}));
 }
+/* Ticking a note that has writing in it finishes the task, not the note.
+   An article you made a task of ("write it by Friday") is still the
+   article when you tick it: it stays under #writing, in Notes and in All,
+   looking like any note, and leaves only the task lists. A ticked task
+   that is just a line — "call Elena" — leaves everywhere, as before.
+   "Writing in it" = 30 words or more below the title. */
+var WRITTEN_MIN=30;
+function writtenNote(i){
+  return !!(i&&i.done&&i.body&&words(richToText(i.body))>=WRITTEN_MIN);
+}
+/* Off the task lists it looks like the writing it is; on them, done. */
+function keptHere(i){
+  return writtenNote(i)&&(!!S.tag||!{today:1,overdue:1,upcoming:1,someday:1,tasks:1,done:1}[S.view]);
+}
 function isOverdue(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)<todayKey() }
 /* "→ Today": the same time of day if it had one, otherwise just today. */
 function moveToToday(i){
@@ -3385,7 +3406,7 @@ function newItemWithPhotos(photos){
 var LENS={
   // named "All", not "Everything" — that's the app's name now, and having both
   // would read as a bug rather than as a pun
-  all:      { title:"All", note:"", test:function(i){ return !i.done } },
+  all:      { title:"All", note:"", test:function(i){ return !i.done||writtenNote(i) } },
   // Today means today. Letting overdue items pile in here is what makes
   // Reminders' Today list useless — it stops meaning "what I planned for now".
   today:    { title:"Today", note:"Dated today — nothing carried over",
@@ -3397,9 +3418,9 @@ var LENS={
   upcoming: { title:"Upcoming", note:"Dated after today",
               test:function(i){ return hasAction(i)&&!i.done&&i.due!=null&&dayOf(i.due)>todayKey() } },
   notes:    { title:"Notes", note:"Text only — no link, no checkbox",
-              test:function(i){ return !hasLink(i)&&!hasAction(i)&&!i.done } },
+              test:function(i){ return !hasLink(i)&&(!hasAction(i)&&!i.done||writtenNote(i)) } },
   links:    { title:"Links", note:"Everything with a link — including links that are also tasks",
-              test:function(i){ return hasLink(i)&&!i.done } },
+              test:function(i){ return hasLink(i)&&(!i.done||writtenNote(i)) } },
   tasks:    { title:"Tasks", note:"Everything actionable — cuts across notes and links",
               test:function(i){ return hasAction(i)&&!i.done } },
   done:     { title:"Completed", note:"", test:function(i){ return !!i.done } },
@@ -3435,7 +3456,7 @@ function visible(){
     if(isSys(i)) return false;                          // a book's or a device's record, not a note
     if(i.issue&&S.view!=="newsletter") return false;   // issues live on their own page
     if(!S.tag&&TASKLENS[S.view]&&doneToday(i)&&!i.archived) return wouldShowIn(S.view,i);
-    if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && !i.done;
+    if(S.tag) return (i.tags||[]).indexOf(S.tag)>=0 && (!i.done||writtenNote(i));
     return (LENS[S.view]||LENS.all).test(i);
   });
   /* Pinned first, always. Then: the task lenses are ordered by when
@@ -4012,7 +4033,7 @@ function photoGrid(item,editable){
 
 function cardHTML(i){
   var L=hasLink(i), A=hasAction(i), P=hasPhotos(i);
-  var cls="card"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(L?" haslink":"")
+  var cls="card"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(keptHere(i)?" kept":"")+(L?" haslink":"")
     +(i.title&&!i.titleAuto?" owntitle":"");
 
   // A short, text-only note is set large. Nothing but words, and few of them,
@@ -4122,7 +4143,7 @@ function cardHTML(i){
 /* One row for list layout. Same data, much less of it. */
 function rowHTML(i){
   var L=hasLink(i), A=hasAction(i), P=hasPhotos(i);
-  var cls="row-item"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"");
+  var cls="row-item"+(i.tint?" tint-"+i.tint:"")+(i.done?" done":"")+(keptHere(i)?" kept":"");
   var h=host(i.url), hu=hue(h);
 
   var thumb="";
@@ -4698,7 +4719,7 @@ function paintSidebar(){
   paintSortRow();
 
   var counts={};
-  all.forEach(function(i){ if(!i.done)(i.tags||[]).forEach(function(x){ counts[x]=(counts[x]||0)+1 }) });
+  all.forEach(function(i){ if(!i.done||writtenNote(i))(i.tags||[]).forEach(function(x){ counts[x]=(counts[x]||0)+1 }) });
   var ncomp=count("compiled"), nissue=count("newsletter");
   /* Newsletters: a section of its own, for the admin or anyone who already
      has an issue. */
@@ -11531,7 +11552,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="100";
+var BUILD="101";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
