@@ -3262,13 +3262,14 @@ function runFetch(item){
    ========================================================================= */
 var MAXDIM=1200, JPEGQ=0.82;
 
-function readImage(file){
+function readImage(file,email){
   return new Promise(function(res){
     if(!file||!/^image\//.test(file.type)) return res(null);
     var fr=new FileReader();
     fr.onload=function(){
       var img=new Image();
       img.onload=function(){
+        if(email){ try{ return res(emailPicture(img,email,/png/i.test(file.type))) }catch(e){} }
         var w=img.naturalWidth, h=img.naturalHeight, scale=Math.min(1,MAXDIM/Math.max(w,h));
         var cw=Math.round(w*scale), ch=Math.round(h*scale);
         try{
@@ -3284,6 +3285,49 @@ function readImage(file){
     fr.onerror=function(){ res(null) };
     fr.readAsDataURL(file);
   });
+}
+/* A picture for an email, sized for where it will sit rather than for a
+   screen. An email column is 600px and a picture in it 520 (a card, 250):
+   twice that is as sharp as any phone or retina screen shows it (no taller
+   than 1200), and every
+   pixel past it is downloaded by every reader on every open — which is what
+   used up the server's monthly allowance.
+
+   So: the width it will be shown at, doubled, and no more. Shrunk in halves
+   with the browser's best smoothing, because one big step from a 4000px
+   photograph makes jagged edges and moiré; a single small step at the end
+   keeps it sharp. A PNG stays a PNG only if it has see-through parts or is
+   genuinely smaller that way (a screenshot of text); a photograph saved as
+   PNG becomes a JPEG a fraction of the size. */
+var EMAIL_IMG=1040, EMAIL_CARD=560, EMAIL_Q=0.82;
+function emailSize(w,h,maxW){
+  /* No taller than it was allowed before (1200 for a picture, in step for a
+     card): a portrait shown 520 wide is still sharp at 1200 high, and any
+     taller would make it heavier than it used to be, not lighter. */
+  var scale=Math.min(1,maxW/w,Math.round(maxW*15/13)/h);
+  return {w:Math.max(1,Math.round(w*scale)), h:Math.max(1,Math.round(h*scale))};
+}
+function emailPicture(img,maxW,wasPng){
+  var w=img.naturalWidth, h=img.naturalHeight, sz=emailSize(w,h,maxW), tw=sz.w, th=sz.h;
+  var src=img, cw=w, ch=h;
+  while(cw/2>=tw*1.05){                            // halve while more than twice the target
+    var half=document.createElement("canvas");
+    half.width=Math.round(cw/2); half.height=Math.round(ch/2);
+    var hg=half.getContext("2d"); hg.imageSmoothingEnabled=true; hg.imageSmoothingQuality="high";
+    hg.drawImage(src,0,0,half.width,half.height);
+    src=half; cw=half.width; ch=half.height;
+  }
+  var c=document.createElement("canvas"); c.width=tw; c.height=th;
+  var g=c.getContext("2d"); g.imageSmoothingEnabled=true; g.imageSmoothingQuality="high";
+  g.drawImage(src,0,0,tw,th);
+  var jpg=c.toDataURL("image/jpeg",EMAIL_Q);
+  if(wasPng){
+    var see=false;
+    try{ var d=g.getImageData(0,0,tw,th).data; for(var k=3;k<d.length;k+=16){ if(d[k]<250){ see=true; break } } }catch(e){}
+    var png=c.toDataURL("image/png");
+    if(see||png.length<jpg.length) return {src:png,w:tw,h:th};
+  }
+  return {src:jpg,w:tw,h:th};
 }
 function readImages(files){
   var list=[].slice.call(files||[]).filter(function(f){ return /^image\//.test(f.type) });
@@ -3696,7 +3740,10 @@ var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,S:1,STRIKE:1,DEL:1,BR:1,A:1,UL:1,OL:1,LI:
 function nlImagePrefix(){
   return (typeof SUPA!=="undefined"&&SUPA&&SUPA.url)?SUPA.url+"/storage/v1/object/public/newsletter/":"\u0000";
 }
+/* Mailchimp's own picture addresses, exact shape only. */
+var MC_IMG=/^https:\/\/(mcusercontent\.com|gallery\.mailchimp\.com)\/[A-Za-z0-9]{8,64}\/(images|files)\/[A-Za-z0-9._-]{1,160}$/;
 function nlImageOk(src){
+  if(MC_IMG.test(src)) return true;
   var pre=nlImagePrefix();
   if(src.indexOf(pre)===0) return /^[A-Za-z0-9._\/-]{1,200}$/.test(src.slice(pre.length))&&src.indexOf("..")<0;
   /* A video's own thumbnail, as YouTube and Vimeo serve it — used only when
@@ -6721,14 +6768,14 @@ function loadCorsImage(src){
   });
 }
 function playOverlay(im){
-  var w=Math.min(1200,im.naturalWidth), h=Math.round(w*im.naturalHeight/im.naturalWidth);
+  var w=Math.min(EMAIL_IMG,im.naturalWidth), h=Math.round(w*im.naturalHeight/im.naturalWidth);
   var c=document.createElement("canvas"); c.width=w; c.height=h;
   var g=c.getContext("2d"); g.drawImage(im,0,0,w,h);
   var r=Math.round(Math.min(w,h)*0.12), cx=w/2, cy=h/2;
   g.fillStyle="rgba(0,0,0,.55)"; g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fill();
   g.fillStyle="#ffffff"; g.beginPath();
   g.moveTo(cx-r*0.32,cy-r*0.5); g.lineTo(cx+r*0.55,cy); g.lineTo(cx-r*0.32,cy+r*0.5); g.closePath(); g.fill();
-  return dataUrlToBlob(c.toDataURL("image/jpeg",0.85));   // throws if the picture would not let itself be copied
+  return dataUrlToBlob(c.toDataURL("image/jpeg",EMAIL_Q));   // throws if the picture would not let itself be copied
 }
 function videoBlock(vid){
   return videoInfo(vid).then(function(info){
@@ -6753,8 +6800,40 @@ function videoBlock(vid){
     });
   });
 }
+/* Newsletter pictures go to Mailchimp, which serves them to readers at no
+   cost to us (newsletter-image.ts holds the key and does the upload). If
+   that function is not there yet, or Mailchimp's key is not set, they go to
+   Everything's own folder as before, and you are told once. */
+var MC_WARNED=false;
+function blobToBase64(blob){
+  return new Promise(function(res,rej){
+    var fr=new FileReader();
+    fr.onload=function(){ res(String(fr.result).replace(/^data:[^,]*,/,"")) };
+    fr.onerror=function(){ rej("Could not read the picture") };
+    fr.readAsDataURL(blob);
+  });
+}
 function uploadNewsletterBlob(blob){
   if(!SYNC.session) return Promise.reject("Sign in first — pictures are kept on the server");
+  return withFreshSession().then(function(){ return blobToBase64(blob) }).then(function(data){
+    return fetch(fnUrl("newsletter-image"),{
+      method:"POST",
+      headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token, "Content-Type":"application/json" },
+      body:JSON.stringify({ type:blob.type, data:data })
+    }).then(function(r){
+      return r.json().catch(function(){ return {} }).then(function(j){
+        if(r.ok&&j&&j.url&&nlImageOk(j.url)) return j.url;
+        /* not deployed (404) or no key yet (503): the old way, said once */
+        if(r.status===404||r.status===503){
+          if(!MC_WARNED){ MC_WARNED=true; toast("Mailchimp hosting isn't set up yet — this picture is on Everything's server") }
+          return uploadToOwnFolder(blob);
+        }
+        throw (j&&j.error)||("Mailchimp upload failed ("+r.status+")");
+      });
+    },function(){ return uploadToOwnFolder(blob) });
+  });
+}
+function uploadToOwnFolder(blob){
   return withFreshSession().then(function(){
     var path="issues/"+uid()+(/png/.test(blob.type)?".png":".jpg");
     return fetch(SUPA.url+"/storage/v1/object/newsletter/"+path,{
@@ -6784,12 +6863,12 @@ function pickImageFiles(multiple,cb){
 /* Into the newsletter's public folder, made the same size as any picture
    added to a note (1200px on the long side: sharp at the email's 600px on
    a high-density screen). Resolves to the public addresses, in order. */
-function uploadNewsletterImages(files){
+function uploadNewsletterImages(files,maxW){
   if(!SYNC.session) return Promise.reject("Sign in first — pictures are kept on the server");
   toast("Uploading "+files.length+" picture"+(files.length===1?"":"s")+"…");
   return withFreshSession().then(function(){
     return Promise.all(files.map(function(file){
-      return readImage(file).then(function(p){
+      return readImage(file,maxW||EMAIL_IMG).then(function(p){
         var blob=p&&dataUrlToBlob(p.src);
         if(!blob) throw "That file is not a picture";
         return uploadNewsletterBlob(blob);
@@ -7628,7 +7707,7 @@ function openEditor(id){
   if(q("#e-nlimg")) q("#e-nlimg").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
     pickImageFiles(false,function(files){
-      uploadNewsletterImages(files).then(function(urls){
+      uploadNewsletterImages(files,EMAIL_IMG).then(function(urls){
         nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>"); nlLinkUp(urls[0],href) });
       },function(err){ toast(String(err)) });
     });
@@ -7645,7 +7724,7 @@ function openEditor(id){
   if(q("#e-nlcards")) q("#e-nlcards").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
     pickImageFiles(true,function(files){
-      uploadNewsletterImages(files.slice(0,2)).then(function(urls){
+      uploadNewsletterImages(files.slice(0,2),EMAIL_CARD).then(function(urls){
         var html="", k=0, hrefs=[];
         (function next(){
           if(k>=urls.length){
@@ -11435,7 +11514,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="98";
+var BUILD="99";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
