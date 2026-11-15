@@ -7891,6 +7891,9 @@ function openEditor(id){
   });
 
   attachSmartQuotes(q("#e-title"),false);
+  /* the issue's subject and preheader are read by every subscriber */
+  if(q("#e-isubj")) attachSmartQuotes(q("#e-isubj"),false);
+  if(q("#e-ipre")) attachSmartQuotes(q("#e-ipre"),false);
   (function(){
     var t=q("#e-title");
     function fit(){ t.style.height="auto"; t.style.height=t.scrollHeight+"px" }
@@ -8511,7 +8514,10 @@ sheet.addEventListener("click",function(e){
   if(pic){
     e.preventDefault(); e.stopPropagation();
     var wrap=pic.parentNode&&pic.parentNode.nodeName==="A"?pic.parentNode:null;
-    askText("A link for this picture","Where clicking it should take the reader. Empty it to remove the link.",
+    /* The picture can also be taken out from here. Clicking a picture opens
+       this box rather than selecting it, so a picture inside a link could
+       not otherwise be removed except by careful backspacing. */
+    askText("This picture","Where clicking it should take the reader. Empty it to remove the link.",
       wrap?wrap.getAttribute("href"):"https://","Done",function(v){
         v=linkFromInput(v);
         var ok=!!v;
@@ -8521,7 +8527,15 @@ sheet.addEventListener("click",function(e){
           pic.parentNode.insertBefore(a2,pic); a2.appendChild(pic) }
         var b=document.getElementById("e-body");
         if(b) b.dispatchEvent(new Event("input",{bubbles:true}));
-      });
+      },{ label:"Remove picture", kind:"dan", cb:function(){
+        /* a card goes whole: its picture, title and caption */
+        var fig=pic.closest("figure");
+        var gone=fig&&fig.querySelectorAll("img").length===1?fig:(wrap||pic);
+        gone.parentNode.removeChild(gone);
+        var b2=document.getElementById("e-body");
+        if(b2) b2.dispatchEvent(new Event("input",{bubbles:true}));
+        toast("Picture removed");
+      }});
     return;
   }
   // A link inside the editable body would otherwise just place the caret.
@@ -10409,10 +10423,12 @@ function askChoice(title,html,choices,cb){
 }
 /* Same dialog, with a field. Used instead of the browser's own prompt, which
    appears detached from the app and looks nothing like it. */
-function askText(title,html,initial,label,cb){
+function askText(title,html,initial,label,cb,extra){
   askbox.innerHTML='<h3>'+esc(title)+'</h3><p>'+html+'</p>'
     +'<input class="askin" id="askinput" spellcheck="false" value="'+esc(initial)+'">'
-    +'<div class="askrow"><button class="btn sec" data-ax="0">Cancel</button>'
+    +'<div class="askrow">'
+    +(extra?'<button class="btn '+(extra.kind||"sec")+'" data-ax="x" style="margin-right:auto">'+esc(extra.label)+'</button>':"")
+    +'<button class="btn sec" data-ax="0">Cancel</button>'
     +'<button class="btn" data-ax="1">'+esc(label)+'</button></div>';
   ask.classList.add("on");
   var input=document.getElementById("askinput");
@@ -10421,6 +10437,7 @@ function askText(title,html,initial,label,cb){
   askCB=function(){};
   askbox.onclick=function(e){
     var b=e.target.closest("[data-ax]"); if(!b) return;
+    if(b.dataset.ax==="x"){ closeAsk(); askCB=null; extra.cb(); return }
     finish(b.dataset.ax==="1");
   };
   input.onkeydown=function(e){
@@ -11514,7 +11531,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="99";
+var BUILD="100";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
@@ -11892,6 +11909,7 @@ try{
   }
 }catch(e){}
 attachSmartQuotes(capin,false);
+attachSmartQuotes(document.getElementById("tbin"),false);   // the task column's box too
 var stored=load();
 if(stored){
   S.items=purgeSamples(stored);
