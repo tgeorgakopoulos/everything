@@ -316,6 +316,15 @@
   .grid.ms .quick,.grid.ms .pick,.grid.ms .thumb,.grid.ms .srcline{display:none!important}
   .grid.ms .foot{margin-top:16px}
   .stchart rect.hit{fill:transparent;cursor:pointer} .stchart rect.hit:hover{fill:color-mix(in srgb,var(--make) 8%,transparent)}
+  .dayrows{max-height:52vh;overflow-y:auto;margin:10px 0 4px;border-top:1px solid var(--line)}
+  .dayrow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line)}
+  .dayrow.off .dayw,.dayrow.off .dayn{opacity:.4;text-decoration:line-through}
+  .dayw{flex:none;width:56px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;color:var(--make)}
+  .dayn{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .dayn span{font-size:11.5px;color:var(--muted);line-height:1.35}
+  .daylink{text-align:left;color:var(--ink);font-weight:600;padding:0;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
+  .dayhint{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .daytog{flex:none;font-size:12px;padding:5px 10px}
   .stfix{font-size:11.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px;padding:0}
   .stfix:hover{color:var(--make)}
   .stmonths{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:110px;align-items:end}
@@ -2356,6 +2365,8 @@ function startInline(card,ev){
   b.setAttribute("spellcheck","true"); t.setAttribute("spellcheck","true");
   attachSmartQuotes(t,true);
   attachSmartQuotes(b,true);
+  attachTypingCounter(t,function(){ return card.dataset.id });
+  attachTypingCounter(b,function(){ return card.dataset.id });
   b.addEventListener("input",function(){ if(INLINE.el===card) dashesToDivider() });
   card.classList.add("inline");
   card.removeAttribute("draggable");
@@ -5674,8 +5685,23 @@ function normalizeItem(o){
       var c={};
       Object.keys(dd.c||{}).forEach(function(t){ if(/^(notes|links|tasks|newsletter)$/.test(t)){ var v=parseInt(dd.c[t],10); if(v) c[t]=v } });
       days[k]={ w:parseInt(dd.w,10)||0, b:b, c:c };
+      /* the day note by note, and the notes you said not to count */
+      if(dd.n&&typeof dd.n==="object"){
+        var nn={}, cnt=0;
+        Object.keys(dd.n).forEach(function(id){
+          var v=dd.n[id];
+          if(cnt<500&&/^[A-Za-z0-9_-]{1,64}$/.test(id)&&Array.isArray(v)){ nn[id]=[parseInt(v[0],10)||0,parseInt(v[1],10)||0]; cnt++ }
+        });
+        if(cnt) days[k].n=nn;
+      }
+      if(dd.x&&typeof dd.x==="object"){
+        var xx={};
+        Object.keys(dd.x).slice(0,500).forEach(function(id){ if(/^[A-Za-z0-9_-]{1,64}$/.test(id)&&dd.x[id]) xx[id]=1 });
+        if(Object.keys(xx).length) days[k].x=xx;
+      }
     });
     out.stats={ days:days };
+    if(typeof o.stats.dev==="string"&&o.stats.dev) out.stats.dev=o.stats.dev.slice(0,40);
   }
   /* Which device of this app last edited it, and at which version — so a
      newer version without that stamp is known to come from elsewhere: the
@@ -6210,13 +6236,30 @@ function wordsOf(i){
 }
 function kindOf(i){ return i.issue?"newsletter":hasLink(i)?"links":hasAction(i)?"tasks":"notes" }
 /* Into this device's record, on that day: the total, each tag, the kind. */
-function recordWords(dayKey,d,i){
+/* And note by note: day.n[noteId] = [typed here, arrived here]. That is
+   what the day's report reads, and what lets a word that two devices both
+   counted as arriving be counted once. */
+function recordWords(dayKey,d,i,src){
   var st=myStats(), day=st.stats.days[dayKey]||(st.stats.days[dayKey]={w:0,b:{},c:{}});
   day.c=day.c||{};
   day.w+=d;
   (i.tags||[]).forEach(function(t){ day.b[t]=(day.b[t]||0)+d });
   var k=kindOf(i); day.c[k]=(day.c[k]||0)+d;
+  if(i&&i.id){
+    day.n=day.n||{};
+    var e=day.n[i.id]||(day.n[i.id]=[0,0]);
+    e[src==="a"?1:0]+=d;
+  }
+  st.stats.dev=deviceLabel();
   st.modified=Date.now();
+}
+/* What this device is, in words, for the report: "Mac · Chrome". */
+function deviceLabel(){
+  var u=navigator.userAgent||"", os=/iPhone/.test(u)?"iPhone":/iPad/.test(u)?"iPad":/Android/.test(u)?"Android"
+    :/Mac/.test(u)?"Mac":/Windows/.test(u)?"Windows":/Linux|CrOS/.test(u)?"Linux":"Device";
+  var br=/Edg\//.test(u)?"Edge":/Firefox\//.test(u)?"Firefox":/Chrome\//.test(u)?"Chrome":/Safari\//.test(u)?"Safari":"";
+  var mine=""; try{ mine=localStorage.getItem("trove.devname")||"" }catch(e){}
+  return (mine||(os+(br?" · "+br:""))).slice(0,40);
 }
 /* Words that arrive already written — from the extension, the writing
    machine, the phone — are yours too, and count on the day they were
@@ -6228,6 +6271,63 @@ var WC_FRESH=null;
 /* Words pasted into a note, waiting to be taken off its count when it is
    saved: pasting brings in writing done elsewhere, it is not writing. */
 var PASTED={}, CAP_PASTED=0;
+/* =========================================================================
+   WORDS TYPED — counted as they are typed, not worked out afterwards.
+
+   The count used to be the difference between a note before and after a
+   save. That counts anything that makes a note longer as writing: a box
+   duplicated in an issue, a paragraph dragged from one place to another,
+   a card's placeholder words, a version restored — and, with four devices
+   and a writing machine, any copy that came back by a road that did not
+   announce itself. It produced a 7,000-word day that was not one.
+
+   Now the editors count what your fingers (or your voice, through the
+   keyboard) put in: each word started by a keystroke counts once. Pasting,
+   dragging, duplicating and anything the app does itself count nothing,
+   and deleting never takes anything off. A brand-new note made from the
+   capture box, the task box or a voice note counts its words, less any
+   pasted; words that arrive from the writing machine, the phone's share
+   sheet or the extension count once, on one device, and are checked
+   against every other device so they cannot count twice.
+   ========================================================================= */
+var TYPED={};
+var WORDCH=/[0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u1F00-\u1FFF\u0400-\u04FF]/;
+function wordStarts(prev,data){
+  var n=0, was=WORDCH.test(prev||"");
+  for(var k=0;k<data.length;k++){
+    var c=data.charAt(k), is=WORDCH.test(c)||(was&&/['’\-]/.test(c));
+    if(is&&!was&&WORDCH.test(c)) n++;
+    was=is;
+  }
+  return n;
+}
+function charBefore(el){
+  if(el.tagName==="INPUT"||el.tagName==="TEXTAREA"){ var s0=el.selectionStart||0; return s0>0?el.value.charAt(s0-1):"" }
+  var sel=window.getSelection(); if(!sel||!sel.rangeCount) return "";
+  var r=sel.getRangeAt(0), nd=r.startContainer;
+  if(nd.nodeType===3) return r.startOffset>0?nd.data.charAt(r.startOffset-1):"";
+  var ch=nd.childNodes[r.startOffset-1];
+  return ch&&ch.textContent?ch.textContent.slice(-1):"";
+}
+function attachTypingCounter(el,idOf){
+  if(!el||el.__tc) return;
+  el.__tc=true;
+  el.addEventListener("beforeinput",function(e){
+    var t=e.inputType||"", data=e.data;
+    if(data==null&&e.dataTransfer&&/insertReplacementText/.test(t)){ try{ data=e.dataTransfer.getData("text/plain") }catch(err){} }
+    if(!data) return;
+    var n=0;
+    if(t==="insertText") n=wordStarts(charBefore(el),data);
+    else if(t==="insertReplacementText"){
+      /* autocorrect and dictation: only the words beyond the ones replaced */
+      var old=""; try{ var rs=e.getTargetRanges&&e.getTargetRanges(); if(rs&&rs[0]){ var rg=document.createRange(); rg.setStart(rs[0].startContainer,rs[0].startOffset); rg.setEnd(rs[0].endContainer,rs[0].endOffset); old=rg.toString() } }catch(err){}
+      n=Math.max(0,words(data)-words(old));
+    }
+    if(!n) return;
+    var id=idOf(); if(!id) return;
+    TYPED[id]=(TYPED[id]||0)+n;
+  });
+}
 function notePaste(id,text){ var n=words(text||""); if(id&&n) PASTED[id]=(PASTED[id]||0)+n }
 /* The most words taken out of a note while it was open, below where it
    started. A save counts what was added after the lowest point, so cutting
@@ -6253,10 +6353,75 @@ function correctDay(key){
       save(); render(); toast("Corrected");
     });
 }
+/* =========================================================================
+   A DAY'S REPORT — what was counted, note by note, and by which device,
+   with a way to take out what should not be there. Opened from the
+   Writing page: "today · what was counted", or any bar of the chart.
+   ========================================================================= */
+function showDay(k){
+  var r=dayNotes(k), days=allDays(), tot=Math.max(0,wordsOn(days,k));
+  var nice=new Date(k+"T12:00:00").toLocaleDateString([], {weekday:"long",day:"numeric",month:"long"});
+  var rows=r.notes.map(function(e){
+    var it=byId(e.id), name=it?((it.title||"").trim()||richToText(it.body||"").trim().slice(0,60)||"Untitled"):"A note since deleted";
+    return '<div class="dayrow'+(e.excluded?" off":"")+'">'
+      +'<div class="dayw">'+fmtN(e.total)+'</div>'
+      +'<div class="dayn">'+(it?'<button class="daylink" data-dayopen="'+esc(e.id)+'">'+esc(name)+'</button>':esc(name))
+        +'<span>'+esc(e.by.join(" · "))+(e.dup?' · counted twice on arrival, kept once':"")+'</span></div>'
+      +'<button class="btn sec daytog" data-dayx="'+esc(e.id)+'">'+(e.excluded?"Count it":"Don't count")+'</button>'
+      +'</div>';
+  }).join("");
+  var dev=r.devices.map(function(d){ return esc(d.name)+': '+fmtN(d.w) }).join(" · ");
+  var noted=r.notes.reduce(function(a,e){ return a+(e.excluded?0:e.total) },0);
+  var before=r.devices.reduce(function(a,d){ return a+d.w },0)-r.notes.reduce(function(a,e){ return a+e.typed+e.arrived+e.dup },0);
+  askbox.innerHTML='<h3>'+esc(nice)+' — '+fmtN(tot)+' words</h3>'
+    +'<p class="dayhint">'+(dev?"By device: "+dev+". ":"")+'<button class="daylink" id="day-name">Name this device</button></p>'
+    +(rows?'<div class="dayrows">'+rows+'</div>':'<p class="dayhint">No notes recorded one by one for this day.</p>')
+    +(before>0?'<p class="dayhint">'+fmtN(before)+' words were counted before notes were recorded one by one (version 102), so only the devices\' totals are known for them. Use “Correct the total” for those.</p>':"")
+    +'<div class="askrow"><button class="btn sec" id="day-fix" style="margin-right:auto">Correct the total…</button>'
+    +'<button class="btn" id="day-close">Close</button></div>';
+  ask.classList.add("on");
+  askbox.onclick=function(e){
+    if(e.target.closest("#day-close")){ closeAsk(); return }
+    if(e.target.closest("#day-fix")){ closeAsk(); correctDay(k); return }
+    if(e.target.closest("#day-name")){
+      closeAsk();
+      var cur=""; try{ cur=localStorage.getItem("trove.devname")||"" }catch(err){}
+      return askText("Name this device","How it appears in the day's report, on every device — “Studio MacBook”, say.",
+        cur||deviceLabel(),"Save",function(v){
+          try{ localStorage.setItem("trove.devname",String(v||"").trim().slice(0,40)) }catch(err){}
+          var st=myStats(); st.stats.dev=deviceLabel(); st.modified=Date.now(); save(); showDay(k);
+        });
+    }
+    var op=e.target.closest("[data-dayopen]");
+    if(op){ closeAsk(); openEditor(op.dataset.dayopen); return }
+    var x=e.target.closest("[data-dayx]");
+    if(x){ toggleDayExclusion(k,x.dataset.dayx); render(); showDay(k) }
+  };
+}
+/* "Don't count" is kept in this device's record and travels like any note;
+   "Count it" again clears it from every device's record. */
+function toggleDayExclusion(k,id){
+  var off=dayNotes(k).notes.some(function(e){ return e.id===id&&e.excluded });
+  if(off){
+    S.items.forEach(function(st){
+      var d=st.stats&&st.stats.days[k];
+      if(d&&d.x&&d.x[id]){ delete d.x[id]; if(!Object.keys(d.x).length) delete d.x; st.modified=Date.now() }
+    });
+  } else {
+    var st=myStats(), d=st.stats.days[k]||(st.stats.days[k]={w:0,b:{},c:{}});
+    d.x=d.x||{}; d.x[id]=1; st.modified=Date.now();
+  }
+  save(); paintWordsToday();
+}
 function countsArrivals(){
   var me="stats-"+DEVICE_ID, now=Date.now();
+  /* Every device must reach the same answer from the same records, so this
+     device's own record is judged by the same 14-day rule as the others'.
+     It used to count itself in regardless — so a device whose record had
+     gone quiet, and had the first name, counted arrivals while the others,
+     having dropped it, picked someone else too. */
   var ids=S.items.filter(function(i){ return i.stats&&(now-(i.modified||0))<14*864e5 }).map(function(i){ return i.id });
-  if(ids.indexOf(me)<0) ids.push(me);
+  if(!ids.length) return true;
   return ids.sort()[0]===me;
 }
 function fromElsewhere(i){ return !(i.ed&&i.edm===i.modified) }
@@ -6268,7 +6433,7 @@ function noteArrival(i){
     var d=n-(c?c.n:0);
     if(d>0){                       // added; what was deleted there is not subtracted
       var when=new Date(i.modified||Date.now()), pad=function(x){ return (x<10?"0":"")+x };
-      recordWords(when.getFullYear()+"-"+pad(when.getMonth()+1)+"-"+pad(when.getDate()),d,i);
+      recordWords(when.getFullYear()+"-"+pad(when.getMonth()+1)+"-"+pad(when.getDate()),d,i,"a");
     }
   }
   WC[i.id]={ n:n, m:i.modified||0 };
@@ -6299,14 +6464,16 @@ function tallyWords(){
     seen[i.id]=1;
     var c=WC[i.id];
     if(c&&c.m===(i.modified||0)) return;            // untouched since last time
-    var n=wordsOf(i), d=n-Math.max(0,(c?c.n:0)-(DROP[i.id]||0));
-    delete DROP[i.id];
-    if(PASTED[i.id]){ d-=PASTED[i.id]; delete PASTED[i.id] }   // pasted in, not written
+    var n=wordsOf(i), d;
+    if(TYPED[i.id]!=null) d=TYPED[i.id];             // what was typed into it
+    else if(!c) d=n-(PASTED[i.id]||0);               // a new note from the capture box, task box or voice
+    else d=0;                                        // changed, but not by typing: moved, tagged, duplicated…
+    delete TYPED[i.id]; delete PASTED[i.id]; delete DROP[i.id];
     if(d<0) d=0;                                     // deleting is not un-writing
     i.ed=DEVICE_ID; i.edm=i.modified||0;             // edited here: this device has counted it
     WC[i.id]={ n:n, m:i.modified||0 };
     if(!d) return;
-    recordWords(k,d,i); any=true;
+    recordWords(k,d,i,"t"); any=true;
   });
   Object.keys(WC).forEach(function(id){ if(!seen[id]&&!FRESH[id]) delete WC[id] });   // deleted: forgotten, not subtracted
   saveWC();
@@ -6324,7 +6491,49 @@ function allDays(){
       Object.keys(src.c||{}).forEach(function(t){ o.c[t]=(o.c[t]||0)+src.c[t] });
     });
   });
+  /* Then take off, day by day, what must not be in it: a note's arrival
+     counted by more than one device (it counts once, the largest), and any
+     note you said not to count. */
+  Object.keys(out).forEach(function(k){
+    var r=dayNotes(k), off={};
+    r.notes.forEach(function(e){
+      var less=e.excluded?e.total+e.dup:e.dup;
+      if(less>0) off[e.id]=less;
+    });
+    Object.keys(off).forEach(function(id){
+      var less=off[id], o=out[k], it=byId(id);
+      o.w-=less;
+      if(it){
+        (it.tags||[]).forEach(function(t){ if(o.b[t]!=null) o.b[t]-=less });
+        var kd=kindOf(it); if(o.c[kd]!=null) o.c[kd]-=less;
+      }
+    });
+  });
   return out;
+}
+/* One day, note by note, across every device: what each typed into it and
+   what arrived, counted once. */
+function dayNotes(k){
+  var per={}, devices=[], excluded={};
+  S.items.forEach(function(st){
+    if(!st.stats) return;
+    var day=st.stats.days[k]; if(!day) return;
+    var me=st.id==="stats-"+DEVICE_ID, name=(st.stats.dev||"another device")+(me?" (this one)":"");
+    devices.push({ id:st.id, name:name, w:day.w||0, me:me });
+    Object.keys(day.x||{}).forEach(function(id){ excluded[id]=1 });
+    Object.keys(day.n||{}).forEach(function(id){
+      var e=per[id]||(per[id]={ id:id, typed:0, arrived:[], by:[] });
+      var v=day.n[id];
+      if(v[0]){ e.typed+=v[0]; e.by.push(name+": typed "+v[0]) }
+      if(v[1]){ e.arrived.push(v[1]); e.by.push(name+": arrived "+v[1]) }
+    });
+  });
+  var notes=Object.keys(per).map(function(id){
+    var e=per[id], arr=e.arrived.length?Math.max.apply(null,e.arrived):0;
+    var sumArr=e.arrived.reduce(function(a,b){ return a+b },0);
+    return { id:id, typed:e.typed, arrived:arr, dup:sumArr-arr, total:e.typed+arr, by:e.by, excluded:!!excluded[id] };
+  }).sort(function(a,b){ return b.total-a.total });
+  return { notes:notes, devices:devices };
 }
 function isoDaysBack(n){
   var d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-n);
@@ -6430,8 +6639,8 @@ function renderStats(){
     +bars.map(function(v,ix){
       var h=v?Math.max(3,Math.round(v*H/max)):0, x=ix*bw+3;
       return '<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-6).toFixed(1)+'" height="'+h+'" rx="3" class="'+(ix===29?"now":"")+'"><title>'
-        +isoDaysBack(29-ix)+': '+fmtN(v)+' words — click to correct</title></rect>'
-        +'<rect x="'+(ix*bw).toFixed(1)+'" y="0" width="'+bw.toFixed(1)+'" height="'+H+'" class="hit" data-fixday="'+isoDaysBack(29-ix)+'"/>';
+        +isoDaysBack(29-ix)+': '+fmtN(v)+' words — click to see what was counted</title></rect>'
+        +'<rect x="'+(ix*bw).toFixed(1)+'" y="0" width="'+bw.toFixed(1)+'" height="'+H+'" class="hit" data-dayreport="'+isoDaysBack(29-ix)+'"/>';
     }).join("")
     +'<line x1="0" x2="'+W+'" y1="'+H+'" y2="'+H+'" class="base"/>'
     +'<text x="0" y="'+(H+16)+'">'+isoDaysBack(29).slice(5).split("-").reverse().join("/")+'</text>'
@@ -6449,7 +6658,7 @@ function renderStats(){
     .sort(function(a,b){ return a.localeCompare(b) });
   return '<div class="stats">'
     +'<div class="stnums">'
-      +'<div><b>'+fmtN(today)+'</b><span>today · <button class="stfix" data-fixday="'+isoDaysBack(0)+'">correct</button></span></div>'
+      +'<div><b>'+fmtN(today)+'</b><span>today · <button class="stfix" data-dayreport="'+isoDaysBack(0)+'">what was counted</button></span></div>'
       +'<div><b>'+fmtN(sumDays(days,7))+'</b><span>this week</span></div>'
       +'<div><b>'+fmtN(sumDays(days,30))+'</b><span>last 30 days</span></div>'
       +'<div><b>'+st+'</b><span>day'+(st===1?"":"s")+' in a row</span></div>'
@@ -7563,7 +7772,7 @@ function openEditor(id){
   });
   function countWords(){
     var n=words(richToText(bodyHtml()));
-    if(wcStart==null) wcStart=n; else noteDrop(i.id,wcStart,n);
+    if(wcStart==null) wcStart=n;
     q("#e-wc").textContent = n ? n.toLocaleString()+" word"+(n===1?"":"s") : "";
   }
   function paintWhen(){
@@ -7912,6 +8121,7 @@ function openEditor(id){
   });
 
   attachSmartQuotes(q("#e-title"),false);
+  attachTypingCounter(q("#e-title"),function(){ return i.id });
   /* the issue's subject and preheader are read by every subscriber */
   if(q("#e-isubj")) attachSmartQuotes(q("#e-isubj"),false);
   if(q("#e-ipre")) attachSmartQuotes(q("#e-ipre"),false);
@@ -7929,6 +8139,7 @@ function openEditor(id){
     fit(); setTimeout(fit,0); setTimeout(fit,120);
   })();
   attachSmartQuotes(body,true);
+  attachTypingCounter(body,function(){ return i.id });
 
   q("#f-link").addEventListener("click",function(){
     var on=!q("#p-link").classList.contains("on");
@@ -8271,7 +8482,7 @@ function openEditor(id){
 }
 function close(){
   var fid=S.editing;
-  if(fid){ delete PASTED[fid]; delete DROP[fid] }   // saved: already accounted; cancelled: nothing was kept
+  if(fid){ delete PASTED[fid]; delete DROP[fid]; delete TYPED[fid] }   // saved: already accounted; cancelled: nothing was kept
   if(fid&&FRESH[fid]){
     delete FRESH[fid];
     var fi=byId(fid);
@@ -8879,6 +9090,8 @@ board.addEventListener("click",function(e){
     if(pi){ pi.finished=!pi.finished; if(!pi.finished) delete pi.finished; pi.modified=Date.now(); save(); render() } return }
   var fx=e.target.closest("[data-fixday]");
   if(fx){ correctDay(fx.getAttribute("data-fixday")); return }
+  var dr=e.target.closest("[data-dayreport]");
+  if(dr){ showDay(dr.getAttribute("data-dayreport")); return }
   var sb=e.target.closest(".stbook");
   if(sb){ S.tag=sb.dataset.tag; S.view="all"; S.q=""; S.sel={}; render(); return }
   var mt=e.target.closest("[data-totoday]");
@@ -10044,7 +10257,7 @@ function openShared(itemId){
        ReferenceError — after the note had been added but before the sheet
        closed, so the copy appeared and the window stayed open looking
        broken. Caught by a test written for something else entirely. */
-    S.items.unshift(copy); save(); close(); render();
+    S.items.unshift(copy); primeWords(copy); save(); close(); render();   // someone else's words
     toast("Copied into your library");
   });
 }
@@ -11552,7 +11765,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="101";
+var BUILD="102";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
