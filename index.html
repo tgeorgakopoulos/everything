@@ -5381,8 +5381,16 @@ function pullChanges(){
   if(!SYNC.on||!SYNC.session) return Promise.resolve();
   SYNC.status="busy"; paintSync();
   return withFreshSession().then(function(){
+    /* Two minutes back from where the last pull stopped. A row's time is
+       set when its write begins, not when it lands, so a slow write from
+       one device can land after a quicker, later one from another — and a
+       pull that has already moved past the later time never sees the
+       earlier row. That is how one laptop could miss a book the others
+       had. Rows already held are recognised and skipped below. */
+    var since=SYNC.lastPull, t=Date.parse(since);
+    if(t>120000) since=new Date(t-120000).toISOString();
     var q="/rest/v1/items?select=id,data,modified,deleted"
-      +"&modified=gt."+encodeURIComponent(SYNC.lastPull)
+      +"&modified=gt."+encodeURIComponent(since)
       +"&order=modified.asc";
     return fetch(SUPA.url+q,{ headers:supaHeaders(true) });
   }).then(function(r){
@@ -5485,6 +5493,8 @@ function applyIncoming(rows){
        account. Sanitised here, once, on the way in. */
     if(incoming&&incoming.body) incoming.body=sanitizeRich(incoming.body);
     if(!incoming) return;
+    /* already held exactly as the server has it: the overlap, not news */
+    if(here&&SYNC.shadow[row.id]!==undefined&&SYNC.shadow[row.id]===sig(incoming)) return;
 
     if(!here){
       /* Arrive at the top, not the bottom. Array order is the manual order,
@@ -5794,7 +5804,7 @@ function exportLibrary(){
 
 function applyImport(data,mode){
   var incoming=(data.items||[]).map(normalizeItem).filter(Boolean);
-  incoming.forEach(primeWords);          // imported words were written elsewhere, not today
+  incoming.forEach(primeOwn);            // imported words were written elsewhere, not today
   if(!incoming.length) return toast("Nothing to import");
 
   if(mode==="replace"){
@@ -5994,7 +6004,7 @@ function compileToNote(){
     url:"",image:"",desc:"",logo:"",site:"",metaState:null,titleAuto:false,
     actionable:false,due:null,done:false,tint:"doc",compiled:true,tags:[],photos:[],
     checks:[],archived:false,pin:false,created:now,modified:now};
-  S.items.unshift(item); primeWords(item);   // gathered, not written
+  S.items.unshift(item); primeOwn(item);   // gathered, not written
   /* The selection has been used, so it is over. Leaving it ticked while
      the view changes to Notes means a set of cards selected on a page you
      are no longer looking at, which is how the next Archive or Delete
@@ -6448,6 +6458,17 @@ var WC={};
 try{ WC=JSON.parse(localStorage.getItem("trove.wordcache")||"{}")||{} }catch(e){ WC={} }
 function saveWC(){ try{ localStorage.setItem("trove.wordcache",JSON.stringify(WC)) }catch(e){} }
 function primeWords(i){ if(i&&!isSys(i)) WC[i.id]={ n:wordsOf(i), m:i.modified||0 } }
+/* Made here, by the app, and already accounted for: say so on the note,
+   the way a save does. Without the stamp a new issue — last week's
+   sections carried over — looked to every other device like writing that
+   had arrived from elsewhere, and the device that counts arrivals counted
+   all of it. The same for a compiled note, a compile into an issue, a
+   saved copy of a shared note, an import. */
+function primeOwn(i){
+  if(!i||isSys(i)) return;
+  primeWords(i);
+  i.ed=DEVICE_ID; i.edm=i.modified||0;
+}
 function myStats(){
   var id="stats-"+DEVICE_ID, st=byId(id);
   if(!st){
@@ -7122,7 +7143,7 @@ function newIssue(tpl){
     if(tpl!=="tisymvainei") issue.template=tpl;
     var item=normalizeItem({ id:uid(), title:"", body:last?carryOver(last.body,T):("<br>"+(T.sections||"")),
       created:now, modified:now, issue:issue });
-    primeWords(item);    // carried over from last week, not written today
+    primeOwn(item);      // carried over from last week, not written today
     S.items.unshift(item);
     S.view="newsletter"; S.tag=null; S.q=""; S.sel={};
     save(); render();
@@ -7168,6 +7189,7 @@ function compileIntoIssue(){
   target.modified=Date.now();
   var prior=WC[target.id];
   WC[target.id]={ n:(prior?prior.n:wasN)+(wordsOf(target)-wasN), m:target.modified };
+  target.ed=DEVICE_ID; target.edm=target.modified;   // accounted for here: not an arrival anywhere else
   var n=list.length;
   S.sel={};
   S.view="newsletter"; S.tag=null; S.q=""; document.getElementById("q").value="";
@@ -10257,7 +10279,7 @@ function openShared(itemId){
        ReferenceError — after the note had been added but before the sheet
        closed, so the copy appeared and the window stayed open looking
        broken. Caught by a test written for something else entirely. */
-    S.items.unshift(copy); primeWords(copy); save(); close(); render();   // someone else's words
+    S.items.unshift(copy); primeOwn(copy); save(); close(); render();   // someone else's words
     toast("Copied into your library");
   });
 }
@@ -10620,7 +10642,7 @@ function addTutorial(){
     tags:[], photos:[], checks:[], archived:false, pin:true, postId:"",
     created:now, modified:now
   });
-  primeWords(S.items[0]);      // the app wrote it, not you
+  primeOwn(S.items[0]);        // the app wrote it, not you
   save();
 }
 
@@ -11229,7 +11251,12 @@ function showCompare(){
   askChoice("Checking…","<div class='stat'>Reading every row from the server.</div>",
     [{label:"Cancel",value:0,kind:"sec"}],function(){});
   compareWithServer().then(function(r){
-    var name=function(i){ return esc(i.title||richToText(i.body).slice(0,60)||"untitled") };
+    var name=function(i){
+      if(i.book) return esc("▤ The book #"+i.book.tag);
+      if(i.stats) return esc("Writing record"+(i.stats.dev?" — "+i.stats.dev:""));
+      if(i.issue) return esc(issueLabel(i));
+      return esc(i.title||richToText(i.body).slice(0,60)||"untitled");
+    };
     var block=function(title,list,render){
       if(!list.length) return "";
       return '<div class="stat"><b>'+esc(title)+' — '+list.length+'</b></div>'
@@ -11765,7 +11792,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="102";
+var BUILD="103";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
