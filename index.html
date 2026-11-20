@@ -939,6 +939,19 @@
   .ebody a:has(img){text-decoration:none}
   .ebody figure,.cbody figure{display:inline-block;vertical-align:top;width:calc(50% - 10px);
     margin:8px 8px 8px 0}
+  /* Two columns in an issue: a row of two small editors, side by side,
+     each holding words, pictures or both. The row itself cannot be typed
+     into, so the caret is always either in a column or outside the row. */
+  .nlrow{display:flex;gap:12px;margin:8px 0 10px;padding-top:20px;position:relative}
+  .ebody .nlrow figure.nlcol{display:block;flex:1;min-width:0;width:auto;margin:0;padding:10px 12px;
+    border:1px dashed var(--line-strong);border-radius:10px;outline:none;min-height:3.2em}
+  .ebody .nlrow figure.nlcol:focus{border-style:solid;border-color:var(--accent)}
+  .ebody .nlrow figure.nlcol img{margin:4px 0 8px}
+  .nlrowbar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:8px;
+    font-size:11px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);user-select:none}
+  .nlrowx{font-size:12px;color:var(--faint);padding:0 4px;border-radius:5px;cursor:pointer}
+  .nlrowx:hover{color:var(--red);background:var(--line)}
+  .ebody center,.cbody center{display:block;text-align:center}
   .ebody figure img,.cbody figure img{margin:0 0 6px}
   .ebody figcaption,.cbody figcaption{font-size:.88em;line-height:1.45;color:var(--read)}
   .cbody img{max-height:160px;object-fit:cover;width:100%}
@@ -3763,7 +3776,7 @@ function setNoteSize(ix){
    round trip. There is still no button to make one here; one that arrives
    is kept. */
 var RICH_OK={STRONG:1,B:1,EM:1,I:1,U:1,S:1,STRIKE:1,DEL:1,BR:1,A:1,UL:1,OL:1,LI:1,H3:1,HR:1,BLOCKQUOTE:1,
-  IMG:1,FIGURE:1,FIGCAPTION:1};
+  IMG:1,FIGURE:1,FIGCAPTION:1,CENTER:1};
 /* Images in a body exist for the newsletter, and only one kind is kept:
    a picture in the newsletter's own public folder on this app's server.
    Anything else — another site's image, a data: address, a tracking pixel
@@ -3938,7 +3951,7 @@ function richToText(html){
 
    Rather than extend the list again and wait for the next tag to be
    forgotten, this asks about every tag the editor can produce. */
-var RICH_TAGS="strong|b|em|i|u|s|strike|del|br|a|ul|ol|li|p|div|h3|hr|blockquote|img|figure|figcaption";
+var RICH_TAGS="strong|b|em|i|u|s|strike|del|br|a|ul|ol|li|p|div|h3|hr|blockquote|img|figure|figcaption|center";
 var LOOKS_RICH=new RegExp("<\\/?(?:"+RICH_TAGS+")\\b","i");
 var LOOKS_ESCAPED=new RegExp("&lt;\\/?(?:"+RICH_TAGS+")(?:&gt;|\\s)","i");
 
@@ -6083,7 +6096,8 @@ function boxesToHtml(container){
   var out="";
   [].forEach.call(container.querySelectorAll(":scope > .nlbox"),function(bx){
     var c=bx.querySelector(".nlc"), t=bx.querySelector(".nlt");
-    var inner=c?c.innerHTML:"";
+    var inner="";
+    if(c){ var cc=c.cloneNode(true); unwrapCols(cc); inner=cc.innerHTML }
     if(bx.classList.contains("ed")) out+=inner;
     else{
       /* A box left without a title has none. Its heading is still stored,
@@ -6110,10 +6124,80 @@ function addBox(container,after){
   boxChanged(container);
   return nb;
 }
+/* Two columns are stored as two <figure>s side by side — the shape the
+   email has always drawn as a pair. In the editor each pair is wrapped in a
+   row that holds them apart and offers its own ✕; the wrapper is taken
+   off again on the way out, so nothing but the figures is ever saved. */
+function wrapCols(nlc){
+  if(!nlc) return;
+  var kids=[].slice.call(nlc.childNodes), k=0;
+  function blank(n){ return n&&(n.nodeName==="BR"||(n.nodeType===3&&!n.data.trim())) }
+  while(k<kids.length){
+    var n=kids[k];
+    if(n.nodeName!=="FIGURE"){ k++; continue }
+    var pair=[n], j=k+1, between=[];
+    while(j<kids.length&&blank(kids[j])){ between.push(kids[j]); j++ }
+    if(j<kids.length&&kids[j].nodeName==="FIGURE"){ pair.push(kids[j]); between.forEach(function(b){ b.remove() }); j++ }
+    else j=k+1;
+    var row=document.createElement("div");
+    row.className="nlrow"; row.setAttribute("contenteditable","false");
+    row.innerHTML='<span class="nlrowbar">Two columns<span class="nlrowx" title="Remove these two columns" role="button">✕</span></span>';
+    nlc.insertBefore(row,pair[0]);
+    if(pair.length===1){ var f2=document.createElement("figure"); f2.innerHTML="<br>"; pair.push(f2) }
+    pair.forEach(function(f){
+      f.className="nlcol"; f.setAttribute("contenteditable","true");
+      if(!f.lastChild||/^(IMG|A|FIGCAPTION)$/.test(f.lastChild.nodeName)) f.appendChild(document.createElement("br"));
+      row.appendChild(f);
+    });
+    if(!row.nextSibling||row.nextSibling.nodeName==="DIV") nlc.insertBefore(document.createElement("br"),row.nextSibling);
+    k=j;
+  }
+}
+function wrapAllCols(container){ [].forEach.call(container.querySelectorAll(".nlc"),wrapCols) }
+function unwrapCols(root){
+  [].forEach.call(root.querySelectorAll(".nlrow"),function(row){
+    [].forEach.call(row.querySelectorAll("figure"),function(f){
+      f.removeAttribute("class"); f.removeAttribute("contenteditable");
+      row.parentNode.insertBefore(f,row);
+    });
+    row.parentNode.removeChild(row);
+  });
+}
+/* Centred lines are kept as <center>: a tag every inbox understands, and
+   one the cleaner can allow without allowing styles in general. */
+function centerIn(w){
+  var sel=getSelection(); if(!sel||!sel.rangeCount) return;
+  var nd=sel.anchorNode, el=nd&&(nd.nodeType===1?nd:nd.parentNode);
+  var c=el&&el.closest&&el.closest("center");
+  if(c&&w.contains(c)){                          // centred already: back to the left
+    while(c.firstChild) c.parentNode.insertBefore(c.firstChild,c);
+    c.parentNode.removeChild(c);
+  } else {
+    try{ document.execCommand("justifyCenter",false,null) }catch(e){}
+  }
+  [].forEach.call(w.querySelectorAll("[style]"),function(x){
+    var centred=/text-align:\s*center/i.test(x.getAttribute("style")||"");
+    x.removeAttribute("style");
+    if(centred&&x.nodeName!=="CENTER"&&!/^(FIGURE|LI|H3)$/.test(x.nodeName)){
+      var cn=document.createElement("center");
+      while(x.firstChild) cn.appendChild(x.firstChild);
+      x.parentNode.replaceChild(cn,x);
+    }
+  });
+}
 function wireBoxes(container){
   if(container.__boxes) return;
   container.__boxes=true;
   container.addEventListener("click",function(e){
+    var rx=e.target.closest(".nlrowx");
+    if(rx){
+      e.preventDefault();
+      var row=rx.closest(".nlrow");
+      askChoice("Remove these two columns?","Both columns go, with everything in them.",
+        [{label:"Cancel",value:false,kind:"sec"},{label:"Remove",value:true,kind:"dan"}],
+        function(yes){ if(yes&&row.parentNode){ row.parentNode.removeChild(row); boxChanged(container) } });
+      return;
+    }
     var add=e.target.closest(".nladd");
     if(add){
       e.preventDefault();
@@ -7318,21 +7402,43 @@ function issueToEmail(item){
       +'<td style="border-left:3px solid '+T.line+';padding:2px 0 2px 16px;font-family:'+NL_SERIF+';font-style:italic;'
       +'font-size:16px;line-height:1.6;color:'+T.muted+'">'+inner+'</td></tr></table>';
   }
+  /* What one column holds, top to bottom: pictures at the column's width,
+     words as paragraphs, centred lines centred. An old card's caption — a
+     bold title over a line of text — reads as it always did. */
+  function column(f){
+    var out="", run="";
+    function flush(center){
+      run.split(/(?:<br>\s*){2,}/).forEach(function(chunk){
+        chunk=chunk.replace(/^(\s*<br>)+|(<br>\s*)+$/g,"").trim();
+        if(chunk&&chunk.replace(/&nbsp;|\s/g,"")) out+=para(chunk,{size:15,mt:out?8:0,mb:0,lh:1.5,style:center?"text-align:center;":""});
+      });
+      run="";
+    }
+    [].forEach.call(f.childNodes,function(c){
+      var t=c.nodeType===1?c.nodeName:"";
+      var lone=t==="IMG"||(t==="A"&&c.children.length===1&&c.children[0].nodeName==="IMG"&&!c.textContent.trim());
+      if(lone){ flush(); out+='<div style="margin:'+(out?"10px":"0")+' 0 0">'+picture(t==="IMG"?c:c.children[0],250)+'</div>'; return }
+      if(t==="FIGCAPTION"){
+        flush();
+        run=[].map.call(c.childNodes,function(x){
+          if(x.nodeName==="B"||x.nodeName==="STRONG")
+            return '<strong style="font-family:'+NL_SANS+';font-weight:600;color:'+T.ink+'">'+[].map.call(x.childNodes,inline).join("")+'</strong>';
+          return inline(x);
+        }).join("");
+        out+=out?'<div style="height:10px;line-height:10px;font-size:0">&nbsp;</div>':"";
+        flush(); return;
+      }
+      if(t==="CENTER"){ flush(); run=[].map.call(c.childNodes,inline).join(""); flush(true); return }
+      run+=inline(c);
+    });
+    flush();
+    return out;
+  }
   function cards(figs){
     var cells=figs.map(function(f){
-      var img=f.querySelector("img"), cap=f.querySelector("figcaption");
-      var capHtml="";
-      if(cap){
-        capHtml=[].map.call(cap.childNodes,function(c){
-          if(c.nodeName==="B"||c.nodeName==="STRONG")
-            return '<strong style="font-family:'+NL_SANS+';font-weight:600;color:'+T.ink+'">'+[].map.call(c.childNodes,inline).join("")+'</strong>';
-          return inline(c);
-        }).join("");
-      }
       return '<!--[if mso]><td width="250" valign="top"><![endif]-->'
         +'<div class="col" style="display:inline-block;width:250px;vertical-align:top;margin:0 6px 18px;text-align:left">'
-        +(img?picture(img,250):"")
-        +(capHtml?para(capHtml,{size:15,mt:10,mb:0,lh:1.5}):"")
+        +column(f)
         +'</div><!--[if mso]></td><![endif]-->';
     }).join("");
     return row('<div style="text-align:center;font-size:0"><!--[if mso]><table role="presentation"><tr><![endif]-->'
@@ -7379,6 +7485,14 @@ function issueToEmail(item){
     if(t==="HR"){ flushRun(); rows.push(row('<div style="border-top:1px solid '+T.links+';margin:10px 0 24px;height:0;line-height:0;font-size:0">&nbsp;</div>')); return }
     if(t==="BLOCKQUOTE"){ flushRun(); rows.push(row(quote([].map.call(n.childNodes,inline).join("")))); return }
     if(t==="UL"||t==="OL"){ flushRun(); rows.push(row(list(n))); return }
+    if(t==="CENTER"){
+      flushRun();
+      [].map.call(n.childNodes,inline).join("").split(/(?:<br>\s*){2,}/).forEach(function(chunk){
+        chunk=chunk.replace(/^(\s*<br>)+|(<br>\s*)+$/g,"").trim();
+        if(chunk&&chunk.replace(/&nbsp;|\s/g,"")) rows.push(row(para(chunk,{style:"text-align:center;"})));
+      });
+      return;
+    }
     if(lone){ flushRun(); var img=t==="IMG"?n:n.children[0]; rows.push(row('<div style="margin:6px 0 18px">'+picture(img,520)+'</div>')); return }
     run+=inline(n);
   });
@@ -7700,7 +7814,8 @@ function openEditor(id){
         +'aria-label="Heading">T</button>')
       +(i.issue?'<button class="facet fmt nlb" id="e-nlimg" title="Image — full width, with a link if you like">▭ Image</button>'
         +'<button class="facet fmt nlb" id="e-nlvid" title="Video — paste a YouTube or Vimeo address; its picture goes in, with a play button">▶ Video</button>'
-        +'<button class="facet fmt nlb" id="e-nlcards" title="Two pictures side by side, each with a title, a caption and a link">▥ Cards</button>':"")
+        +'<button class="facet fmt nlb" id="e-nlcards" title="Two columns side by side — words, pictures or both in each">◫ Columns</button>'
+        +'<button class="facet fmt nlb" id="e-center" title="Centre the selected lines; press again to undo" aria-label="Centre">≡ Centre</button>':"")
       +'<span class="wc" id="e-wc"></span>'
       +'<span class="edat" id="e-when" title="When this note last changed"></span>'
     +'</div>'
@@ -7773,12 +7888,12 @@ function openEditor(id){
      other note is one editor. These two are the only places that know. */
   function bodyHtml(){ return i.issue?boxesToHtml(body):body.innerHTML }
   function setBodyHtml(h){
-    if(i.issue){ body.innerHTML=issueBoxesHTML(h,issueKey(i)==="360"?"Text":"Editorial") } else body.innerHTML=sanitizeRich(h);
+    if(i.issue){ body.innerHTML=issueBoxesHTML(h,issueKey(i)==="360"?"Text":"Editorial"); wrapAllCols(body) } else body.innerHTML=sanitizeRich(h);
   }
   /* Where typing and the toolbar go: in an issue, the box you were last in. */
   var lastEditable=null;
   body.addEventListener("focusin",function(e){
-    var ed=e.target.closest&&e.target.closest(".nlc");
+    var ed=e.target.closest&&e.target.closest(".nlcol,.nlc");
     if(ed) lastEditable=ed;
   });
   function writingIn(){
@@ -7786,7 +7901,17 @@ function openEditor(id){
     if(lastEditable&&body.contains(lastEditable)) return lastEditable;
     return body.querySelector(".nlc");
   }
-  if(i.issue) wireBoxes(body);
+  if(i.issue){ wrapAllCols(body); wireBoxes(body) }
+  /* Backspace just after a pair of columns would take the whole pair with
+     it; it stops at the row instead. Remove a row with its ✕. */
+  if(i.issue) body.addEventListener("keydown",function(e){
+    if(e.key!=="Backspace") return;
+    var sel=getSelection(); if(!sel||!sel.rangeCount||!sel.isCollapsed) return;
+    var r=sel.getRangeAt(0), nd=r.startContainer, prev=null;
+    if(nd.nodeType===3){ if(r.startOffset===0) prev=nd.previousSibling }
+    else prev=nd.childNodes[r.startOffset-1];
+    if(prev&&prev.classList&&prev.classList.contains("nlrow")) e.preventDefault();
+  });
   if(q("#e-nlbox")) q("#e-nlbox").addEventListener("mousedown",function(e){
     e.preventDefault();
     var nb=addBox(body,null);
@@ -7959,7 +8084,8 @@ function openEditor(id){
   if(q("#e-nlimg")) q("#e-nlimg").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
     pickImageFiles(false,function(files){
-      uploadNewsletterImages(files,EMAIL_IMG).then(function(urls){
+      var inCol=!!(lastEditable&&lastEditable.classList&&lastEditable.classList.contains("nlcol"));
+      uploadNewsletterImages(files,inCol?EMAIL_CARD:EMAIL_IMG).then(function(urls){
         nlLink(function(href){ nlInsert(nlPicture(urls[0],href)+"<br>"); nlLinkUp(urls[0],href) });
       },function(err){ toast(String(err)) });
     });
@@ -7973,26 +8099,28 @@ function openEditor(id){
       videoBlock(vid).then(function(html){ nlInsert(html+"<br>") },function(err){ toast(String(err)) });
     });
   });
+  /* Two columns, empty, where the caret is. Words, pictures (▭ Image, with
+     the caret in a column) or both go in each. Replaces Cards, which tied a
+     picture, a title and a caption together and fought every edit. */
   if(q("#e-nlcards")) q("#e-nlcards").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
-    pickImageFiles(true,function(files){
-      uploadNewsletterImages(files.slice(0,2),EMAIL_CARD).then(function(urls){
-        var html="", k=0, hrefs=[];
-        (function next(){
-          if(k>=urls.length){
-            nlInsert(html+"<br>");
-            urls.forEach(function(u,ix){ nlLinkUp(u,hrefs[ix]) });
-            return;
-          }
-          nlLink(function(href){
-            hrefs[k]=href;
-            html+='<figure>'+nlPicture(urls[k],href)
-              +'<figcaption><b>Τίτλος</b><br>Λεζάντα</figcaption></figure>';
-            k++; next();
-          });
-        })();
-      },function(err){ toast(String(err)) });
-    });
+    var w=writingIn();
+    if(w&&w.classList.contains("nlcol")) return toast("Columns go in a box, not inside another column");
+    nlInsert("<figure><br></figure><figure><br></figure><br>");
+    var nlc=w&&(w.classList.contains("nlc")?w:w.closest(".nlc"));
+    wrapCols(nlc);
+    var row=nlc&&[].slice.call(nlc.querySelectorAll(".nlrow")).pop();
+    var first=row&&row.querySelector(".nlcol");
+    if(first){ first.focus(); lastEditable=first }
+    boxChanged(body);
+  });
+  if(q("#e-center")) q("#e-center").addEventListener("mousedown",function(e){
+    e.preventDefault();
+    var w=writingIn();
+    var sel=getSelection();
+    if(!(sel&&sel.rangeCount&&w.contains(sel.getRangeAt(0).startContainer))) w.focus();
+    centerIn(w);
+    boxChanged(body); countWords();
   });
   body.addEventListener("keydown",function(e){
     if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){
@@ -11792,7 +11920,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="103";
+var BUILD="104";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
