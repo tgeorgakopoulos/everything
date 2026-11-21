@@ -7410,7 +7410,7 @@ function issueToEmail(item){
     function flush(center){
       run.split(/(?:<br>\s*){2,}/).forEach(function(chunk){
         chunk=chunk.replace(/^(\s*<br>)+|(<br>\s*)+$/g,"").trim();
-        if(chunk&&chunk.replace(/&nbsp;|\s/g,"")) out+=para(chunk,{size:15,mt:out?8:0,mb:0,lh:1.5,style:center?"text-align:center;":""});
+        if(chunk&&chunk.replace(/&nbsp;|\s/g,"")) out+=para(chunk,{mt:out?12:0,mb:0,style:center?"text-align:center;":""});   // the body's own size, like every other paragraph
       });
       run="";
     }
@@ -11920,7 +11920,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="104";
+var BUILD="105";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
