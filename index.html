@@ -5692,6 +5692,10 @@ function normalizeItem(o){
       preheader:String(o.issue.preheader||"").slice(0,300) };
     if(typeof o.issue.template==="string"&&/^[a-z0-9_-]{1,40}$/.test(o.issue.template))
       out.issue.template=o.issue.template;
+    /* Its draft in Mailchimp, once there is one: sending again updates it. */
+    var mc=o.issue.mc;
+    if(mc&&typeof mc==="object"&&/^[a-z0-9]{6,20}$/.test(String(mc.id||"")))
+      out.issue.mc={ id:String(mc.id), web:parseInt(mc.web,10)||0, list:/^[a-z0-9]{6,20}$/.test(String(mc.list||""))?String(mc.list):"" };
   }
   /* Two kinds of record that are not notes and are never listed as notes:
      a book (a tag that has been made one) and a device's writing record. */
@@ -6054,6 +6058,7 @@ function issueFromEditor(i){
     n:num>0?num:i.issue.n, date:g("e-idate")||i.issue.date,
     subject:g("e-isubj").trim().slice(0,200), preheader:g("e-ipre").trim().slice(0,300) };
   if(i.issue.template) out.template=i.issue.template;
+  if(i.issue.mc) out.mc=i.issue.mc;
   return out;
 }
 /* ---- the issue editor's boxes ----------------------------------------
@@ -7561,6 +7566,79 @@ function flashBtn(b,text,bad){
   b.classList.add(bad?"fail":"done");
   b.__flash=setTimeout(function(){ b.innerHTML=b.dataset.label; b.classList.remove("done","fail") },1800);
 }
+/* =========================================================================
+   AN ISSUE, STRAIGHT INTO MAILCHIMP
+
+   The issue as it stands in the editor becomes a draft campaign in the
+   audience chosen for that newsletter: subject, preheader and the email,
+   exactly as the preview shows it. Pressed again, the same draft is
+   updated. Sending stays in Mailchimp — once gone, an email cannot be
+   called back, so the last look is yours, there. The work is done by the
+   newsletter-send function, which holds the Mailchimp key.
+   ========================================================================= */
+function mcCall(body){
+  if(!SYNC.session) return Promise.reject("Sign in first");
+  return withFreshSession().then(function(){
+    return fetch(fnUrl("newsletter-send"),{ method:"POST",
+      headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token, "Content-Type":"application/json" },
+      body:JSON.stringify(body) });
+  }).then(function(r){
+    return r.json().catch(function(){ return {} }).then(function(j){
+      if(r.ok) return j;
+      if(r.status===404) throw "The newsletter-send function isn't set up yet — see MAILCHIMP-SEND.html";
+      throw (j&&j.error)||("Mailchimp: "+r.status);
+    });
+  });
+}
+function mcListKey(item){ return "trove.mc.list."+issueKey(item) }
+function chooseAudience(item,force){
+  var saved=null; try{ saved=JSON.parse(localStorage.getItem(mcListKey(item))||"null") }catch(e){}
+  if(saved&&saved.id&&!force) return Promise.resolve(saved);
+  return mcCall({ action:"lists" }).then(function(j){
+    var lists=j.lists||[];
+    if(!lists.length) throw "No audiences in Mailchimp";
+    return new Promise(function(res,rej){
+      askChoice("Which audience gets "+(NL_TEMPLATES[issueKey(item)]||{}).name+"?",
+        "Chosen once for this newsletter; you can change it later.",
+        [{label:"Cancel",value:null,kind:"sec"}].concat(lists.map(function(l){
+          return { label:l.name+" · "+fmtN(l.members), value:l } })),
+        function(l){
+          if(!l) return rej("");
+          try{ localStorage.setItem(mcListKey(item),JSON.stringify({ id:l.id, name:l.name })) }catch(e){}
+          res({ id:l.id, name:l.name });
+        });
+    });
+  });
+}
+function sendToMailchimp(item,btn,remember,force){
+  var iss=item.issue||{};
+  if(!issueSubject(item)) return toast("Give the issue a subject first");
+  var tpl=NL_TEMPLATES[issueKey(item)]||{};
+  chooseAudience(item,force).then(function(aud){
+    if(btn) flashBtn(btn,"Sending…");
+    return mcCall({ action:"draft", list_id:aud.id, subject:issueSubject(item), preheader:iss.preheader||"",
+      title:(tpl.name||"Newsletter")+" · γράμμα "+iss.n, html:issueToEmail(item),
+      campaign_id:iss.mc&&iss.mc.list===aud.id?iss.mc.id:"" }).then(function(j){
+      var mc={ id:j.campaign_id, web:j.web_id, list:aud.id };
+      remember(mc);
+      if(btn) flashBtn(btn,"✓ In Mailchimp");
+      askChoice(j.updated?"Draft updated in Mailchimp":"Draft ready in Mailchimp",
+        "<b>"+esc(issueSubject(item))+"</b><br>for <b>"+esc(aud.name)+"</b>. Nothing has been sent: "
+        +"look it over and send or schedule it in Mailchimp. Pressing → Mailchimp again updates this same draft.",
+        [{label:"Close",value:0,kind:"sec"},{label:"Another audience…",value:3,kind:"sec"},
+         {label:"Send a test…",value:2,kind:"sec"},{label:"Open in Mailchimp",value:1}],
+        function(v){
+          if(v===1) window.open(j.url,"_blank","noopener");
+          if(v===3) sendToMailchimp(item,btn,remember,true);
+          if(v===2) askText("Send a test","To up to three addresses, separated by commas.",
+            (SYNC.session&&SYNC.session.email)||"","Send test",function(t){
+              mcCall({ action:"test", campaign_id:mc.id, emails:String(t||"").split(/[,\s]+/).filter(Boolean) })
+                .then(function(){ toast("Test sent") },function(e){ toast(String(e)) });
+            });
+        });
+    });
+  }).catch(function(e){ if(e) toast(String(e)) });
+}
 function copyIssueHtml(item,btn){
   copyToClipboard(issueToEmail(item),function(ok){
     flashBtn(btn,ok?"✓ Copied":"Couldn't copy",!ok);
@@ -7787,7 +7865,8 @@ function openEditor(id){
       +'<label class="subj">Subject line<input id="e-isubj" placeholder="What the inbox shows — the title, if left empty" value="'+esc(i.issue.subject)+'"></label>'
       +'<label class="wide">Preview text<input id="e-ipre" placeholder="The grey line under the subject in the inbox" value="'+esc(i.issue.preheader)+'"></label>'
       +'<div class="issueacts"><button class="btn sec" id="e-iprev">◱ Preview</button>'
-      +'<button class="btn sec" id="e-icopy">Copy HTML</button></div>'
+      +'<button class="btn sec" id="e-icopy">Copy HTML</button>'
+      +'<button class="btn" id="e-imc" title="Make this issue a draft campaign in Mailchimp — you send it from there">→ Mailchimp</button></div>'
       +'</div>':"")
     /* A title that wraps. As a one-line field a long title scrolled sideways
        and showed its own end, first letters cut off at the edge. */
@@ -8081,6 +8160,9 @@ function openEditor(id){
   }
   if(q("#e-iprev")) q("#e-iprev").addEventListener("click",function(){ flashBtn(q("#e-iprev"),"Opening…"); showIssuePreview(issueNow()) });
   if(q("#e-icopy")) q("#e-icopy").addEventListener("click",function(){ copyIssueHtml(issueNow(),q("#e-icopy")) });
+  if(q("#e-imc")) q("#e-imc").addEventListener("click",function(){
+    sendToMailchimp(issueNow(),q("#e-imc"),function(mc){ i.issue.mc=mc; i.modified=Date.now(); save() });
+  });
   if(q("#e-nlimg")) q("#e-nlimg").addEventListener("mousedown",function(e){
     e.preventDefault(); nlRemember();
     pickImageFiles(false,function(files){
@@ -11920,7 +12002,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="105";
+var BUILD="106";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
