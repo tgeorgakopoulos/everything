@@ -316,6 +316,33 @@
   .grid.ms .quick,.grid.ms .pick,.grid.ms .thumb,.grid.ms .srcline{display:none!important}
   .grid.ms .foot{margin-top:16px}
   .stchart rect.hit{fill:transparent;cursor:pointer} .stchart rect.hit:hover{fill:color-mix(in srgb,var(--make) 8%,transparent)}
+  /* ---- Triage ---- */
+  .trihead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
+  .trinote{font-size:12px;color:var(--muted);margin-left:auto}
+  .trilist{display:flex;flex-direction:column;gap:8px;max-width:980px}
+  .tri{display:flex;gap:14px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+  .tri.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .trimg{flex:none;width:88px;height:66px;border-radius:8px;object-fit:cover;background:var(--line)}
+  .trimg.none{background:var(--surface-2)}
+  .trimain{flex:1;min-width:0}
+  .trimeta{font-size:11.5px;color:var(--muted);display:flex;gap:4px;align-items:center}
+  .triscore{margin-left:auto;font-weight:700;color:var(--make);font-variant-numeric:tabular-nums}
+  .trititle{display:block;font-weight:650;color:var(--ink);font-size:15px;line-height:1.35;margin:3px 0;text-decoration:none}
+  .trititle:hover{text-decoration:underline}
+  .trisum{font-size:13px;color:var(--read);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .triact{flex:none;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+  .trirate{display:flex;gap:3px}
+  .trirate button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line-strong);font-size:12px;font-weight:700;color:var(--ui)}
+  .trirate button.on,.trirate button:hover{background:var(--make);border-color:var(--make);color:#fff}
+  .tribtns{display:flex;gap:6px}
+  .tribtns .btn{padding:5px 10px;font-size:12px}
+  .trisrc{display:flex;gap:8px;align-items:center;padding:8px 2px;border-bottom:1px solid var(--line)}
+  .trisrc.off{opacity:.55}
+  .trisrcn{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;font-size:13px}
+  .trisrcn span{font-size:11.5px;color:var(--muted)}
+  .trisrcu{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .trierr{color:var(--red)}
+  @media (max-width:760px){ .tri{flex-wrap:wrap} .trimg{width:64px;height:48px} .triact{width:100%;flex-direction:row;justify-content:space-between} .trinote{margin-left:0} }
   .dayrows{max-height:52vh;overflow-y:auto;margin:10px 0 4px;border-top:1px solid var(--line)}
   .dayrow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--line)}
   .dayrow.off .dayw,.dayrow.off .dayn{opacity:.4;text-decoration:line-through}
@@ -1450,6 +1477,36 @@
     /* on a phone the sheet already fills the screen; only the type changes */
     .sheet.focus{width:100%;padding:30px 22px 0}
   }
+  /* ---- FOCUS, the whole screen ------------------------------------------
+     The note takes the screen (or all of it but the sidebar), in one of three
+     rooms: paper, dark, or night blue. Everything but the words fades while
+     you type and comes back when the mouse moves. Scrolling is ordinary or
+     typewriter — the line being written held at the middle. */
+  .scrim.focus{display:block;padding:0;backdrop-filter:none;background:var(--fbg,#F6F2E9)}
+  .scrim.focus.side{left:236px}
+  .scrim.focus[data-ft="paper"]{--fbg:#F6F2E9;--fink:#25221C;--fread:#2F2B24;--ffaint:#8C8576;--fline:rgba(40,30,10,.12)}
+  .scrim.focus[data-ft="dark"]{--fbg:#141617;--fink:#E4E2DC;--fread:#CFCCC4;--ffaint:#7C807F;--fline:rgba(255,255,255,.10)}
+  .scrim.focus[data-ft="night"]{--fbg:#0E1E36;--fink:#EFE6CC;--fread:#E2D8BC;--ffaint:#8193AE;--fline:rgba(239,230,204,.12)}
+  .sheet.focus{width:100%;height:100%;max-height:none;border-radius:0;box-shadow:none;animation:none;
+    background:var(--fbg);padding:84px 6vw 0;overflow-y:auto}
+  .sheet.focus > :not(.etitle):not(.ebody):not(.fmtbar):not(.sticky):not(.fctl){display:none!important}
+  .sheet.focus .etitle,.sheet.focus .ebody{color:var(--fink);background:transparent}
+  .sheet.focus .ebody{color:var(--fread);padding-bottom:30vh}
+  .sheet.focus.tw .ebody{padding-bottom:55vh}
+  .sheet.focus .etitle::placeholder,.sheet.focus .ebody:empty::before{color:var(--ffaint)}
+  .sheet.focus .fmtbar,.sheet.focus .sticky,.sheet.focus .fctl{transition:opacity .35s}
+  .sheet.focus .sticky{background:var(--fbg);border-color:var(--fline)}
+  .sheet.focus .fmt,.sheet.focus .facet{color:var(--ffaint)}
+  .sheet.focus.calm .fmtbar,.sheet.focus.calm .sticky,.sheet.focus.calm .fctl{opacity:0}
+  .fctl{display:none}
+  .sheet.focus .fctl{display:flex;position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:60;gap:6px;align-items:center;
+    padding:6px 8px;border-radius:12px;background:var(--fbg);border:1px solid var(--fline);font-size:12px;color:var(--ffaint)}
+  .scrim.focus.side .sheet.focus .fctl{left:calc(50% + 118px)}
+  .fctl button{padding:4px 9px;border-radius:8px;color:var(--ffaint);font-size:12px;font-weight:600}
+  .fctl button.on{color:var(--fink);background:var(--fline)}
+  .fctl .fsep{width:1px;height:16px;background:var(--fline);margin:0 2px}
+  .fctl .fwc{padding:0 6px;font-variant-numeric:tabular-nums}
+  @media (max-width:760px){ .scrim.focus.side{left:0} .fctl [data-fs="side"]{display:none} }
   .ebody strong,.ebody b{font-weight:700}
   .ebody em,.ebody i{font-style:italic}
   .sheet ::placeholder{color:var(--faint)}
@@ -1892,6 +1949,8 @@
     <button class="nav" data-view="connect" id="nav-connect"><span class="ico"><svg viewBox="0 0 24 24"><circle cx="8.4" cy="8.6" r="3.3"/><circle cx="16.4" cy="15.4" r="3.3"/><path d="M10.8 11.1l3.2 2.7"/></svg></span>Connect<span class="n" id="c-connect"></span></button>
     <button class="nav" data-view="notes"><span class="ico"><svg viewBox="0 0 24 24"><rect x="4.5" y="3.5" width="15" height="17" rx="3.2"/><path d="M8.2 9h7.6M8.2 12.8h7.6M8.2 16.6h4.6"/></svg></span>Notes<span class="n" id="c-notes"></span></button>
     <button class="nav" data-view="links"><span class="ico"><svg viewBox="0 0 24 24"><path d="M10.2 13.8a3.9 3.9 0 0 0 5.6 0l2.5-2.5a3.9 3.9 0 1 0-5.6-5.6l-1 1"/><path d="M13.8 10.2a3.9 3.9 0 0 0-5.6 0l-2.5 2.5a3.9 3.9 0 1 0 5.6 5.6l1-1"/></svg></span>Links<span class="n" id="c-links"></span></button>
+    <!-- Triage: what your sources found, to read and sort. -->
+    <button class="nav" data-view="triage" id="nav-triage" style="display:none" title="Links from your sources, twice a day, to read and sort"><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16l-6 7v5l-4 2v-7z"/></svg></span>Triage<span class="n" id="c-triage"></span></button>
     <!-- Newsletters and Books: what you make, after what you gather. -->
     <button class="nav" data-view="newsletter" id="nav-newsletter" style="display:none" title="Every issue of the newsletters"><span class="ico"><svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M4.6 7.6l7.4 5.4 7.4-5.4"/></svg></span>Newsletters<span class="n" id="c-newsletter"></span></button>
     <button class="nav" id="nav-books" data-toggle="books" style="display:none" title="Tags you have made into books"><span class="ico"><svg viewBox="0 0 24 24"><path d="M5.2 5.6a2.2 2.2 0 0 1 2.2-2.2h11.4v14.4H7.4a2.2 2.2 0 0 0-2.2 2.2z"/><path d="M5.2 19.8a2.2 2.2 0 0 0 2.2 0.8h11.4v-2.8"/><path d="M9.2 8h5.6"/></svg></span>Books<span class="n" id="c-books"></span>
@@ -3677,8 +3736,9 @@ function quoteFor(prev,ch){
    that is what puts it on the browser's own undo stack: ⌘Z gives you the
    two dashes back, which is the escape hatch for anyone who wanted to
    type two dashes and meant it. */
-function dashesToDivider(){
-  var sel=getSelection();
+function dashesToDivider(doc){
+  doc=doc||document;
+  var sel=doc.getSelection();
   if(!sel||!sel.rangeCount||!sel.isCollapsed) return false;
   var r=sel.getRangeAt(0), n=r.startContainer;
   if(n.nodeType!==3) return false;
@@ -3708,10 +3768,10 @@ function dashesToDivider(){
   // into one character before we ever see the second keystroke
   var mark=/^[ \t]*(--|–|—)$/.exec(head);
   if(!mark) return false;
-  var kill=document.createRange();
+  var kill=doc.createRange();
   kill.setStart(n,at-mark[1].length); kill.setEnd(n,at);
   sel.removeAllRanges(); sel.addRange(kill);
-  try{ document.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
+  try{ doc.execCommand("insertHTML",false,"<hr><br>") }catch(e){}
   return true;
 }
 
@@ -3722,8 +3782,9 @@ function attachSmartQuotes(el,rich){
     if(quoteStyle==="off") return;
     if(e.inputType!=="insertText"||(e.data!=='"'&&e.data!=="'")) return;
     var prev="";
+    var dk=el.ownerDocument||document;          // a popped-out note is in another window
     if(rich){
-      var sel=window.getSelection();
+      var sel=dk.getSelection();
       if(!sel||!sel.rangeCount) return;
       var r=sel.getRangeAt(0);
       if(r.startContainer.nodeType===3&&r.startOffset>0)
@@ -3736,7 +3797,7 @@ function attachSmartQuotes(el,rich){
     if(!rep) return;
     e.preventDefault();
     if(rich){
-      try{ document.execCommand("insertText",false,rep) }catch(err){}
+      try{ dk.execCommand("insertText",false,rep) }catch(err){}
     } else {
       var a=el.value.slice(0,el.selectionStart), b=el.value.slice(el.selectionEnd);
       el.value=a+rep+b;
@@ -4418,6 +4479,13 @@ function render(){
     paintSidebar(); paintTaskbar();
     return;
   }
+  if(S.view==="triage"&&!S.q&&!S.tag){
+    document.getElementById("viewtitle").textContent="Triage";
+    document.getElementById("lensnote").textContent="From your sources, twice a day — rate 1–5 to teach it, send the good ones on";
+    board.innerHTML=renderTriage();
+    paintSidebar(); paintTaskbar();
+    return;
+  }
   if(S.view==="connect"&&!S.q&&!S.tag){
     document.getElementById("viewtitle").textContent="Connect";
     document.getElementById("lensnote").textContent=
@@ -4833,6 +4901,10 @@ function paintSidebar(){
   }
   var nc=document.getElementById("nav-connect");
   if(nc) nc.style.display=SYNC.session?"":"none";
+  var nt=document.getElementById("nav-triage");
+  if(nt) nt.style.display=SYNC.session?"":"none";
+  var ct=document.getElementById("c-triage");
+  if(ct) ct.textContent=TRI.loaded&&TRI.items.length?TRI.items.length:"";
 }
 
 /* =========================================================================
@@ -6402,7 +6474,7 @@ function wordStarts(prev,data){
 }
 function charBefore(el){
   if(el.tagName==="INPUT"||el.tagName==="TEXTAREA"){ var s0=el.selectionStart||0; return s0>0?el.value.charAt(s0-1):"" }
-  var sel=window.getSelection(); if(!sel||!sel.rangeCount) return "";
+  var sel=(el.ownerDocument||document).getSelection(); if(!sel||!sel.rangeCount) return "";
   var r=sel.getRangeAt(0), nd=r.startContainer;
   if(nd.nodeType===3) return r.startOffset>0?nd.data.charAt(r.startOffset-1):"";
   var ch=nd.childNodes[r.startOffset-1];
@@ -7829,9 +7901,63 @@ var scrim=document.getElementById("scrim"), sheet=document.getElementById("sheet
    rewrites className wholesale — choosing a colour would otherwise drop you
    out of focus without explanation. */
 var FOCUS=false;
+var FOCUSCTX=null;
+function wireFocusOnce(){
+  if(sheet.__focusWired) return;
+  sheet.__focusWired=true;
+  sheet.addEventListener("click",function(e){
+    var b=e.target.closest&&e.target.closest(".fctl button"); if(!b||!FOCUSCTX) return;
+    e.preventDefault();
+    var pr=focusPrefs();
+    if(b.dataset.ft) pr.theme=b.dataset.ft;
+    if(b.dataset.fs==="normal"||b.dataset.fs==="type") pr.scroll=b.dataset.fs;
+    if(b.dataset.fs==="side") pr.side=!pr.side;
+    if(b.dataset.fs==="exit"){ FOCUSCTX.toggle(); return }
+    saveFocusPrefs(pr); FOCUSCTX.paint();
+    var body=sheet.querySelector(".ebody"); if(body) body.focus();
+  });
+  /* While you type, everything but the words fades; a moved mouse brings it back. */
+  var calmT=null;
+  sheet.addEventListener("input",function(){
+    if(!FOCUS) return;
+    sheet.classList.add("calm"); if(FOCUSCTX) FOCUSCTX.words();
+    if(focusPrefs().scroll==="type") typewriter();
+  });
+  sheet.addEventListener("mousemove",function(){
+    if(!FOCUS||!sheet.classList.contains("calm")) return;
+    clearTimeout(calmT); calmT=setTimeout(function(){ sheet.classList.remove("calm") },60);
+  });
+  sheet.addEventListener("keyup",function(e){
+    if(FOCUS&&focusPrefs().scroll==="type"&&/^(Arrow|Enter|Page|Home|End)/.test(e.key)) typewriter();
+  });
+  sheet.addEventListener("mouseup",function(){ if(FOCUS&&focusPrefs().scroll==="type") setTimeout(typewriter,0) });
+  /* ⌘⇧F, so you can reach for more room without leaving the keyboard. */
+  sheet.addEventListener("keydown",function(e){
+    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&(e.key==="f"||e.key==="F")&&FOCUSCTX){
+      e.preventDefault(); FOCUSCTX.toggle();
+    }
+  });
+}
+/* Typewriter: the caret's line held at about the middle of the screen. */
+function typewriter(){
+  var sl=getSelection(); if(!sl||!sl.rangeCount) return;
+  var r=sl.getRangeAt(0).cloneRange(), rect=null;
+  try{ var rs=r.getClientRects(); rect=rs&&rs.length?rs[rs.length-1]:r.getBoundingClientRect() }catch(e){ return }
+  if(!rect||(!rect.top&&!rect.bottom)) return;
+  var box=sheet.getBoundingClientRect(), target=box.top+box.height*0.45;
+  sheet.scrollTop+=Math.round(rect.top-target);
+}
+function focusPrefs(){
+  var p={}; try{ p=JSON.parse(localStorage.getItem("trove.focus")||"{}")||{} }catch(e){}
+  return { theme:/^(paper|dark|night)$/.test(p.theme)?p.theme:"paper", scroll:p.scroll==="type"?"type":"normal", side:!!p.side };
+}
+function saveFocusPrefs(p){ try{ localStorage.setItem("trove.focus",JSON.stringify(p)) }catch(e){} }
 function applySheetTint(tint){
-  sheet.className="sheet"+(tint?" tint-"+tint:"")+(FOCUS?" focus":"");
+  sheet.className="sheet"+(tint?" tint-"+tint:"")+(FOCUS?" focus":"")
+    +(FOCUS&&focusPrefs().scroll==="type"?" tw":"");
   scrim.classList.toggle("focus",FOCUS);
+  scrim.classList.toggle("side",FOCUS&&focusPrefs().side);
+  if(FOCUS) scrim.setAttribute("data-ft",focusPrefs().theme);
 }
 
 function openEditor(id){
@@ -8578,17 +8704,41 @@ function openEditor(id){
     applySheetTint(d.tint);
     var btn=q("#e-focus");
     if(btn) btn.classList.toggle("on",FOCUS);
+    paintFocus();
     var body=q(".ebody");
     if(body) body.focus();
   }
-  /* ⌘⇧F, so you can reach for more room without leaving the keyboard. It is
-     bound on the sheet rather than the window, so it exists only while a note
-     is open and cannot collide with anything on the board behind. */
-  sheet.addEventListener("keydown",function(e){
-    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&(e.key==="f"||e.key==="F")){
-      e.preventDefault(); toggleFocus();
-    }
-  });
+  /* The room's controls, at the top, fading with the rest. Remembered. */
+  var focusStart=0;
+  function paintFocus(){
+    var pr=focusPrefs();
+    scrim.setAttribute("data-ft",pr.theme);
+    scrim.classList.toggle("side",FOCUS&&pr.side);
+    sheet.classList.toggle("tw",FOCUS&&pr.scroll==="type");
+    var c=q(".fctl");
+    if(!FOCUS){ if(c) c.remove(); sheet.classList.remove("calm"); return }
+    if(!c){ c=document.createElement("div"); c.className="fctl"; sheet.appendChild(c); focusStart=TYPED[i.id]||0 }
+    c.innerHTML=[["paper","Paper"],["dark","Dark"],["night","Night"]].map(function(t){
+        return '<button data-ft="'+t[0]+'" class="'+(pr.theme===t[0]?"on":"")+'">'+t[1]+'</button>' }).join("")
+      +'<span class="fsep"></span>'
+      +'<button data-fs="normal" class="'+(pr.scroll!=="type"?"on":"")+'" title="Ordinary scrolling">Scroll</button>'
+      +'<button data-fs="type" class="'+(pr.scroll==="type"?"on":"")+'" title="The line you write stays in the middle">Typewriter</button>'
+      +'<span class="fsep"></span>'
+      +'<button data-fs="side" class="'+(pr.side?"on":"")+'" title="Keep the sidebar beside the page">Sidebar</button>'
+      +'<span class="fsep"></span><span class="fwc" id="e-fwc"></span>'
+      +'<button data-fs="exit" title="Back to the ordinary editor — ⌘⇧F">Exit</button>';
+    paintFocusWords();
+  }
+  function paintFocusWords(){
+    var el=q("#e-fwc"); if(!el) return;
+    var n=Math.max(0,(TYPED[i.id]||0)-focusStart);
+    el.textContent=n?("+"+n+" word"+(n===1?"":"s")):"";
+  }
+  /* The sheet outlives each note, so its listeners are wired once and
+     reach the open note through FOCUSCTX. (The ⌘⇧F listener used to be
+     added on every open, so after two notes one press toggled twice.) */
+  FOCUSCTX={ toggle:toggleFocus, paint:paintFocus, words:paintFocusWords };
+  wireFocusOnce();
   q("#e-focus").addEventListener("click",toggleFocus);
   /* Commit first, then hand the note over. The popout reads the note from the
      library, so anything still sitting in these fields has to be in the
@@ -8601,6 +8751,7 @@ function openEditor(id){
     if(lockedWhileCatchingUp(id)){
       toast("Catching up — one moment"); return;
     }
+    if(i.issue) return toast("An issue is written in its own editor, with its boxes");
     applyEdits();
     popOut(id);
   });
@@ -8723,7 +8874,10 @@ function close(){
       setTimeout(render,0);
     } else if(fi){ save() }   // now it is a note: on disk, and on its way up
   }
-  scrim.classList.remove("on"); S.editing=null; editorApply=null;
+  scrim.classList.remove("on","focus","side"); sheet.classList.remove("focus","calm","tw");
+  FOCUS=false; FOCUSCTX=null;
+  var fc=sheet.querySelector(".fctl"); if(fc) fc.remove();
+  S.editing=null; editorApply=null;
   flushPending();          // rows that arrived while this note was open
 }
 
@@ -8801,8 +8955,50 @@ function popOut(id){
     markEl.textContent="…";
     clearTimeout(timer); timer=setTimeout(commit,700);
   }
+  /* The same editor as everywhere else: your quote marks, words counted as
+     typed, pastes cleaned (and not counted), two dashes for a divider,
+     ⌘K for a link, ⌘⇧X to strike through, the same toolbar. */
+  attachSmartQuotes(titleEl,false); attachSmartQuotes(bodyEl,true);
+  attachTypingCounter(titleEl,function(){ return id }); attachTypingCounter(bodyEl,function(){ return id });
+  function pfmt(cmd){
+    bodyEl.focus();
+    if(cmd==="link"){
+      var u=linkFromInput(w.prompt("Link to","https://")||"");
+      if(u) try{ doc.execCommand("createLink",false,u) }catch(e){}
+    } else if(cmd==="quote"||cmd==="heading"){
+      var tag=cmd==="quote"?"blockquote":"h3", sl=doc.getSelection(), nd=sl&&sl.anchorNode;
+      var inside=nd&&(nd.nodeType===1?nd:nd.parentNode).closest(tag);
+      try{ doc.execCommand("formatBlock",false,inside?"div":tag) }catch(e){}
+    } else { try{ doc.execCommand(cmd,false,null) }catch(e){} }
+    later();
+  }
+  doc.querySelector(".poptools").addEventListener("mousedown",function(e){
+    var b=e.target.closest("[data-pf]"); if(!b) return;
+    e.preventDefault(); pfmt(b.getAttribute("data-pf"));
+  });
+  bodyEl.addEventListener("keydown",function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); pfmt("link") }
+    if((e.metaKey||e.ctrlKey)&&e.shiftKey&&e.key.toLowerCase()==="x"){ e.preventDefault(); pfmt("strikethrough") }
+  });
+  bodyEl.addEventListener("paste",function(e){
+    if(!e.clipboardData) return;
+    var html=e.clipboardData.getData("text/html"), txt=e.clipboardData.getData("text/plain");
+    if(html==null&&txt==null) return;
+    e.preventDefault();
+    var clean=html?sanitizeRich(html):"";
+    notePaste(id,clean&&richToText(clean).trim()?richToText(clean):(txt||""));
+    try{
+      if(clean&&richToText(clean).trim()) doc.execCommand("insertHTML",false,clean);
+      else doc.execCommand("insertText",false,txt||"");
+    }catch(err){ try{ doc.execCommand("insertText",false,txt||"") }catch(e2){} }
+  });
+  bodyEl.addEventListener("click",function(e){
+    var a=e.target.closest&&e.target.closest("a[href]");
+    if(a&&SAFE_HREF.test(a.getAttribute("href")||"")){ e.preventDefault(); w.open(a.getAttribute("href"),"_blank","noopener") }
+  });
   titleEl.addEventListener("input",later);
   bodyEl.addEventListener("input",function(){
+    dashesToDivider(doc);
     later();
     doc.getElementById("wc").textContent=wordsIn(bodyEl.innerText||"");
   });
@@ -8880,12 +9076,18 @@ function popoutHTML(i,dark){
        lower specificity whatever the order — so a plain `.sheet` rule here
        would lose and the bottom bar would sit on top of the last line. */
     +'.sheet,.sheet.focus{padding-bottom:64px}'
+    /* a page to write on: the measure and type of the editor at its roomiest */
+    +'.sheet.pop{width:100%;padding:40px 6vw 64px}'
+    +'.sheet.pop .etitle,.sheet.pop .ebody,.sheet.pop .poptools{max-width:64ch;margin-left:auto;margin-right:auto}'
+    +'.sheet.pop .ebody{font-size:calc(clamp(17px,0.62vw + 10.5px,22px)*var(--tscale));line-height:1.8;min-height:62vh}'
+    +'.sheet.pop .etitle{font-size:calc(clamp(26px,1.1vw + 15px,34px)*var(--tscale));margin-bottom:12px}'
     +'.etitle{width:100%}'
     +'.popbar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:14px;'
       +'align-items:center;justify-content:center;padding:9px;'
       +'background:var(--surface);border-top:1px solid var(--line);'
       +'font-size:12.5px;color:var(--muted);z-index:5}'
     +'#saved{color:var(--accent);font-weight:640;min-width:44px;text-align:left}'
+    +'.poptools{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 10px}'
     +'#gone{position:fixed;left:0;right:0;top:0;z-index:9;padding:12px 18px;'
       +'background:#A8501E;color:#fff;font-size:14px;font-weight:600}';
 
@@ -8901,9 +9103,20 @@ function popoutHTML(i,dark){
   +'<style>'+fix+'</style>'
   +'<div id="gone" hidden>The main Everything window has closed, so nothing here '
     +'can be saved. Copy anything you need before closing this one.</div>'
-  +'<div class="scrim on focus">'
-    +'<div class="sheet focus">'
+  +'<div class="scrim on">'
+    +'<div class="sheet pop">'
       +'<input class="etitle" id="t" placeholder="Title" value="'+esc(i.title||"")+'">'
+      /* the editor's own toolbar, the same buttons in the same order */
+      +'<div class="fmtbar poptools">'
+        +'<button class="facet fmt" data-pf="bold" title="Bold (⌘B)"><b>B</b></button>'
+        +'<button class="facet fmt" data-pf="italic" title="Italic (⌘I)"><i>I</i></button>'
+        +'<button class="facet fmt" data-pf="strikethrough" title="Strikethrough (⌘⇧X)"><s>S</s></button>'
+        +'<button class="facet fmt" data-pf="link" title="Link (⌘K)">↗</button>'
+        +'<button class="facet fmt li" data-pf="insertUnorderedList" title="Bulleted list">•</button>'
+        +'<button class="facet fmt li" data-pf="insertOrderedList" title="Numbered list">1.</button>'
+        +'<button class="facet fmt qt" data-pf="quote" title="Quotation">❝</button>'
+        +'<button class="facet fmt hd" data-pf="heading" title="Heading">T</button>'
+      +'</div>'
       +'<div class="ebody" id="b" contenteditable="true" spellcheck="true" '
         +'data-ph="Write…">'+sanitizeRich(i.body||"")+'</div>'
     +'</div>'
@@ -9861,6 +10074,240 @@ function publicUrl(id){
   return dir+"p/?u="+encodeURIComponent(h)+(id?"&p="+encodeURIComponent(id):"");
 }
 
+/* =========================================================================
+   TRIAGE — what your sources found, to read, rate and sort.
+
+   The triage-fetch function reads your sources twice a day and files what
+   it finds; this page shows it, best first. "Best" is learned from you:
+   every 1–5 you give teaches it which sources and which subjects you care
+   for, and the order changes as it learns — a few dozen ratings make a
+   difference. Sending an item on (w) makes it an ordinary link note under
+   your chosen tag, #weekly to begin with; skipping (x) clears it away.
+   Nothing here is decided by anyone but you.
+   ========================================================================= */
+var TRI={ items:[], sources:[], hist:[], loaded:false, busy:false, err:"", cur:0, model:null };
+TRI.tag=(function(){ try{ return localStorage.getItem("trove.triage.tag")||"weekly" }catch(e){ return "weekly" } })();
+var TRI_SEEDS=[
+  ["The Guardian — World","https://www.theguardian.com/world/rss"],
+  ["The Guardian — Culture","https://www.theguardian.com/culture/rss"],
+  ["The Economist — Latest","https://www.economist.com/latest/rss.xml"],
+  ["The New York Times","https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"],
+  ["Καθημερινή","https://www.kathimerini.gr/feed/"],
+  ["Kottke","https://feeds.kottke.org/main"],
+  ["Atlas Obscura","https://www.atlasobscura.com/feeds/latest"],
+  ["Open Culture","https://www.openculture.com/feed"],
+  ["Aeon","https://aeon.co/feed.rss"],
+  ["Literary Hub","https://lithub.com/feed/"],
+  ["MetaFilter","https://rss.metafilter.com/metafilter.rss"],
+  ["Hacker News — front page","https://hnrss.org/frontpage"]
+];
+var TRI_STOP={};
+("that this with from have were what when your about their there would which will more than they into after over just been also says said could first years year news como para "
+ +"αυτο αυτη ειναι οποιο οποια οπως μετα στην στον στις στους απο για και που δεν εχει ηταν ολοι ολες μονο ακομη").split(" ").forEach(function(w){ TRI_STOP[w]=1 });
+function triTokens(text){
+  var seen={}, out=[];
+  String(text||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").split(/[^a-z0-9\u03b1-\u03c9\u03c2]+/).forEach(function(w){
+    if(w.length<4||TRI_STOP[w]) return;
+    var k=w.slice(0,6);                         // a crude stem: "politics", "political" → "politi"
+    if(!seen[k]){ seen[k]=1; out.push(k) }
+  });
+  return out;
+}
+/* What it has learned: how you rate each source, and each word, compared
+   with your average. A skip you did not rate counts as a mild "no"; a link
+   you sent on without rating, as a mild "yes". */
+function triModel(hist){
+  var rows=hist.map(function(h){
+    var r=h.rating!=null?h.rating:(h.state==="kept"?4:h.state==="skipped"?2:null), wt=h.rating!=null?1:0.5;
+    return r==null?null:{ r:r, w:wt, src:h.source_id, toks:triTokens(h.title+" "+(h.summary||"")) };
+  }).filter(Boolean);
+  var n=0, sum=0; rows.forEach(function(x){ n+=x.w; sum+=x.r*x.w });
+  var mu=n?(sum+3*3)/(n+3):3, src={}, tok={};
+  rows.forEach(function(x){
+    var d=(x.r-mu)*x.w;
+    var s0=src[x.src]||(src[x.src]={s:0,n:0}); s0.s+=d; s0.n+=x.w;
+    x.toks.forEach(function(k){ var t0=tok[k]||(tok[k]={s:0,n:0}); t0.s+=d; t0.n+=x.w });
+  });
+  return { mu:mu, src:src, tok:tok, rated:hist.filter(function(h){ return h.rating!=null }).length };
+}
+function triScore(m,it){
+  if(!m) return 3;
+  var sb=m.src[it.source_id], b=sb?sb.s/(sb.n+3):0;
+  var toks=triTokens(it.title+" "+(it.summary||"")), t=0;
+  toks.forEach(function(k){ var x=m.tok[k]; if(x) t+=x.s/(x.n+2) });
+  if(toks.length) t/=Math.sqrt(toks.length);
+  return Math.max(1,Math.min(5,m.mu+b+t));
+}
+function triSort(){
+  TRI.model=triModel(TRI.hist);
+  TRI.items.forEach(function(it){ it._score=triScore(TRI.model,it) });
+  TRI.items.sort(function(a,b){ return (b._score-a._score)||((Date.parse(b.published_at||b.fetched_at)||0)-(Date.parse(a.published_at||a.fetched_at)||0)) });
+  TRI.cur=Math.min(TRI.cur,Math.max(0,TRI.items.length-1));
+}
+function loadTriage(){
+  if(!SYNC.session) return Promise.resolve();
+  TRI.busy=true;
+  return withFreshSession().then(function(){
+    return Promise.all([
+      rest("/triage_sources?select=*&order=created_at.asc"),
+      rest("/triage_items?select=id,source_id,url,title,summary,image,author,published_at,fetched_at,rating,state&state=eq.new&order=fetched_at.desc&limit=400"),
+      rest("/triage_items?select=source_id,title,summary,rating,state&or=(rating.not.is.null,state.in.(kept,skipped))&order=fetched_at.desc&limit=3000")
+    ]);
+  }).then(function(r){
+    TRI.sources=r[0]||[]; TRI.items=r[1]||[]; TRI.hist=r[2]||[]; TRI.err=""; TRI.loaded=true;
+    var seeded=false; try{ seeded=localStorage.getItem("trove.triage.seeded")==="1" }catch(e){}
+    if(!TRI.sources.length&&!seeded){
+      try{ localStorage.setItem("trove.triage.seeded","1") }catch(e){}
+      return rest("/triage_sources",{ method:"POST", prefer:"return=minimal",
+        body:TRI_SEEDS.map(function(x){ return { kind:"rss", name:x[0], url:x[1] } }) }).then(loadTriage);
+    }
+    triSort();
+  }).catch(function(e){
+    TRI.err=/triage_/.test((e&&e.msg)||"")||/relation|does not exist|schema cache/i.test((e&&e.msg)||"")
+      ?"Triage isn't set up on the server yet — see TRIAGE.html.":((e&&e.msg)||"Could not reach the server");
+  }).then(function(){ TRI.busy=false; if(S.view==="triage") render(); else paintSidebar() });
+}
+function triTagChoices(){
+  var c={}; S.items.forEach(function(i){ if(!isSys(i)) (i.tags||[]).forEach(function(t){ c[t]=(c[t]||0)+1 }) });
+  return Object.keys(c).sort(function(a,b){ return c[b]-c[a] }).slice(0,24);
+}
+function triSource(id){ return TRI.sources.filter(function(s){ return s.id===id })[0]||null }
+function triAgo(it){ var t=Date.parse(it.published_at||it.fetched_at); return t?agoText(t):"" }
+function renderTriage(){
+  if(!SYNC.session) return '<div class="empty"><div class="big">◌</div>Sign in to use Triage.</div>';
+  if(!TRI.loaded&&!TRI.err){ if(!TRI.busy) loadTriage(); return '<div class="empty"><div class="big">◌</div>Reading what your sources found…</div>' }
+  var m=TRI.model||{rated:0};
+  var head='<div class="trihead">'
+    +'<button class="btn" data-tri="check">Check now</button>'
+    +'<button class="btn sec" data-tri="sources">Sources · '+TRI.sources.filter(function(s){ return s.enabled }).length+'</button>'
+    +'<button class="btn sec" data-tri="tag" title="Where w sends a link">Send to #'+esc(TRI.tag)+'</button>'
+    +'<span class="trinote">'+(m.rated<20?"Rate a few dozen to teach it — ":"Learning from "+fmtN(m.rated)+" ratings · ")
+      +'<b>j/k</b> move · <b>1–5</b> rate · <b>w</b> send · <b>x</b> skip · <b>o</b> open</span>'
+    +'</div>';
+  if(TRI.err) return head+'<div class="empty"><div class="big">◌</div>'+esc(TRI.err)+'</div>';
+  if(!TRI.items.length) return head+'<div class="empty"><div class="big">✓</div>Nothing waiting. Your sources are read at 07:00 and 17:00.</div>';
+  return head+'<div class="trilist">'+TRI.items.map(function(it,ix){
+    var src=triSource(it.source_id);
+    return '<div class="tri'+(ix===TRI.cur?" cur":"")+'" data-triid="'+esc(it.id)+'">'
+      +(it.image&&/^https:/.test(it.image)?'<img class="trimg" src="'+esc(it.image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="trimg none"></div>')
+      +'<div class="trimain">'
+        +'<div class="trimeta">'+esc(src?src.name:"")+(it.author?' · '+esc(it.author):"")+' · '+esc(triAgo(it))
+          +'<span class="triscore" title="How much it expects you to like this">'+it._score.toFixed(1)+'</span></div>'
+        +'<a class="trititle" href="'+esc(it.url)+'" target="_blank" rel="noopener noreferrer">'+esc(it.title||it.url)+'</a>'
+        +(it.summary?'<div class="trisum">'+esc(it.summary)+'</div>':"")
+      +'</div>'
+      +'<div class="triact">'
+        +'<div class="trirate">'+[1,2,3,4,5].map(function(n){ return '<button data-trirate="'+n+'" class="'+(it.rating===n?"on":"")+'">'+n+'</button>' }).join("")+'</div>'
+        +'<div class="tribtns"><button class="btn" data-trikeep>→ #'+esc(TRI.tag)+'</button><button class="btn sec" data-triskip>Skip</button></div>'
+      +'</div>'
+    +'</div>';
+  }).join("")+'</div>';
+}
+function triMove(d){
+  TRI.cur=Math.max(0,Math.min(TRI.items.length-1,TRI.cur+d));
+  [].forEach.call(board.querySelectorAll(".tri"),function(el,ix){ el.classList.toggle("cur",ix===TRI.cur) });
+  var el=board.querySelectorAll(".tri")[TRI.cur]; if(el&&el.scrollIntoView) try{ el.scrollIntoView({block:"nearest"}) }catch(e){}
+}
+function triPatch(id,body){ return rest("/triage_items?id=eq."+encodeURIComponent(id),{ method:"PATCH", prefer:"return=minimal", body:body }) }
+function triFind(id){ for(var k=0;k<TRI.items.length;k++) if(TRI.items[k].id===id) return k; return -1 }
+function triRate(id,n){
+  var ix=triFind(id); if(ix<0) return;
+  var it=TRI.items[ix]; it.rating=n;
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:n, state:"new" });
+  triPatch(id,{ rating:n }).catch(function(e){ toast((e&&e.msg)||"Could not save the rating") });
+  /* rated: it stays in place so you can still send it on; the rest re-sort */
+  var keep=it; triSort(); TRI.cur=TRI.items.indexOf(keep); render();
+}
+function triGone(ix){ TRI.items.splice(ix,1); TRI.cur=Math.min(TRI.cur,Math.max(0,TRI.items.length-1)); render() }
+function triKeep(id){
+  var ix=triFind(id); if(ix<0) return;
+  var it=TRI.items[ix], src=triSource(it.source_id), now=Date.now();
+  var note=normalizeItem({ id:uid(), title:it.title||"", url:it.url, desc:it.summary||"", image:/^https:/.test(it.image||"")?it.image:"",
+    site:src?src.name.split(" — ")[0]:"", tags:[TRI.tag], created:now, modified:now });
+  S.items.unshift(note); primeOwn(note);
+  if(!note.image) fetchMeta(note);
+  save();
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:it.rating, state:"kept" });
+  triPatch(id,{ state:"kept" }).catch(function(){});
+  toast("Sent to #"+TRI.tag);
+  triGone(ix);
+}
+function triSkip(id){
+  var ix=triFind(id); if(ix<0) return;
+  var it=TRI.items[ix];
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:it.rating, state:"skipped" });
+  triPatch(id,{ state:"skipped" }).catch(function(){});
+  triGone(ix);
+}
+function triCheckNow(btn){
+  if(btn) flashBtn(btn,"Checking…");
+  withFreshSession().then(function(){
+    return fetch(fnUrl("triage-fetch"),{ method:"POST",
+      headers:{ apikey:SUPA.key, Authorization:"Bearer "+SYNC.session.access_token, "Content-Type":"application/json" }, body:"{}" });
+  }).then(function(r){ return r.json().catch(function(){ return {} }).then(function(j){
+    if(r.status===404) throw "The triage-fetch function isn't set up yet — see TRIAGE.html";
+    if(!r.ok) throw (j&&j.error)||("HTTP "+r.status);
+    toast((j.added?(j.added+" new from "+j.sources+" sources"):"Nothing new")+(j.failed?" · "+j.failed+" could not be read — see Sources":""));
+    return loadTriage();
+  }) }).catch(function(e){ toast(String(e)) });
+}
+function triSources(){
+  var rows=TRI.sources.map(function(s){
+    var st=s.last_error?'<span class="trierr">'+esc(s.last_error)+'</span>'
+      :(s.last_run?fmtN(s.last_count||0)+" new, "+esc(agoText(Date.parse(s.last_run))):"not read yet");
+    return '<div class="trisrc'+(s.enabled?"":" off")+'">'
+      +'<div class="trisrcn"><b>'+esc(s.name||s.url)+'</b><span>'+esc(s.kind==="bluesky"?"Bluesky":"Feed")+' · '+st+'</span><span class="trisrcu">'+esc(s.url)+'</span></div>'
+      +'<button class="btn sec" data-srcon="'+esc(s.id)+'">'+(s.enabled?"Pause":"Resume")+'</button>'
+      +'<button class="btn sec" data-srcdel="'+esc(s.id)+'">Remove</button></div>';
+  }).join("");
+  askbox.innerHTML='<h3>Triage sources</h3>'
+    +'<p class="dayhint">News sites by their feed address (RSS or Atom), or Bluesky by an account or feed address, '
+    +'e.g. <code>https://bsky.app/profile/kottke.org</code>. Threads, Instagram and TikTok have no open feeds: share from those apps as now.</p>'
+    +'<div class="dayrows">'+rows+'</div>'
+    +'<div class="row" style="gap:8px;margin-top:12px"><input class="askin" id="src-url" placeholder="Feed or Bluesky address" style="flex:2;margin:0">'
+    +'<input class="askin" id="src-name" placeholder="Name" style="flex:1;margin:0"><button class="btn" id="src-add">Add</button></div>'
+    +'<div class="askrow"><button class="btn" id="src-close">Done</button></div>';
+  ask.classList.add("on");
+  askbox.onclick=function(e){
+    if(e.target.closest("#src-close")){ closeAsk(); render(); return }
+    var on=e.target.closest("[data-srcon]"), del=e.target.closest("[data-srcdel]");
+    if(on){ var s=TRI.sources.filter(function(x){ return x.id===on.dataset.srcon })[0];
+      s.enabled=!s.enabled; rest("/triage_sources?id=eq."+s.id,{ method:"PATCH", prefer:"return=minimal", body:{ enabled:s.enabled } }).catch(function(){});
+      triSources(); return }
+    if(del){ var id=del.dataset.srcdel;
+      rest("/triage_sources?id=eq."+id,{ method:"DELETE", prefer:"return=minimal" }).then(function(){
+        TRI.sources=TRI.sources.filter(function(x){ return x.id!==id }); TRI.items=TRI.items.filter(function(x){ return x.source_id!==id }); triSources() })
+        .catch(function(err){ toast((err&&err.msg)||"Could not remove it") });
+      return }
+    if(e.target.closest("#src-add")){
+      var u=linkFromInput(document.getElementById("src-url").value), nm=document.getElementById("src-name").value.trim();
+      if(!u) return toast("That isn't a web address");
+      var kind=/^https:\/\/bsky\.app\/profile\//i.test(u)?"bluesky":"rss";
+      if(!nm){ try{ nm=new URL(u).hostname.replace(/^www\./,"") }catch(err){ nm=u } }
+      rest("/triage_sources",{ method:"POST", prefer:"return=representation", body:{ kind:kind, name:nm.slice(0,80), url:u } })
+        .then(function(r){ TRI.sources=TRI.sources.concat(r||[]); triSources(); toast("Added — it is read at the next check") })
+        .catch(function(err){ toast((err&&err.msg)||"Could not add it") });
+    }
+  };
+}
+board.addEventListener("click",function(e){
+  if(S.view!=="triage") return;
+  var b=e.target.closest("[data-tri]");
+  if(b){ var a=b.dataset.tri;
+    if(a==="check") triCheckNow(b);
+    if(a==="sources") triSources();
+    if(a==="tag") askTag("Send to which tag?","Where <b>w</b> and the → button put a link.",triTagChoices(),"Use",function(t){
+      t=String(t||"").replace(/^#/,"").trim().toLowerCase(); if(!t) return;
+      TRI.tag=t; try{ localStorage.setItem("trove.triage.tag",t) }catch(err){} render() });
+    return }
+  var row=e.target.closest("[data-triid]"); if(!row) return;
+  var id=row.dataset.triid;
+  var rb=e.target.closest("[data-trirate]");
+  if(rb){ triRate(id,+rb.dataset.trirate); return }
+  if(e.target.closest("[data-trikeep]")){ triKeep(id); return }
+  if(e.target.closest("[data-triskip]")){ triSkip(id); return }
+  if(!e.target.closest("a")){ TRI.cur=triFind(id); triMove(0) }
+});
 function loadPosts(force){
   if(!SYNC.session){ POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; return Promise.resolve() }
   if(POSTS.loaded&&!force) return Promise.resolve();
@@ -11592,6 +12039,7 @@ document.querySelector(".sidebar").addEventListener("click",function(e){
     document.getElementById("q").value="";
     if(S.view==="posts") loadPosts();
     if(S.view==="connect") loadConnections();
+    if(S.view==="triage") loadTriage();
     render();
   }
   if(t){ S.tag=(S.tag===t.dataset.tag?null:t.dataset.tag); S.q=""; S.sel={}; document.getElementById("q").value=""; render() }
@@ -11858,6 +12306,22 @@ document.querySelector(".mobtabs").addEventListener("click",function(e){
   render();
 });
 document.getElementById("q").addEventListener("input",function(e){ S.q=e.target.value; S.sel={}; render() });
+/* Triage by keyboard: j/k (or ↓/↑) to move, 1–5 to rate, w to send on,
+   x to skip, o or Enter to open. Only on the Triage page, and never while
+   a note, a dialogue or a field has the keyboard. */
+document.addEventListener("keydown",function(e){
+  if(S.view!=="triage"||S.q||S.tag||!TRI.items.length) return;
+  if(ask.classList.contains("on")||scrim.classList.contains("on")||light.classList.contains("on")) return;
+  var t=e.target; if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  var k=e.key, it=TRI.items[TRI.cur];
+  if(k==="j"||k==="ArrowDown"){ e.preventDefault(); triMove(1) }
+  else if(k==="k"||k==="ArrowUp"){ e.preventDefault(); triMove(-1) }
+  else if(/^[1-5]$/.test(k)&&it){ e.preventDefault(); triRate(it.id,+k) }
+  else if((k==="w"||k==="s")&&it){ e.preventDefault(); triKeep(it.id) }
+  else if(k==="x"&&it){ e.preventDefault(); triSkip(it.id) }
+  else if((k==="o"||k==="Enter")&&it){ e.preventDefault(); window.open(it.url,"_blank","noopener") }
+});
 /* Keyboard focus is layered, and each layer swallows what belongs to it.
    Without this, ⌘K or an undo pressed inside an open note also reached the
    board behind it — which is why text was appearing and vanishing in the
@@ -12002,7 +12466,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="106";
+var BUILD="107";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
