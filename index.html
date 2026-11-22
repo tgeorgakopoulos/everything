@@ -319,6 +319,20 @@
   /* ---- Triage ---- */
   .trihead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
   .trinote{font-size:12px;color:var(--muted);margin-left:auto}
+  .tri-grid .tricard{cursor:default}
+  .tricard.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .tricard .trilink{display:block;color:var(--ink);text-decoration:none}
+  .tricard .trilink:hover{text-decoration:underline}
+  .tricard .desc{-webkit-line-clamp:unset;display:block}
+  .trifoot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+  .trifoot .btn{padding:4px 9px;font-size:12px}
+  .trifoot .trisend{margin-left:auto}
+  .tristate{margin-left:auto;font-size:12px;font-weight:650;color:var(--accent)}
+  .tricard.tri-skipped{opacity:.4}
+  .tricard.tri-rated .thumb,.tricard.tri-kept .thumb{opacity:.85}
+  .tribatch{font-size:13px;color:var(--ui)}
+  .tridone{text-align:center;padding:22px 0 34px;color:var(--muted);font-size:14px}
+  .tridone .btn{margin-left:8px}
   .trilist{display:flex;flex-direction:column;gap:8px;max-width:980px}
   .tri{display:flex;gap:14px;align-items:flex-start;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
   .tri.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
@@ -4904,7 +4918,7 @@ function paintSidebar(){
   var nt=document.getElementById("nav-triage");
   if(nt) nt.style.display=SYNC.session?"":"none";
   var ct=document.getElementById("c-triage");
-  if(ct) ct.textContent=TRI.loaded&&TRI.items.length?TRI.items.length:"";
+  if(ct) ct.textContent=TRI.loaded&&TRI.items.length?TRI.items.length:"";   // waiting to be rated
 }
 
 /* =========================================================================
@@ -10150,7 +10164,7 @@ function loadTriage(){
   return withFreshSession().then(function(){
     return Promise.all([
       rest("/triage_sources?select=*&order=created_at.asc"),
-      rest("/triage_items?select=id,source_id,url,title,summary,image,author,published_at,fetched_at,rating,state&state=eq.new&order=fetched_at.desc&limit=400"),
+      rest("/triage_items?select=id,source_id,url,title,summary,image,author,published_at,fetched_at,rating,state&state=eq.new&rating=is.null&order=fetched_at.desc&limit=600"),
       rest("/triage_items?select=source_id,title,summary,rating,state&or=(rating.not.is.null,state.in.(kept,skipped))&order=fetched_at.desc&limit=3000")
     ]);
   }).then(function(r){
@@ -10162,6 +10176,10 @@ function loadTriage(){
         body:TRI_SEEDS.map(function(x){ return { kind:"rss", name:x[0], url:x[1] } }) }).then(loadTriage);
     }
     triSort();
+    /* the batch on screen stays as it is while you work through it */
+    var have={}; TRI.items.forEach(function(x){ have[x.id]=x });
+    var keep=(TRI.batch||[]).filter(function(id){ return have[id]||TRI.handled[id] });
+    if(!keep.length) triNewBatch();
   }).catch(function(e){
     TRI.err=/triage_/.test((e&&e.msg)||"")||/relation|does not exist|schema cache/i.test((e&&e.msg)||"")
       ?"Triage isn't set up on the server yet — see TRIAGE.html.":((e&&e.msg)||"Could not reach the server");
@@ -10173,71 +10191,121 @@ function triTagChoices(){
 }
 function triSource(id){ return TRI.sources.filter(function(s){ return s.id===id })[0]||null }
 function triAgo(it){ var t=Date.parse(it.published_at||it.fetched_at); return t?agoText(t):"" }
+/* ---- Batches of twelve, while it learns -----------------------------
+   Twelve at a time, best first, laid out like your links in the
+   moodboard — the picture, the title and as much of the description as a
+   saved link shows. Rate each (1–5), send the good ones on, skip the
+   rest; when all twelve are done, the next twelve come, sorted again by
+   what it has just learned. A run brings up to 120: ten batches. */
+var TRI_BATCH=12;
+TRI.batch=[]; TRI.handled={}; TRI.byId={};
+function triNewBatch(){
+  triSort();
+  TRI.byId={}; TRI.handled={};
+  TRI.batch=TRI.items.slice(0,TRI_BATCH).map(function(x){ TRI.byId[x.id]=x; return x.id });
+  TRI.cur=0;
+  /* fill each card the way a saved link fills: picture, site, description */
+  TRI.batch.forEach(function(id){ var x=TRI.byId[id]; if(x&&!x.metaState) fetchMeta(x) });
+}
+function triBatchItems(){ return TRI.batch.map(function(id){ return TRI.byId[id] }).filter(Boolean) }
+function triLeft(){ return TRI.items.filter(function(x){ return TRI.batch.indexOf(x.id)<0 }).length }
+function triBatchDone(){ return TRI.batch.length&&TRI.batch.every(function(id){ return TRI.handled[id] }) }
+function triCard(it,ix){
+  var src=triSource(it.source_id), h=host(it.url), hu=hue(h), st=TRI.handled[it.id];
+  var g="linear-gradient(135deg,hsl("+hu+" 46% 80%),hsl("+((hu+45)%360)+" 42% 90%))";
+  var img=/^https:/.test(it.image||"")?it.image:"";
+  var desc=it.desc||it.summary||"";
+  return '<article class="card haslink tricard'+(ix===TRI.cur?" cur":"")+(st?" tri-"+st.split(":")[0]:"")+'" data-triid="'+esc(it.id)+'">'
+    +'<div class="thumb'+(img?" tall":"")+'" style="background:'+g+'">'
+      +(img?'<img src="'+esc(img)+'" loading="lazy" decoding="async" alt="" referrerpolicy="no-referrer" onload="this.classList.add(\'in\')" onerror="this.remove()">':"")
+      +(it.metaState==="loading"?'<div class="skel"></div>':"")+'</div>'
+    +'<div class="head"><div style="min-width:0;flex:1">'
+      +'<a class="ctitle trilink" href="'+esc(it.url)+'" target="_blank" rel="noopener noreferrer">'+esc(it.title||it.url)+'</a>'
+      +'<div class="srcline"><span class="fav" style="background:hsl('+hu+' 42% 46%)">'+esc((h[0]||"?").toUpperCase())
+        +(it.logo?'<img src="'+esc(it.logo)+'" alt="" onerror="this.remove()">':"")+'</span>'
+        +esc(it.site||(src?src.name:h))+(it.author?' · '+esc(it.author):"")+' · '+esc(triAgo(it))+'</div>'
+    +'</div></div>'
+    +(desc?'<div class="desc">'+esc(desc)+'</div>':"")
+    +'<div class="trifoot">'
+      +'<div class="trirate">'+[1,2,3,4,5].map(function(n){ return '<button data-trirate="'+n+'" class="'+(it.rating===n?"on":"")+'">'+n+'</button>' }).join("")+'</div>'
+      +(st==="kept"||(st&&st.indexOf("kept")>=0)?'<span class="tristate">✓ in #'+esc(TRI.tag)+'</span>'
+        :'<button class="btn trisend" data-trikeep title="w">→ #'+esc(TRI.tag)+'</button>')
+      +'<button class="btn sec" data-triskip title="x">'+(st==="skipped"?"Skipped":"Skip")+'</button>'
+    +'</div>'
+  +'</article>';
+}
 function renderTriage(){
   if(!SYNC.session) return '<div class="empty"><div class="big">◌</div>Sign in to use Triage.</div>';
   if(!TRI.loaded&&!TRI.err){ if(!TRI.busy) loadTriage(); return '<div class="empty"><div class="big">◌</div>Reading what your sources found…</div>' }
-  var m=TRI.model||{rated:0};
+  var m=TRI.model||{rated:0}, list=triBatchItems();
+  var done=TRI.batch.filter(function(id){ return TRI.handled[id] }).length, left=triLeft();
+  var batches=Math.ceil(left/TRI_BATCH);
   var head='<div class="trihead">'
-    +'<button class="btn" data-tri="check">Check now</button>'
+    +'<span class="tribatch"><b>'+done+' of '+list.length+'</b> done'+(batches?' · '+batches+' more batch'+(batches===1?"":"es")+' waiting':"")+'</span>'
+    +(triBatchDone()&&left?'<button class="btn" data-tri="next">Next '+Math.min(TRI_BATCH,left)+' →</button>':"")
+    +'<button class="btn sec" data-tri="check">Check now</button>'
     +'<button class="btn sec" data-tri="sources">Sources · '+TRI.sources.filter(function(s){ return s.enabled }).length+'</button>'
     +'<button class="btn sec" data-tri="tag" title="Where w sends a link">Send to #'+esc(TRI.tag)+'</button>'
-    +'<span class="trinote">'+(m.rated<20?"Rate a few dozen to teach it — ":"Learning from "+fmtN(m.rated)+" ratings · ")
-      +'<b>j/k</b> move · <b>1–5</b> rate · <b>w</b> send · <b>x</b> skip · <b>o</b> open</span>'
+    +'<span class="trinote">'+(m.rated<30?"Teaching it — ":"Learned from "+fmtN(m.rated)+" ratings · ")
+      +'<b>1–5</b> rate · <b>w</b> send · <b>x</b> skip · <b>j/k</b> move · <b>o</b> open · <b>n</b> next</span>'
     +'</div>';
   if(TRI.err) return head+'<div class="empty"><div class="big">◌</div>'+esc(TRI.err)+'</div>';
-  if(!TRI.items.length) return head+'<div class="empty"><div class="big">✓</div>Nothing waiting. Your sources are read at 07:00 and 17:00.</div>';
-  return head+'<div class="trilist">'+TRI.items.map(function(it,ix){
-    var src=triSource(it.source_id);
-    return '<div class="tri'+(ix===TRI.cur?" cur":"")+'" data-triid="'+esc(it.id)+'">'
-      +(it.image&&/^https:/.test(it.image)?'<img class="trimg" src="'+esc(it.image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<div class="trimg none"></div>')
-      +'<div class="trimain">'
-        +'<div class="trimeta">'+esc(src?src.name:"")+(it.author?' · '+esc(it.author):"")+' · '+esc(triAgo(it))
-          +'<span class="triscore" title="How much it expects you to like this">'+it._score.toFixed(1)+'</span></div>'
-        +'<a class="trititle" href="'+esc(it.url)+'" target="_blank" rel="noopener noreferrer">'+esc(it.title||it.url)+'</a>'
-        +(it.summary?'<div class="trisum">'+esc(it.summary)+'</div>':"")
-      +'</div>'
-      +'<div class="triact">'
-        +'<div class="trirate">'+[1,2,3,4,5].map(function(n){ return '<button data-trirate="'+n+'" class="'+(it.rating===n?"on":"")+'">'+n+'</button>' }).join("")+'</div>'
-        +'<div class="tribtns"><button class="btn" data-trikeep>→ #'+esc(TRI.tag)+'</button><button class="btn sec" data-triskip>Skip</button></div>'
-      +'</div>'
-    +'</div>';
-  }).join("")+'</div>';
+  if(!list.length) return head+'<div class="empty"><div class="big">✓</div>Nothing waiting. Your sources are read at 07:00 and 17:00.</div>';
+  var n=moodCols();
+  return head+'<div class="grid mood tri-grid" data-cols="'+n+'">'
+    +moodColumns(list.map(triCard),n,0).map(function(c){ return '<div class="mcol">'+c.join("")+'</div>' }).join("")
+    +'</div>'
+    +(triBatchDone()?'<div class="tridone">'+(left?'All twelve done. <button class="btn" data-tri="next">Next '+Math.min(TRI_BATCH,left)+' →</button>'
+      :'All done until the next check, at 07:00 or 17:00.')+'</div>':"");
 }
 function triMove(d){
-  TRI.cur=Math.max(0,Math.min(TRI.items.length-1,TRI.cur+d));
-  [].forEach.call(board.querySelectorAll(".tri"),function(el,ix){ el.classList.toggle("cur",ix===TRI.cur) });
-  var el=board.querySelectorAll(".tri")[TRI.cur]; if(el&&el.scrollIntoView) try{ el.scrollIntoView({block:"nearest"}) }catch(e){}
+  TRI.cur=Math.max(0,Math.min(TRI.batch.length-1,TRI.cur+d));
+  [].forEach.call(board.querySelectorAll(".tricard"),function(el){ el.classList.toggle("cur",el.dataset.triid===TRI.batch[TRI.cur]) });
+  var el=board.querySelector('.tricard[data-triid="'+TRI.batch[TRI.cur]+'"]'); if(el&&el.scrollIntoView) try{ el.scrollIntoView({block:"nearest"}) }catch(e){}
 }
 function triPatch(id,body){ return rest("/triage_items?id=eq."+encodeURIComponent(id),{ method:"PATCH", prefer:"return=minimal", body:body }) }
 function triFind(id){ for(var k=0;k<TRI.items.length;k++) if(TRI.items[k].id===id) return k; return -1 }
-function triRate(id,n){
-  var ix=triFind(id); if(ix<0) return;
-  var it=TRI.items[ix]; it.rating=n;
-  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:n, state:"new" });
-  triPatch(id,{ rating:n }).catch(function(e){ toast((e&&e.msg)||"Could not save the rating") });
-  /* rated: it stays in place so you can still send it on; the rest re-sort */
-  var keep=it; triSort(); TRI.cur=TRI.items.indexOf(keep); render();
+function triMark(id,what){
+  var prev=TRI.handled[id]||"";
+  TRI.handled[id]=prev&&prev!==what&&what!=="skipped"?(prev.indexOf(what)>=0?prev:prev+":"+what):what;
+  var ix=triFind(id); if(ix>=0) TRI.items.splice(ix,1);       // no longer waiting
+  /* on to the next card that is not done yet */
+  var at=TRI.batch.indexOf(id);
+  for(var k=1;k<=TRI.batch.length;k++){ var c=(at+k)%TRI.batch.length; if(!TRI.handled[TRI.batch[c]]){ TRI.cur=c; break } }
+  render();
 }
-function triGone(ix){ TRI.items.splice(ix,1); TRI.cur=Math.min(TRI.cur,Math.max(0,TRI.items.length-1)); render() }
+function triRate(id,n){
+  var it=TRI.byId[id]; if(!it) return;
+  it.rating=n;
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:(it.desc||it.summary), rating:n, state:"new" });
+  triPatch(id,{ rating:n }).catch(function(e){ toast((e&&e.msg)||"Could not save the rating") });
+  triMark(id,"rated");
+}
 function triKeep(id){
-  var ix=triFind(id); if(ix<0) return;
-  var it=TRI.items[ix], src=triSource(it.source_id), now=Date.now();
-  var note=normalizeItem({ id:uid(), title:it.title||"", url:it.url, desc:it.summary||"", image:/^https:/.test(it.image||"")?it.image:"",
-    site:src?src.name.split(" — ")[0]:"", tags:[TRI.tag], created:now, modified:now });
+  var it=TRI.byId[id]; if(!it) return;
+  if(TRI.handled[id]&&TRI.handled[id].indexOf("kept")>=0) return;
+  var src=triSource(it.source_id), now=Date.now();
+  var note=normalizeItem({ id:uid(), title:it.title||"", url:it.url, desc:it.desc||it.summary||"",
+    image:/^https:/.test(it.image||"")?it.image:"", logo:it.logo||"", site:it.site||(src?src.name.split(" — ")[0]:""),
+    tags:[TRI.tag], created:now, modified:now, metaState:it.metaState==="ok"?"ok":null });
   S.items.unshift(note); primeOwn(note);
-  if(!note.image) fetchMeta(note);
+  if(note.metaState!=="ok") fetchMeta(note);
   save();
-  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:it.rating, state:"kept" });
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:(it.desc||it.summary), rating:it.rating, state:"kept" });
   triPatch(id,{ state:"kept" }).catch(function(){});
   toast("Sent to #"+TRI.tag);
-  triGone(ix);
+  triMark(id,"kept");
 }
 function triSkip(id){
-  var ix=triFind(id); if(ix<0) return;
-  var it=TRI.items[ix];
-  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:it.summary, rating:it.rating, state:"skipped" });
+  var it=TRI.byId[id]; if(!it) return;
+  TRI.hist.unshift({ source_id:it.source_id, title:it.title, summary:(it.desc||it.summary), rating:it.rating, state:"skipped" });
   triPatch(id,{ state:"skipped" }).catch(function(){});
-  triGone(ix);
+  triMark(id,"skipped");
+}
+function triNext(){
+  if(!triBatchDone()) return toast("Rate, send or skip all twelve first");
+  triNewBatch(); render();
+  try{ board.scrollTop=0; window.scrollTo(0,0) }catch(e){}
 }
 function triCheckNow(btn){
   if(btn) flashBtn(btn,"Checking…");
@@ -10249,7 +10317,11 @@ function triCheckNow(btn){
     if(!r.ok) throw (j&&j.error)||("HTTP "+r.status);
     toast((j.added?(j.added+" new from "+j.sources+" sources"):"Nothing new")+(j.failed?" · "+j.failed+" could not be read — see Sources":""));
     return loadTriage();
-  }) }).catch(function(e){ toast(String(e)) });
+  }) }).catch(function(e){
+    /* a network failure here almost always means the function is not at
+       that address (or still has Verify JWT on): say so, not "TypeError" */
+    toast(e instanceof TypeError?"Couldn't reach the triage function — check step 3 of TRIAGE.html":String(e));
+  });
 }
 function triSources(){
   var rows=TRI.sources.map(function(s){
@@ -10295,6 +10367,7 @@ board.addEventListener("click",function(e){
   var b=e.target.closest("[data-tri]");
   if(b){ var a=b.dataset.tri;
     if(a==="check") triCheckNow(b);
+    if(a==="next") triNext();
     if(a==="sources") triSources();
     if(a==="tag") askTag("Send to which tag?","Where <b>w</b> and the → button put a link.",triTagChoices(),"Use",function(t){
       t=String(t||"").replace(/^#/,"").trim().toLowerCase(); if(!t) return;
@@ -10306,7 +10379,7 @@ board.addEventListener("click",function(e){
   if(rb){ triRate(id,+rb.dataset.trirate); return }
   if(e.target.closest("[data-trikeep]")){ triKeep(id); return }
   if(e.target.closest("[data-triskip]")){ triSkip(id); return }
-  if(!e.target.closest("a")){ TRI.cur=triFind(id); triMove(0) }
+  if(!e.target.closest("a")){ TRI.cur=Math.max(0,TRI.batch.indexOf(id)); triMove(0) }
 });
 function loadPosts(force){
   if(!SYNC.session){ POSTS.list=[]; POSTS.profile=null; POSTS.loaded=false; return Promise.resolve() }
@@ -12310,17 +12383,18 @@ document.getElementById("q").addEventListener("input",function(e){ S.q=e.target.
    x to skip, o or Enter to open. Only on the Triage page, and never while
    a note, a dialogue or a field has the keyboard. */
 document.addEventListener("keydown",function(e){
-  if(S.view!=="triage"||S.q||S.tag||!TRI.items.length) return;
+  if(S.view!=="triage"||S.q||S.tag||!TRI.batch.length) return;
   if(ask.classList.contains("on")||scrim.classList.contains("on")||light.classList.contains("on")) return;
   var t=e.target; if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
   if(e.metaKey||e.ctrlKey||e.altKey) return;
-  var k=e.key, it=TRI.items[TRI.cur];
+  var k=e.key, it=TRI.byId[TRI.batch[TRI.cur]];
   if(k==="j"||k==="ArrowDown"){ e.preventDefault(); triMove(1) }
   else if(k==="k"||k==="ArrowUp"){ e.preventDefault(); triMove(-1) }
   else if(/^[1-5]$/.test(k)&&it){ e.preventDefault(); triRate(it.id,+k) }
   else if((k==="w"||k==="s")&&it){ e.preventDefault(); triKeep(it.id) }
   else if(k==="x"&&it){ e.preventDefault(); triSkip(it.id) }
   else if((k==="o"||k==="Enter")&&it){ e.preventDefault(); window.open(it.url,"_blank","noopener") }
+  else if(k==="n"){ e.preventDefault(); triNext() }
 });
 /* Keyboard focus is layered, and each layer swallows what belongs to it.
    Without this, ⌘K or an undo pressed inside an open note also reached the
@@ -12466,7 +12540,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="107";
+var BUILD="108";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
