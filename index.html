@@ -296,6 +296,34 @@
   .stnums span{font-size:12.5px;color:var(--muted)}
   .sth{font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
   .stchart{width:100%;height:auto;display:block}
+  .stats{max-width:820px}
+  .strecs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .strec{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:3px}
+  .strec span{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .strec b{font-size:24px;font-weight:720;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .strec em{font-style:normal;font-size:12px;color:var(--muted)}
+  .strec:first-child b{color:var(--make)}
+  .styear{width:100%;height:auto;display:block}
+  .styear text{font-size:10px;fill:var(--faint)}
+  .styear rect{cursor:pointer}
+  .styear .hm0{fill:var(--line)} .styear .hm1{fill:color-mix(in srgb,var(--make) 25%,var(--surface))}
+  .styear .hm2{fill:color-mix(in srgb,var(--make) 48%,var(--surface))} .styear .hm3{fill:color-mix(in srgb,var(--make) 72%,var(--surface))}
+  .styear .hm4{fill:var(--make)}
+  .styear rect:hover{stroke:var(--ink);stroke-width:1}
+  .stchart.big text{font-size:11.5px}
+  .stchart rect.best{fill:var(--make)}
+  .stchart .val{fill:var(--ink);font-weight:650}
+  .stchart .avg{stroke:var(--accent);stroke-dasharray:5 5;stroke-width:1.5}
+  .stchart .avgt{fill:var(--accent);font-weight:650;paint-order:stroke;stroke:var(--bg);stroke-width:5px;stroke-linejoin:round}
+  .stchart.wk rect.wd{fill:color-mix(in srgb,var(--accent) 60%,transparent)}
+  .stchart.wk rect.we{fill:var(--make)}
+  .stcompare{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-bottom:12px}
+  .stcompare div{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 16px;min-width:150px}
+  .stcompare div b{display:block;font-size:26px;font-weight:720;color:var(--accent);font-variant-numeric:tabular-nums}
+  .stcompare div.we b{color:var(--make)}
+  .stcompare div span{font-size:12px;color:var(--muted)}
+  .stcompare p{flex:1;min-width:200px;align-self:center;font-size:14px;color:var(--read);margin:0}
+  @media (max-width:760px){ .strecs{grid-template-columns:repeat(2,1fr)} }
   .stchart rect{fill:color-mix(in srgb,var(--make) 45%,transparent)} .stchart rect.now{fill:var(--make)}
   .stchart .base{stroke:var(--line-strong)} .stchart text{font-size:11px;fill:var(--faint)}
   .stchart .mx{font-weight:650;fill:var(--muted)}
@@ -331,6 +359,14 @@
   .tricard.tri-skipped{opacity:.4}
   .tricard.tri-rated .thumb,.tricard.tri-kept .thumb{opacity:.85}
   .tribatch{font-size:13px;color:var(--ui)}
+  .trinav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 0 12px}
+  .tridots{display:flex;gap:7px;align-items:center}
+  .tridot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);padding:0;
+    background:conic-gradient(var(--make) var(--f),transparent 0);transition:transform .12s}
+  .tridot:hover{transform:scale(1.18)}
+  .tridot.ahead{border-style:dashed;opacity:.6}
+  .tridot.full{border-color:var(--make)}
+  .tridot.now{box-shadow:0 0 0 3px var(--accent-soft);border-color:var(--accent)}
   .tridone{text-align:center;padding:22px 0 34px;color:var(--muted);font-size:14px}
   .tridone .btn{margin-left:8px}
   .trilist{display:flex;flex-direction:column;gap:8px;max-width:980px}
@@ -372,6 +408,8 @@
   .stmonths div{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
   .stmonths i{display:block;width:100%;min-height:2px;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--accent) 55%,transparent)}
   .stmonths span{font-size:10.5px;color:var(--faint)}
+  .stmonths{height:150px}
+  .stmonths b{font-size:11px;font-weight:650;color:var(--muted);font-variant-numeric:tabular-nums}
   .stbooks{display:flex;flex-direction:column;gap:8px}
   .stbook{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr 1fr auto;gap:10px;align-items:center;text-align:left;
     background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--ui)}
@@ -6826,6 +6864,115 @@ function whereWords(days){
   if(!a&&!b) return "";
   return '<h3 class="sth">Where the words went — last 30 days</h3><div class="stwheres">'+a+b+'</div>';
 }
+/* =========================================================================
+   THE WRITING PAGE, IN PICTURES
+   A year at a glance, weeks, weekdays against weekends, and your records.
+   Every number comes from the same day-by-day record as the rest of the
+   page (allDays), so what the pictures say and what the totals say agree.
+   ========================================================================= */
+function isoOf(d){ var p=function(x){ return (x<10?"0":"")+x }; return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()) }
+function dayAt(n){ var d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()-n); return d }
+function mondayOf(d){ var x=new Date(d); x.setHours(12,0,0,0); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x }
+var GR_MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+var GR_DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function niceDay(k){ var d=new Date(k+"T12:00:00"); return d.getDate()+" "+GR_MONTHS[d.getMonth()]+" "+d.getFullYear() }
+function statRecords(days){
+  var bestD=null, weeks={}, months={}, longest=0, run=0, writing=0, sum=0;
+  var keys=Object.keys(days).sort();
+  keys.forEach(function(k){
+    var w=Math.max(0,wordsOn(days,k)); if(!w) return;
+    writing++; sum+=w;
+    if(!bestD||w>bestD.w) bestD={k:k,w:w};
+    var wk=isoOf(mondayOf(new Date(k+"T12:00:00"))); weeks[wk]=(weeks[wk]||0)+w;
+    var m=k.slice(0,7); months[m]=(months[m]||0)+w;
+  });
+  var first=keys.length?new Date(keys[0]+"T12:00:00"):new Date();
+  for(var d=new Date(first);d<=new Date();d.setDate(d.getDate()+1)){
+    if(Math.max(0,wordsOn(days,isoOf(d)))>0){ run++; if(run>longest) longest=run } else run=0;
+  }
+  function top(o){ var b=null; Object.keys(o).forEach(function(k){ if(!b||o[k]>b.w) b={k:k,w:o[k]} }); return b }
+  return { day:bestD, week:top(weeks), month:top(months), longest:longest, avg:writing?Math.round(sum/writing):0, writing:writing };
+}
+function statRecordsHTML(r){
+  function card(label,big,sub){ return '<div class="strec"><span>'+label+'</span><b>'+big+'</b><em>'+sub+'</em></div>' }
+  var wk=r.week?(function(){ var a=new Date(r.week.k+"T12:00:00"), b=new Date(a); b.setDate(b.getDate()+6);
+    return a.getDate()+" "+GR_MONTHS[a.getMonth()]+" – "+b.getDate()+" "+GR_MONTHS[b.getMonth()] })():"";
+  return '<div class="strecs">'
+    +card("Best day",r.day?fmtN(r.day.w):"—",r.day?niceDay(r.day.k):"not yet")
+    +card("Best week",r.week?fmtN(r.week.w):"—",wk||"not yet")
+    +card("Best month",r.month?fmtN(r.month.w):"—",r.month?GR_MONTHS[+r.month.k.slice(5)-1]+" "+r.month.k.slice(0,4):"not yet")
+    +card("Longest run",r.longest+" day"+(r.longest===1?"":"s"),"writing every day")
+    +card("A writing day",r.avg?fmtN(r.avg):"—",r.writing?"on average, over "+r.writing+" days":"not yet")
+    +'</div>';
+}
+/* A year at a glance: one square a day, darker for more words. */
+function statYear(days){
+  var start=mondayOf(dayAt(364)), cells="", months="", W=53, cs=13, gap=3, x0=30;
+  var vals=[]; for(var n=0;n<371;n++){ var dd=new Date(start); dd.setDate(start.getDate()+n); if(dd>new Date()) break; var v=Math.max(0,wordsOn(days,isoOf(dd))); if(v) vals.push(v) }
+  vals.sort(function(a,b){ return a-b });
+  function q(p){ return vals.length?vals[Math.min(vals.length-1,Math.floor(p*vals.length))]:1 }
+  var t1=q(.25),t2=q(.5),t3=q(.75);
+  var lastM=-1;
+  for(var wk=0;wk<W;wk++){
+    for(var dw=0;dw<7;dw++){
+      var d=new Date(start); d.setDate(start.getDate()+wk*7+dw);
+      if(d>new Date()) continue;
+      var k=isoOf(d), v=Math.max(0,wordsOn(days,k));
+      var lv=!v?0:v<=t1?1:v<=t2?2:v<=t3?3:4;
+      cells+='<rect x="'+(x0+wk*(cs+gap))+'" y="'+(18+dw*(cs+gap))+'" width="'+cs+'" height="'+cs+'" rx="3" class="hm'+lv+'" data-dayreport="'+k+'"><title>'+niceDay(k)+': '+fmtN(v)+' words</title></rect>';
+      if(dw===0&&d.getDate()<=7&&d.getMonth()!==lastM){ lastM=d.getMonth(); months+='<text x="'+(x0+wk*(cs+gap))+'" y="11">'+GR_MONTHS[lastM]+'</text>' }
+    }
+  }
+  var lab=[0,2,4].map(function(i){ return '<text x="0" y="'+(18+i*(cs+gap)+10)+'">'+GR_DAYS[i]+'</text>' }).join("");
+  var key='<g transform="translate('+(x0+W*(cs+gap)-128)+',138)"><text x="0" y="10">less</text>'
+    +[0,1,2,3,4].map(function(i){ return '<rect x="'+(28+i*16)+'" y="0" width="12" height="12" rx="3" class="hm'+i+'"/>' }).join("")
+    +'<text x="110" y="10">more</text></g>';
+  return '<svg class="styear" viewBox="0 0 '+(x0+W*(cs+gap)+10)+' 156" role="img" aria-label="Words written each day, the last year">'+months+lab+cells+key+'</svg>';
+}
+/* Weeks: the last twenty-six, with the average as a line. */
+function statWeeks(days){
+  var N=26, cur=mondayOf(new Date()), vals=[], labels=[];
+  for(var i=N-1;i>=0;i--){
+    var m=new Date(cur); m.setDate(cur.getDate()-7*i);
+    var t=0; for(var k=0;k<7;k++){ var d=new Date(m); d.setDate(m.getDate()+k); t+=Math.max(0,wordsOn(days,isoOf(d))) }
+    vals.push(t); labels.push(m);
+  }
+  var max=Math.max.apply(null,vals.concat([1])), W=720, H=190, bw=W/N, nz=vals.filter(function(v){ return v }), avg=nz.length?nz.reduce(function(a,b){ return a+b },0)/nz.length:0;
+  var best=vals.indexOf(Math.max.apply(null,vals));
+  var bars=vals.map(function(v,ix){
+    var h=v?Math.max(3,Math.round(v*(H-30)/max)):0, x=ix*bw+4;
+    return '<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-8).toFixed(1)+'" height="'+h+'" rx="4" class="'+(ix===N-1?"now":ix===best&&v?"best":"")+'"><title>Week of '+labels[ix].getDate()+' '+GR_MONTHS[labels[ix].getMonth()]+': '+fmtN(v)+' words</title></rect>'
+      +(ix===best&&v?'<text x="'+(x+(bw-8)/2).toFixed(1)+'" y="'+(H-h-6)+'" text-anchor="middle" class="val">'+fmtN(v)+'</text>':"")
+      +(ix%4===0?'<text x="'+(x+(bw-8)/2).toFixed(1)+'" y="'+(H+16)+'" text-anchor="middle">'+labels[ix].getDate()+' '+GR_MONTHS[labels[ix].getMonth()]+'</text>':"");
+  }).join("");
+  var ay=H-Math.round(avg*(H-30)/max);
+  return '<svg class="stchart big" viewBox="0 0 '+W+' '+(H+24)+'" role="img" aria-label="Words written each week, the last six months">'+bars
+    +'<line x1="0" x2="'+W+'" y1="'+H+'" y2="'+H+'" class="base"/>'
+    +(avg?'<line x1="0" x2="'+W+'" y1="'+ay+'" y2="'+ay+'" class="avg"/><text x="4" y="'+(ay-6)+'" class="avgt">average week · '+fmtN(Math.round(avg))+'</text>':"")
+    +'</svg>';
+}
+/* Weekdays and weekends: the average for each day of the week, over the
+   last twelve weeks, every day counted — the ones you did not write too. */
+function statWeekdays(days){
+  var tot=[0,0,0,0,0,0,0], cnt=[0,0,0,0,0,0,0];
+  for(var n=0;n<84;n++){ var d=dayAt(n), i=(d.getDay()+6)%7; tot[i]+=Math.max(0,wordsOn(days,isoOf(d))); cnt[i]++ }
+  var avg=tot.map(function(t,i){ return cnt[i]?t/cnt[i]:0 });
+  var wd=(avg[0]+avg[1]+avg[2]+avg[3]+avg[4])/5, we=(avg[5]+avg[6])/2;
+  var max=Math.max.apply(null,avg.concat([1])), W=720, H=170, bw=W/7;
+  var bars=avg.map(function(v,i){
+    var h=v?Math.max(3,Math.round(v*(H-34)/max)):0, x=i*bw+14;
+    return '<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+(bw-28).toFixed(1)+'" height="'+h+'" rx="6" class="'+(i>=5?"we":"wd")+'"/>'
+      +'<text x="'+(x+(bw-28)/2).toFixed(1)+'" y="'+(H-h-7)+'" text-anchor="middle" class="val">'+(v?fmtN(Math.round(v)):"")+'</text>'
+      +'<text x="'+(x+(bw-28)/2).toFixed(1)+'" y="'+(H+17)+'" text-anchor="middle">'+GR_DAYS[i]+'</text>';
+  }).join("");
+  var line=!wd&&!we?"Not enough days yet."
+    :we>wd?"You write <b>"+Math.round((we/(wd||1)-1)*100)+"% more</b> on a weekend day than on a weekday."
+    :"You write <b>"+Math.round((wd/(we||1)-1)*100)+"% more</b> on a weekday than on a weekend day.";
+  return '<div class="stcompare"><div><b>'+fmtN(Math.round(wd))+'</b><span>a weekday, on average</span></div>'
+    +'<div class="we"><b>'+fmtN(Math.round(we))+'</b><span>a weekend day</span></div><p>'+line+'</p></div>'
+    +'<svg class="stchart big wk" viewBox="0 0 '+W+' '+(H+24)+'" role="img" aria-label="Average words by day of the week">'+bars
+    +'<line x1="0" x2="'+W+'" y1="'+H+'" y2="'+H+'" class="base"/></svg>';
+}
 function renderStats(){
   var days=allDays(), today=wordsOn(days,isoDaysBack(0)), st=streak(days);
   var bars=[], max=1;
@@ -6859,9 +7006,13 @@ function renderStats(){
       +'<div><b>'+fmtN(sumDays(days,30))+'</b><span>last 30 days</span></div>'
       +'<div><b>'+st+'</b><span>day'+(st===1?"":"s")+' in a row</span></div>'
     +'</div>'
+    +'<h3 class="sth">Records</h3>'+statRecordsHTML(statRecords(days))
     +'<h3 class="sth">The last thirty days</h3>'+svg
+    +'<h3 class="sth">A year of writing</h3>'+statYear(days)
+    +'<h3 class="sth">Week by week</h3>'+statWeeks(days)
+    +'<h3 class="sth">Weekdays and weekends</h3>'+statWeekdays(days)
     +'<h3 class="sth">The last twelve months</h3><div class="stmonths">'
-      +months.map(function(x){ return '<div title="'+fmtN(x.v)+' words"><i style="height:'+Math.round(x.v*100/mmax)+'%"></i><span>'+esc(x.label)+'</span></div>' }).join("")
+      +months.map(function(x){ return '<div title="'+fmtN(x.v)+' words"><b>'+(x.v?(x.v>=1000?(x.v/1000).toFixed(x.v>=10000?0:1)+"k":fmtN(x.v)):"")+'</b><i style="height:'+Math.round(x.v*82/mmax)+'%"></i><span>'+esc(x.label)+'</span></div>' }).join("")
     +'</div>'
     +whereWords(days)
     +'<h3 class="sth">Books</h3>'
@@ -10100,7 +10251,14 @@ function publicUrl(id){
    Nothing here is decided by anyone but you.
    ========================================================================= */
 var TRI={ items:[], sources:[], hist:[], loaded:false, busy:false, err:"", cur:0, model:null };
-TRI.tag=(function(){ try{ return localStorage.getItem("trove.triage.tag")||"weekly" }catch(e){ return "weekly" } })();
+/* Kept links go where links waiting to be written about wait: #phone,
+   the same place the phone's share sheet sends them. #weekly is for the
+   ones ready to compile. */
+TRI.tag=(function(){ try{
+  var t=localStorage.getItem("trove.triage.tag");
+  if(t==="weekly"&&!localStorage.getItem("trove.triage.tag2")){ t="phone"; localStorage.setItem("trove.triage.tag","phone") }
+  localStorage.setItem("trove.triage.tag2","1");
+  return t||"phone" }catch(e){ return "phone" } })();
 var TRI_SEEDS=[
   ["The Guardian — World","https://www.theguardian.com/world/rss"],
   ["The Guardian — Culture","https://www.theguardian.com/culture/rss"],
@@ -10176,10 +10334,7 @@ function loadTriage(){
         body:TRI_SEEDS.map(function(x){ return { kind:"rss", name:x[0], url:x[1] } }) }).then(loadTriage);
     }
     triSort();
-    /* the batch on screen stays as it is while you work through it */
-    var have={}; TRI.items.forEach(function(x){ have[x.id]=x });
-    var keep=(TRI.batch||[]).filter(function(id){ return have[id]||TRI.handled[id] });
-    if(!keep.length) triNewBatch();
+    triStart();
   }).catch(function(e){
     TRI.err=/triage_/.test((e&&e.msg)||"")||/relation|does not exist|schema cache/i.test((e&&e.msg)||"")
       ?"Triage isn't set up on the server yet — see TRIAGE.html.":((e&&e.msg)||"Could not reach the server");
@@ -10198,18 +10353,38 @@ function triAgo(it){ var t=Date.parse(it.published_at||it.fetched_at); return t?
    rest; when all twelve are done, the next twelve come, sorted again by
    what it has just learned. A run brings up to 120: ten batches. */
 var TRI_BATCH=12;
-TRI.batch=[]; TRI.handled={}; TRI.byId={};
-function triNewBatch(){
-  triSort();
-  TRI.byId={}; TRI.handled={};
-  TRI.batch=TRI.items.slice(0,TRI_BATCH).map(function(x){ TRI.byId[x.id]=x; return x.id });
-  TRI.cur=0;
-  /* fill each card the way a saved link fills: picture, site, description */
-  TRI.batch.forEach(function(id){ var x=TRI.byId[id]; if(x&&!x.metaState) fetchMeta(x) });
+TRI.pages=[]; TRI.page=0; TRI.batch=[]; TRI.handled={}; TRI.byId={};
+/* Batches are made as you reach them, from what is still waiting, sorted
+   by everything it has learned so far — so each one is a little better
+   aimed than the one before. Ones you have seen stay as they were, to go
+   back to. */
+function triStart(){
+  TRI.byId={}; TRI.items.forEach(function(x){ TRI.byId[x.id]=x });
+  TRI.pages=[]; TRI.page=0; TRI.handled={};
+  triBuildPage(); triShowPage(0);
 }
+function triPaged(){ var p={}; TRI.pages.forEach(function(pg){ pg.forEach(function(id){ p[id]=1 }) }); return p }
+function triBuildPage(){
+  triSort();
+  var paged=triPaged();
+  var pg=TRI.items.filter(function(x){ return !paged[x.id] }).slice(0,TRI_BATCH).map(function(x){ return x.id });
+  if(!pg.length) return false;
+  TRI.pages.push(pg);
+  pg.forEach(function(id){ var x=TRI.byId[id]; if(x&&!x.metaState) fetchMeta(x) });   // fill each card as a saved link fills
+  return true;
+}
+function triShowPage(n){
+  TRI.page=Math.max(0,Math.min(TRI.pages.length-1,n));
+  TRI.batch=TRI.pages[TRI.page]||[];
+  var first=0; for(var k=0;k<TRI.batch.length;k++){ if(!TRI.handled[TRI.batch[k]]){ first=k; break } }
+  TRI.cur=first;
+}
+function triNewBatch(){ if(triBuildPage()) triShowPage(TRI.pages.length-1) }
 function triBatchItems(){ return TRI.batch.map(function(id){ return TRI.byId[id] }).filter(Boolean) }
-function triLeft(){ return TRI.items.filter(function(x){ return TRI.batch.indexOf(x.id)<0 }).length }
-function triBatchDone(){ return TRI.batch.length&&TRI.batch.every(function(id){ return TRI.handled[id] }) }
+function triLeft(){ var p=triPaged(); return TRI.items.filter(function(x){ return !p[x.id] }).length }
+function triPageDone(pg){ return pg.length&&pg.every(function(id){ return TRI.handled[id] }) }
+function triBatchDone(){ return triPageDone(TRI.batch) }
+function triTotalPages(){ return TRI.pages.length+Math.ceil(triLeft()/TRI_BATCH) }
 function triCard(it,ix){
   var src=triSource(it.source_id), h=host(it.url), hu=hue(h), st=TRI.handled[it.id];
   var g="linear-gradient(135deg,hsl("+hu+" 46% 80%),hsl("+((hu+45)%360)+" 42% 90%))";
@@ -10238,16 +10413,25 @@ function renderTriage(){
   if(!SYNC.session) return '<div class="empty"><div class="big">◌</div>Sign in to use Triage.</div>';
   if(!TRI.loaded&&!TRI.err){ if(!TRI.busy) loadTriage(); return '<div class="empty"><div class="big">◌</div>Reading what your sources found…</div>' }
   var m=TRI.model||{rated:0}, list=triBatchItems();
-  var done=TRI.batch.filter(function(id){ return TRI.handled[id] }).length, left=triLeft();
-  var batches=Math.ceil(left/TRI_BATCH);
-  var head='<div class="trihead">'
-    +'<span class="tribatch"><b>'+done+' of '+list.length+'</b> done'+(batches?' · '+batches+' more batch'+(batches===1?"":"es")+' waiting':"")+'</span>'
-    +(triBatchDone()&&left?'<button class="btn" data-tri="next">Next '+Math.min(TRI_BATCH,left)+' →</button>':"")
+  var done=TRI.batch.filter(function(id){ return TRI.handled[id] }).length, total=triTotalPages();
+  /* one dot per batch: filled as it is done, the one you are on ringed */
+  var dots='';
+  for(var k=0;k<total;k++){
+    var pg=TRI.pages[k], f=pg?pg.filter(function(id){ return TRI.handled[id] }).length/pg.length:0;
+    dots+='<button class="tridot'+(k===TRI.page?" now":"")+(pg?"":" ahead")+(f===1?" full":"")+'" data-tripage="'+k+'" title="Batch '+(k+1)+'" style="--f:'+Math.round(f*100)+'%"></button>';
+  }
+  var head='<div class="trinav">'
+    +'<button class="btn sec" data-tri="prev"'+(TRI.page>0?"":" disabled")+' title="p">← Previous</button>'
+    +'<div class="tridots">'+dots+'</div>'
+    +'<button class="btn" data-tri="next"'+(TRI.page<total-1?"":" disabled")+' title="n">Next →</button>'
+    +'<span class="tribatch">Batch <b>'+(TRI.page+1)+'</b> of '+total+' · '+done+' of '+list.length+' done</span>'
+    +'</div>'
+    +'<div class="trihead">'
     +'<button class="btn sec" data-tri="check">Check now</button>'
     +'<button class="btn sec" data-tri="sources">Sources · '+TRI.sources.filter(function(s){ return s.enabled }).length+'</button>'
-    +'<button class="btn sec" data-tri="tag" title="Where w sends a link">Send to #'+esc(TRI.tag)+'</button>'
+    +'<button class="btn sec" data-tri="tag" title="Where w keeps a link">Keep in #'+esc(TRI.tag)+'</button>'
     +'<span class="trinote">'+(m.rated<30?"Teaching it — ":"Learned from "+fmtN(m.rated)+" ratings · ")
-      +'<b>1–5</b> rate · <b>w</b> send · <b>x</b> skip · <b>j/k</b> move · <b>o</b> open · <b>n</b> next</span>'
+      +'<b>1–5</b> rate · <b>w</b> keep · <b>x</b> skip · <b>j/k</b> move · <b>o</b> open · <b>n/p</b> next/previous batch</span>'
     +'</div>';
   if(TRI.err) return head+'<div class="empty"><div class="big">◌</div>'+esc(TRI.err)+'</div>';
   if(!list.length) return head+'<div class="empty"><div class="big">✓</div>Nothing waiting. Your sources are read at 07:00 and 17:00.</div>';
@@ -10255,7 +10439,7 @@ function renderTriage(){
   return head+'<div class="grid mood tri-grid" data-cols="'+n+'">'
     +moodColumns(list.map(triCard),n,0).map(function(c){ return '<div class="mcol">'+c.join("")+'</div>' }).join("")
     +'</div>'
-    +(triBatchDone()?'<div class="tridone">'+(left?'All twelve done. <button class="btn" data-tri="next">Next '+Math.min(TRI_BATCH,left)+' →</button>'
+    +(triBatchDone()?'<div class="tridone">'+(TRI.page<total-1?'Batch done. <button class="btn" data-tri="next">Next batch →</button>'
       :'All done until the next check, at 07:00 or 17:00.')+'</div>':"");
 }
 function triMove(d){
@@ -10270,9 +10454,13 @@ function triMark(id,what){
   TRI.handled[id]=prev&&prev!==what&&what!=="skipped"?(prev.indexOf(what)>=0?prev:prev+":"+what):what;
   var ix=triFind(id); if(ix>=0) TRI.items.splice(ix,1);       // no longer waiting
   /* on to the next card that is not done yet */
-  var at=TRI.batch.indexOf(id);
+  var at=TRI.batch.indexOf(id), was=TRI.page;
   for(var k=1;k<=TRI.batch.length;k++){ var c=(at+k)%TRI.batch.length; if(!TRI.handled[TRI.batch[c]]){ TRI.cur=c; break } }
   render();
+  /* the last card of a batch done: on to the next, after a breath */
+  if(triBatchDone()&&TRI.page<triTotalPages()-1) setTimeout(function(){
+    if(S.view==="triage"&&TRI.page===was&&triBatchDone()){ triNext(); toast("Batch "+(was+1)+" done") }
+  },650);
 }
 function triRate(id,n){
   var it=TRI.byId[id]; if(!it) return;
@@ -10302,11 +10490,14 @@ function triSkip(id){
   triPatch(id,{ state:"skipped" }).catch(function(){});
   triMark(id,"skipped");
 }
-function triNext(){
-  if(!triBatchDone()) return toast("Rate, send or skip all twelve first");
-  triNewBatch(); render();
+function triGo(n){
+  while(n>TRI.pages.length-1&&triBuildPage()){}
+  if(n<0||n>TRI.pages.length-1) return;
+  triShowPage(n); render();
   try{ board.scrollTop=0; window.scrollTo(0,0) }catch(e){}
 }
+function triNext(){ if(TRI.page<triTotalPages()-1) triGo(TRI.page+1) }
+function triPrev(){ if(TRI.page>0) triGo(TRI.page-1) }
 function triCheckNow(btn){
   if(btn) flashBtn(btn,"Checking…");
   withFreshSession().then(function(){
@@ -10368,11 +10559,15 @@ board.addEventListener("click",function(e){
   if(b){ var a=b.dataset.tri;
     if(a==="check") triCheckNow(b);
     if(a==="next") triNext();
+    if(a==="prev") triPrev();
     if(a==="sources") triSources();
-    if(a==="tag") askTag("Send to which tag?","Where <b>w</b> and the → button put a link.",triTagChoices(),"Use",function(t){
+    if(a==="tag") askTag("Keep links in which tag?","Where <b>w</b> and the keep button put a link.",triTagChoices(),"Use",function(t){
       t=String(t||"").replace(/^#/,"").trim().toLowerCase(); if(!t) return;
       TRI.tag=t; try{ localStorage.setItem("trove.triage.tag",t) }catch(err){} render() });
-    return }
+    return;
+  }
+  var dt=e.target.closest("[data-tripage]");
+  if(dt){ triGo(+dt.dataset.tripage); return }
   var row=e.target.closest("[data-triid]"); if(!row) return;
   var id=row.dataset.triid;
   var rb=e.target.closest("[data-trirate]");
@@ -12394,7 +12589,8 @@ document.addEventListener("keydown",function(e){
   else if((k==="w"||k==="s")&&it){ e.preventDefault(); triKeep(it.id) }
   else if(k==="x"&&it){ e.preventDefault(); triSkip(it.id) }
   else if((k==="o"||k==="Enter")&&it){ e.preventDefault(); window.open(it.url,"_blank","noopener") }
-  else if(k==="n"){ e.preventDefault(); triNext() }
+  else if(k==="n"||k==="ArrowRight"){ e.preventDefault(); triNext() }
+  else if(k==="p"||k==="ArrowLeft"){ e.preventDefault(); triPrev() }
 });
 /* Keyboard focus is layered, and each layer swallows what belongs to it.
    Without this, ⌘K or an undo pressed inside an open note also reached the
@@ -12540,7 +12736,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="108";
+var BUILD="109";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
