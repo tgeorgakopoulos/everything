@@ -347,6 +347,11 @@
   /* ---- Triage ---- */
   .trihead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 14px}
   .trinote{font-size:12px;color:var(--muted);margin-left:auto}
+  /* a link's facts: its kind in small capitals, then the facts, dotted */
+  .facts{display:flex;flex-wrap:wrap;align-items:baseline;gap:1px 11px;margin-top:6px;font-size:calc(11.5px*var(--tscale));color:var(--muted);line-height:1.5}
+  .facts b{font-size:10px;font-weight:750;letter-spacing:.07em;text-transform:uppercase;color:var(--make)}
+  .facts span{white-space:nowrap}
+  .rfacts{color:var(--make)}
   .tri-grid .tricard{cursor:default}
   .tricard.cur{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   .tricard .trilink{display:block;color:var(--ink);text-decoration:none}
@@ -3314,7 +3319,8 @@ var H_MICROLINK={ json:true,
     var d=j.data;
     return {title:d.title||"",desc:d.description||"",
       image:(d.image&&d.image.url)||(d.screenshot&&d.screenshot.url)||"",
-      logo:(d.logo&&d.logo.url)||"",site:d.publisher||""};
+      logo:(d.logo&&d.logo.url)||"",site:d.publisher||"",
+      facts:d.author?ldFacts([],{author:d.author,published:d.date}):null, soft:true};
   }};
 var H_ALLORIGINS={ json:false,
   url:function(u){ return "https://api.allorigins.win/raw?url="+encodeURIComponent(u) },
@@ -3343,6 +3349,92 @@ function helpersFor(u){
   list.push(H_MICROLINK,H_ALLORIGINS,H_CORSPROXY,H_READER);
   return list;
 }
+/* ---- LINK FACTS (shared: the app, the api function, the extension) ----
+   Most sites describe their page for search engines in a block of
+   schema.org data: a recipe's times and servings, a book's author and
+   rating, an event's date and place, an article's author and length.
+   ldFacts reads those blocks and keeps the few facts worth a line on a
+   card: {t:"Recipe", f:[["Prep","15 min"],["Serves","4"],["","★ 4.8"]]}.
+   Nothing here runs code from the page: the blocks are parsed as JSON. */
+function ldFacts(blocks,meta){
+  var all=[];
+  function walk(o,d){
+    if(!o||typeof o!=="object"||d>6) return;
+    if(Array.isArray(o)){ for(var i=0;i<o.length;i++) walk(o[i],d+1); return }
+    if(o["@graph"]) walk(o["@graph"],d+1);
+    if(o["@type"]) all.push(o);
+    if(o.mainEntity) walk(o.mainEntity,d+1);
+  }
+  for(var b=0;b<(blocks||[]).length;b++) walk(blocks[b],0);
+  function types(o){ return [].concat(o["@type"]||[]).join(" ") }
+  function find(re){ for(var i=0;i<all.length;i++) if(re.test(types(all[i]))) return all[i]; return null }
+  function str(x){ return x==null?"":String(x).replace(/\s+/g," ").trim() }
+  function nm(x){
+    if(!x) return "";
+    if(Array.isArray(x)){ var n=[]; for(var i=0;i<x.length&&n.length<2;i++){ var s=nm(x[i]); if(s) n.push(s) } return n.join(", ")+(x.length>2?" et al.":"") }
+    if(typeof x==="object") return str(x.name||(x.givenName?(x.givenName+" "+(x.familyName||"")):""));
+    return str(x);
+  }
+  function dur(iso){
+    var m=/^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/i.exec(str(iso)); if(!m) return "";
+    var h=(+m[1]||0)*24+(+m[2]||0), mi=+m[3]||0;
+    if(!h&&!mi&&m[4]) mi=Math.ceil(+m[4]/60);
+    return (h?h+" h":"")+(h&&mi?" ":"")+(mi?mi+" min":"")||"";
+  }
+  var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function day(d){ var t=Date.parse(str(d)); if(!isFinite(t)) return ""; var x=new Date(t); return x.getUTCDate()+" "+MON[x.getUTCMonth()]+" "+x.getUTCFullYear() }
+  function when(d){ var t=Date.parse(str(d)); if(!isFinite(t)) return ""; var x=new Date(t); var s=x.getDate()+" "+MON[x.getMonth()]+" "+x.getFullYear();
+    return /T\d\d:\d\d/.test(str(d))?s+", "+(x.getHours()<10?"0":"")+x.getHours()+":"+(x.getMinutes()<10?"0":"")+x.getMinutes():s }
+  function rating(o){ var r=o&&o.aggregateRating; var v=r&&parseFloat(r.ratingValue); return v?("★ "+(Math.round(v*10)/10)):"" }
+  function price(o){
+    var of=o&&o.offers; if(Array.isArray(of)) of=of[0]; if(!of) return "";
+    var p=of.price||(of.priceSpecification&&of.priceSpecification.price)||of.lowPrice; if(p==null||p==="") return "";
+    var c=str(of.priceCurrency), sym={EUR:"€",USD:"$",GBP:"£"}[c];
+    var n=parseFloat(p); if(!isFinite(n)) return "";
+    return sym?sym+n.toFixed(n%1?2:0):(n.toFixed(n%1?2:0)+(c?" "+c:""));
+  }
+  function place(x){
+    if(!x) return ""; if(Array.isArray(x)) x=x[0];
+    if(typeof x==="string") return str(x);
+    var a=x.address||{}; if(typeof a==="string") return str(x.name||a);
+    return [str(x.name),str(a.addressLocality)].filter(Boolean).filter(function(v,i,l){ return l.indexOf(v)===i }).join(", ");
+  }
+  function out(t,list){
+    var f=[]; for(var i=0;i<list.length&&f.length<5;i++){ var v=str(list[i][1]); if(v&&v.length<=70) f.push([list[i][0],v]) }
+    return f.length?{t:t,f:f}:null;
+  }
+  var o;
+  if((o=find(/\bRecipe\b/))) return out("Recipe",[["Prep",dur(o.prepTime)],["Cook",dur(o.cookTime)],["Total",!o.prepTime&&!o.cookTime?dur(o.totalTime):""],
+    ["Serves",str([].concat(o.recipeYield||[])[0]).replace(/\s*servings?/i,"")],["",rating(o)]]);
+  if((o=find(/\bBook\b/))) return out("Book",[["",nm(o.author)],["",o.numberOfPages?o.numberOfPages+" pages":""],["",rating(o)],["",str(o.datePublished).slice(0,4)]]);
+  if((o=find(/Event\b/))) return out("Event",[["",when(o.startDate)],["",place(o.location)],["",price(o)]]);
+  if((o=find(/\bMusic(Album|Playlist|Recording)\b/))) return out("Music",[["",nm(o.byArtist)],["",o.numTracks?o.numTracks+" tracks":""],["",str(o.genre)],["",str(o.datePublished).slice(0,4)]]);
+  if((o=find(/\b(Movie|TVSeries|TVSeason|TVEpisode)\b/))) return out(/Movie/.test(types(o))?"Film":"TV",[["",nm(o.director)],["",str(o.datePublished||o.startDate).slice(0,4)],["",dur(o.duration)],["",rating(o)]]);
+  if((o=find(/\bPodcast(Episode|Series)\b/))) return out("Podcast",[["",nm(o.partOfSeries)],["",dur(o.duration||(o.timeRequired))],["",day(o.datePublished)]]);
+  if((o=find(/\bJobPosting\b/))) return out("Job",[["",nm(o.hiringOrganization)],["",place(o.jobLocation)],["",str(o.employmentType).toLowerCase().replace(/_/g," ")]]);
+  if((o=find(/\bScholarlyArticle\b/))) return out("Paper",[["",nm(o.author)],["",nm(o.isPartOf)||nm(o.publisher)],["",str(o.datePublished).slice(0,4)]]);
+  if((o=find(/\bProduct\b/))) return out("Product",[["",nm(o.brand)],["",price(o)],["",rating(o)]]);
+  if((o=find(/\b(Restaurant|Hotel|LodgingBusiness|LocalBusiness|Museum|TouristAttraction|Place)\b/))) return out("Place",[["",place(o)],["",str(o.servesCuisine&&[].concat(o.servesCuisine)[0])],["",str(o.priceRange)],["",rating(o)]]);
+  if((o=find(/\bVideoObject\b/))) return out("Video",[["",dur(o.duration)],["",day(o.uploadDate)],["",nm(o.author||o.creator)]]);
+  if((o=find(/\b(NewsArticle|Article|BlogPosting|Report|ReviewArticle|AnalysisNewsArticle|OpinionNewsArticle)\b/))){
+    var wc=parseInt(o.wordCount,10);
+    return out("Article",[["",nm(o.author)],["",day(o.datePublished)],["",wc>150?Math.max(1,Math.round(wc/230))+" min read":""]]);
+  }
+  /* no structured block: what the meta tags say, for an article */
+  meta=meta||{};
+  if(meta.author||meta.published||meta.minutes) return out("Article",[["",str(meta.author)],["",day(meta.published)],["",meta.minutes?meta.minutes+" min read":""]]);
+  return null;
+}
+/* The facts of a parsed HTML document: its schema.org blocks and meta tags. */
+function docFacts(doc){
+  var blocks=[], s=doc.querySelectorAll('script[type="application/ld+json"]');
+  for(var i=0;i<s.length&&i<12;i++){ try{ blocks.push(JSON.parse(s[i].textContent)) }catch(e){} }
+  function m(sel){ var e=doc.querySelector(sel); return e?(e.getAttribute("content")||"").trim():"" }
+  var meta={ author:m('meta[name="author"]')||m('meta[property="article:author"]').replace(/^https?:\/\/\S+$/,""),
+    published:m('meta[property="article:published_time"]')||m('meta[name="date"]'),
+    minutes:(m('meta[name="twitter:data1"]').match(/^(\d+)\s*min/i)||[])[1]||"" };
+  return ldFacts(blocks,meta);
+}
 function abs(src,base){ try{ return new URL(src,base).href }catch(e){ return src||"" } }
 function fromHTML(html,base){
   var doc=new DOMParser().parseFromString(html,"text/html");
@@ -3354,7 +3446,7 @@ function fromHTML(html,base){
     ||m('meta[name="twitter:image"]')||m('meta[name="twitter:image:src"]');
   var icon=doc.querySelector('link[rel~="apple-touch-icon"]')||doc.querySelector('link[rel~="icon"]');
   return {title:title,desc:desc,image:img?abs(img,base):"",
-    logo:icon?abs(icon.getAttribute("href"),base):"",site:m('meta[property="og:site_name"]')};
+    logo:icon?abs(icon.getAttribute("href"),base):"",site:m('meta[property="og:site_name"]'),facts:docFacts(doc)};
 }
 function applyMeta(item,meta){
   if(meta.title&&(item.titleAuto||!item.title)){ item.title=meta.title.slice(0,180); item.titleAuto=false }
@@ -3362,8 +3454,42 @@ function applyMeta(item,meta){
   if(meta.image) item.image=meta.image;
   if(meta.logo) item.logo=meta.logo;
   if(meta.site) item.site=meta.site;
+  if(meta.facts&&(!item.facts||!meta.soft)) item.facts=meta.facts;
 }
 var mqueue=[], mactive=0;
+/* The preview services give a title and a picture but not the page's own
+   description of itself, so the page is read once more, through the same
+   proxies, for its schema.org facts — a recipe's times, a book's author,
+   an event's date. Once per link; quietly gives up if it cannot. */
+var FQUEUE=[], FACTIVE=0;
+function fetchFacts(item){ if(item&&item.url&&!isMailLink(item.url)&&FQUEUE.indexOf(item)<0){ FQUEUE.push(item); pumpFacts() } }
+function pumpFacts(){
+  while(FACTIVE<2&&FQUEUE.length){
+    var item=FQUEUE.shift(); FACTIVE++;
+    (function(item){
+      var hs=[H_ALLORIGINS,H_CORSPROXY], k=0;
+      function next(){
+        if(k>=hs.length){ FACTIVE--; pumpFacts(); return }
+        var h=hs[k++], ctl, timer;
+        try{ ctl=new AbortController(); timer=setTimeout(function(){ ctl.abort() },9000) }catch(e){}
+        fetch(h.url(item.url),ctl?{signal:ctl.signal,mode:"cors"}:{mode:"cors"})
+          .then(function(r){ if(!r.ok) throw 0; return r.text() })
+          .then(function(t){
+            clearTimeout(timer);
+            var f=docFacts(new DOMParser().parseFromString(t,"text/html"));
+            if(!f) throw 0;
+            item.facts=f; FACTIVE--; save(); renderSoon(); pumpFacts();
+          }).catch(function(){ clearTimeout(timer); next() });
+      }
+      next();
+    })(item);
+  }
+}
+/* The facts as a line on a card: "Recipe · Prep 15 min · Serves 4 · ★ 4.8". */
+function factsLine(i){
+  var f=i&&i.facts; if(!f||!f.f||!f.f.length) return "";
+  return '<div class="facts"><b>'+esc(f.t)+'</b>'+f.f.map(function(x){ return '<span>'+(x[0]?esc(x[0])+" ":"")+esc(x[1])+'</span>' }).join("")+'</div>';
+}
 /* A link to an email is private to its owner. Asking a preview service
    about it would hand that service your address and the message's id, and
    all it could ever see is a sign-in page. So mail links are never looked
@@ -3387,10 +3513,10 @@ function runFetch(item){
   if(yt) item.image=item.image||("https://i.ytimg.com/vi/"+yt+"/hqdefault.jpg");
   item.logo=item.logo||faviconFor(item.url);
 
-  var chain=helpersFor(item.url), idx=0;
+  var chain=helpersFor(item.url), idx=0, usedJson=false;
   function attempt(){
     if(idx>=chain.length){ finish(); return }
-    var h=chain[idx++], ctl, timer;
+    var h=chain[idx++], ctl, timer; usedJson=!!h.json;
     try{ ctl=new AbortController(); timer=setTimeout(function(){ctl.abort()},11000) }catch(e){}
     fetch(h.url(item.url), ctl?{signal:ctl.signal,mode:"cors"}:{mode:"cors"})
       .then(function(r){ if(!r.ok) throw 0; return h.json?r.json():r.text() })
@@ -3407,6 +3533,7 @@ function runFetch(item){
     // partial success still counts: a thumbnail and an icon beat a dead card
     item.metaState=(item.image||item.desc||!item.titleAuto)?"ok":"fail";
     mactive--; save(); renderSoon(); pump();
+    if(usedJson&&item.metaState==="ok") fetchFacts(item);
   }
   attempt();
 }
@@ -4211,7 +4338,8 @@ function cardHTML(i){
     var status=i.metaState==="loading"?'<span class="pulse"></span>'
       :(i.metaState==="fail"?'<button class="refetch" data-refetch="'+i.id+'">retry</button>':"");
     srcline='<div class="srcline"><span class="fav" style="background:hsl('+hu+' 42% 46%)">'
-      +esc((h[0]||"?").toUpperCase())+favimg+'</span>'+esc(i.site||h)+status+'</div>';
+      +esc((h[0]||"?").toUpperCase())+favimg+'</span>'+esc(i.site||h)+status+'</div>'
+      +factsLine(i);
   }
 
   // checklist: show the first few, tickable straight from the card
@@ -4290,6 +4418,7 @@ function rowHTML(i){
 
   var exc=[];
   if(L) exc.push('<span class="rsrc">'+esc(i.site||h)+'</span>');
+  if(L&&i.facts&&i.facts.f) exc.push('<span class="rfacts">'+esc(i.facts.t)+' · '+i.facts.f.slice(0,3).map(function(x){ return esc((x[0]?x[0]+" ":"")+x[1]) }).join(" · ")+'</span>');
   var text=richToText(i.body).replace(/\s+/g," ").trim() || (L?i.desc:"");
   if(text) exc.push(esc(text));
 
@@ -5853,6 +5982,12 @@ function normalizeItem(o){
     });
     out.stats={ days:days };
     if(typeof o.stats.dev==="string"&&o.stats.dev) out.stats.dev=o.stats.dev.slice(0,40);
+  }
+  /* A link's facts, as its page describes itself (ldFacts). */
+  if(o.facts&&typeof o.facts==="object"&&typeof o.facts.t==="string"&&Array.isArray(o.facts.f)){
+    var ff=o.facts.f.filter(function(x){ return Array.isArray(x)&&typeof x[1]==="string"&&x[1] }).slice(0,5)
+      .map(function(x){ return [String(x[0]||"").slice(0,12),x[1].slice(0,70)] });
+    if(ff.length) out.facts={ t:o.facts.t.slice(0,20), f:ff };
   }
   /* Which device of this app last edited it, and at which version — so a
      newer version without that stamp is known to come from elsewhere: the
@@ -10399,6 +10534,7 @@ function triCard(it,ix){
       +'<div class="srcline"><span class="fav" style="background:hsl('+hu+' 42% 46%)">'+esc((h[0]||"?").toUpperCase())
         +(it.logo?'<img src="'+esc(it.logo)+'" alt="" onerror="this.remove()">':"")+'</span>'
         +esc(it.site||(src?src.name:h))+(it.author?' · '+esc(it.author):"")+' · '+esc(triAgo(it))+'</div>'
+      +factsLine(it)
     +'</div></div>'
     +(desc?'<div class="desc">'+esc(desc)+'</div>':"")
     +'<div class="trifoot">'
@@ -10475,7 +10611,7 @@ function triKeep(id){
   var src=triSource(it.source_id), now=Date.now();
   var note=normalizeItem({ id:uid(), title:it.title||"", url:it.url, desc:it.desc||it.summary||"",
     image:/^https:/.test(it.image||"")?it.image:"", logo:it.logo||"", site:it.site||(src?src.name.split(" — ")[0]:""),
-    tags:[TRI.tag], created:now, modified:now, metaState:it.metaState==="ok"?"ok":null });
+    tags:[TRI.tag], created:now, modified:now, metaState:it.metaState==="ok"?"ok":null, facts:it.facts||null });
   S.items.unshift(note); primeOwn(note);
   if(note.metaState!=="ok") fetchMeta(note);
   save();
@@ -12736,7 +12872,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="109";
+var BUILD="110";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
