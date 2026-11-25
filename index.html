@@ -163,6 +163,12 @@
     border:2px solid var(--make);display:grid;place-items:center;background:var(--surface);
     font-size:12px;font-weight:800;color:transparent;transition:.12s}
   .tbbox:hover{background:var(--make-soft)}
+  /* appointments: the time first, the row marked down its left edge */
+  .tbrow.timed{border-left:3px solid var(--accent);padding-left:10px}
+  .tbtime{display:inline-block;margin-right:8px;padding:1px 7px;border-radius:6px;vertical-align:1px;
+    font-size:12.5px;font-weight:750;font-variant-numeric:tabular-nums;color:var(--accent);background:var(--accent-soft)}
+  .tbrow.gone .tbtime{opacity:.6}
+  .due.appt{font-weight:700;color:var(--accent);background:var(--accent-soft);padding:1px 7px;border-radius:6px}
   .tbbox.on{background:var(--make);border-color:var(--make);color:#fff}
   .tbrow.gone{opacity:.6;box-shadow:none}
   .tbrow.gone .tbttl{text-decoration:line-through;color:var(--muted)}
@@ -4368,7 +4374,7 @@ function cardHTML(i){
   }
   if(i.compiled) foot.push('<button class="tag docmark" data-auto="compiled" '
       +'title="See every compiled document">⇥ compiled</button>');
-  if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+'">◔ '+fmtDue(i.due,i.timed)+'</span>');
+  if(A&&i.due!=null) foot.push('<span class="due '+dueClass(i.due)+(i.timed?" appt":"")+'">'+(i.timed?"◷ ":"◔ ")+fmtDue(i.due,i.timed)+'</span>');
   if(isOverdue(i)) foot.push('<button class="totoday" data-totoday="'+i.id+'" title="Move it to today">→ Today</button>');
   if(A&&i.due==null&&!i.done) foot.push('<span class="due later">◇ Someday</span>');
   (i.tags||[]).forEach(function(t){ foot.push('<span class="tag">#'+esc(t)+'</span>') });
@@ -4867,14 +4873,22 @@ function paintTaskbar(){
 }
 function taskRowHTML(i){
   var meta=[];
-  if(i.due!=null) meta.push('<span class="'+dueClass(i.due)+'">'+fmtDue(i.due,i.timed)+'</span>');
+  /* An appointment is not a to-do: its time leads, in a chip of its own,
+     and the row is marked down its edge. Its date is said only when it is
+     not today. */
+  var timed=i.due!=null&&i.timed, time="";
+  if(timed){
+    var dd=new Date(i.due);
+    time='<span class="tbtime">'+(dd.getHours()<10?"0":"")+dd.getHours()+":"+(dd.getMinutes()<10?"0":"")+dd.getMinutes()+'</span>';
+    if(dayOf(i.due)!==todayKey()) meta.push('<span class="'+dueClass(i.due)+'">'+fmtDue(i.due,false)+'</span>');
+  } else if(i.due!=null) meta.push('<span class="'+dueClass(i.due)+'">'+fmtDue(i.due,i.timed)+'</span>');
   if(hasLink(i)) meta.push(esc(i.site||host(i.url)));
   (i.tags||[]).slice(0,2).forEach(function(t){ meta.push("#"+esc(t)) });
   var label=i.title||richToText(i.body).replace(/\s+/g," ").trim()||"Untitled";
-  return '<div class="tbrow'+(i.done?" gone":"")+'" data-tbopen="'+i.id+'">'
+  return '<div class="tbrow'+(i.done?" gone":"")+(timed?" timed":"")+(i.tint?" tint-"+i.tint:"")+'" data-tbopen="'+i.id+'">'
     +'<span class="tbbox'+(i.done?" on":"")+'" data-tbdone="'+i.id+'" title="'
       +(i.done?"Not done after all":"Done")+'">✓</span>'
-    +'<span class="tbtx"><span class="tbttl">'+esc(label)+'</span>'
+    +'<span class="tbtx"><span class="tbttl">'+time+esc(label)+'</span>'
     +(meta.length?'<span class="tbmeta">'+meta.join("")+'</span>':"")
     +'</span>'
     +(isOverdue(i)?'<button class="totoday" data-totoday="'+i.id+'" title="Move it to today">→ Today</button>':"")
@@ -10408,6 +10422,17 @@ var TRI_SEEDS=[
   ["MetaFilter","https://rss.metafilter.com/metafilter.rss"],
   ["Hacker News — front page","https://hnrss.org/frontpage"]
 ];
+/* Sources added later, once, to a library that already has its own list:
+   each is added if its address is not there yet, and never again after
+   you remove it. */
+var TRI_ADDED=[
+  { key:"2026-11-24", list:[
+    ["Asterisk","https://asteriskmag.com/feed"],
+    ["Big Think","https://bigthink.com/feed/"],
+    ["The New Yorker","https://www.newyorker.com/feed/everything"],
+    ["Financial Times","https://www.ft.com/rss/home"],
+    ["Reddit — popular today","https://www.reddit.com/r/popular/top/.rss?t=day"] ] }
+];
 var TRI_STOP={};
 ("that this with from have were what when your about their there would which will more than they into after over just been also says said could first years year news como para "
  +"αυτο αυτη ειναι οποιο οποια οπως μετα στην στον στις στους απο για και που δεν εχει ηταν ολοι ολες μονο ακομη").split(" ").forEach(function(w){ TRI_STOP[w]=1 });
@@ -10468,6 +10493,16 @@ function loadTriage(){
       return rest("/triage_sources",{ method:"POST", prefer:"return=minimal",
         body:TRI_SEEDS.map(function(x){ return { kind:"rss", name:x[0], url:x[1] } }) }).then(loadTriage);
     }
+    var more=[];
+    TRI_ADDED.forEach(function(g){
+      var done=false; try{ done=localStorage.getItem("trove.triage.added."+g.key)==="1" }catch(e){}
+      if(done) return;
+      try{ localStorage.setItem("trove.triage.added."+g.key,"1") }catch(e){}
+      g.list.forEach(function(x){
+        if(!TRI.sources.some(function(s){ return s.url===x[1] })) more.push({ kind:"rss", name:x[0], url:x[1] });
+      });
+    });
+    if(more.length) return rest("/triage_sources",{ method:"POST", prefer:"return=minimal", body:more }).then(loadTriage);
     triSort();
     triStart();
   }).catch(function(e){
@@ -12872,7 +12907,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="110";
+var BUILD="112";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
