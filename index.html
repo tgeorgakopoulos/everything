@@ -416,6 +416,7 @@
   .daylink{text-align:left;color:var(--ink);font-weight:600;padding:0;text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
   .dayhint{font-size:12.5px;color:var(--muted);line-height:1.5}
   .daytog{flex:none;font-size:12px;padding:5px 10px}
+  .devarr{font-weight:500;font-size:12px;color:var(--make)}
   .stfix{font-size:11.5px;color:var(--faint);text-decoration:underline;text-underline-offset:2px;padding:0}
   .stfix:hover{color:var(--make)}
   .stmonths{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;height:110px;align-items:end}
@@ -6085,6 +6086,7 @@ function normalizeItem(o){
     });
     out.stats={ days:days };
     if(typeof o.stats.dev==="string"&&o.stats.dev) out.stats.dev=o.stats.dev.slice(0,40);
+    if(o.stats.noarr===true) out.stats.noarr=true;
   }
   /* A link's facts, as its page describes itself (ldFacts). */
   if(o.facts&&typeof o.facts==="object"&&typeof o.facts.t==="string"&&Array.isArray(o.facts.f)){
@@ -6831,7 +6833,10 @@ function showDay(k){
       +'<button class="btn sec daytog" data-dayx="'+esc(e.id)+'">'+(e.excluded?"Count it":"Don't count")+'</button>'
       +'</div>';
   }).join("");
-  var dev=r.devices.map(function(d){ return esc(d.name)+': '+fmtN(d.w) }).join(" · ");
+  var dev=r.devices.map(function(d){
+    return esc(d.name)+': '+fmtN(d.w)
+      +(d.arrived?' <button class="daylink devarr" data-noarr="'+esc(d.id)+'">'+(d.noarr?"count its arrivals again":"don't count what arrived on it")+'</button>':"");
+  }).join(" · ");
   var noted=r.notes.reduce(function(a,e){ return a+(e.excluded?0:e.total) },0);
   var before=r.devices.reduce(function(a,d){ return a+d.w },0)-r.notes.reduce(function(a,e){ return a+e.typed+e.arrived+e.dup },0);
   askbox.innerHTML='<h3>'+esc(nice)+' — '+fmtN(tot)+' words</h3>'
@@ -6855,6 +6860,15 @@ function showDay(k){
     }
     var op=e.target.closest("[data-dayopen]");
     if(op){ closeAsk(); openEditor(op.dataset.dayopen); return }
+    var na=e.target.closest("[data-noarr]");
+    if(na){
+      var rec=byId(na.dataset.noarr);
+      if(rec&&rec.stats){
+        if(rec.stats.noarr) delete rec.stats.noarr; else rec.stats.noarr=true;
+        rec.modified=Date.now(); save(); paintWordsToday(); render(); showDay(k);
+      }
+      return;
+    }
     var x=e.target.closest("[data-dayx]");
     if(x){ toggleDayExclusion(k,x.dataset.dayx); render(); showDay(k) }
   };
@@ -6956,13 +6970,17 @@ function tallyWords(){
   saveWC();
   if(any) paintWordsToday();
 }
-/* Words were first counted on 12 November 2026. A day before that in any
+/* Words were first counted late on 12 November 2026 (the version that
+   counted was uploaded that night), and the hour that remained was spent
+   trying it out — pasting text written elsewhere, which the next version
+   learned not to count. So the record begins on 13 November. A day before
+   that in any
    record is not writing that was counted but a library that arrived late:
    a device that had only part of the library (the Safari app, before the
    sync fix of version 114) received the rest as if it were new and filed
    it under the day each note was last changed — August, October. Those
    days are left out. */
-var WORDS_START="2026-11-12";
+var WORDS_START="2026-11-13";
 /* Every device's record, added up: { "2026-11-12": {w, b:{tag:n}} }. */
 function allDays(){
   var out={};
@@ -7004,13 +7022,20 @@ function dayNotes(k){
     if(!st.stats) return;
     var day=st.stats.days[k]; if(!day) return;
     var me=st.id==="stats-"+DEVICE_ID, name=(st.stats.dev||"another device")+(me?" (this one)":"");
-    devices.push({ id:st.id, name:name, w:day.w||0, me:me });
+    var noarr=!!st.stats.noarr;
+    devices.push({ id:st.id, name:name, w:day.w||0, me:me, noarr:noarr, arrived:0 });
     Object.keys(day.x||{}).forEach(function(id){ excluded[id]=1 });
     Object.keys(day.n||{}).forEach(function(id){
       var e=per[id]||(per[id]={ id:id, typed:0, arrived:[], by:[] });
       var v=day.n[id];
       if(v[0]){ e.typed+=v[0]; e.by.push(name+": typed "+v[0]) }
-      if(v[1]){ e.arrived.push(v[1]); e.by.push(name+": arrived "+v[1]) }
+      if(v[1]){
+        devices[devices.length-1].arrived+=v[1];
+        /* a device whose arrivals you said not to count: they stay in its
+           record but are taken off every total */
+        if(noarr){ e.drop=(e.drop||0)+v[1]; e.by.push(name+": arrived "+v[1]+" (not counted)") }
+        else { e.arrived.push(v[1]); e.by.push(name+": arrived "+v[1]) }
+      }
     });
   });
   var notes=Object.keys(per).map(function(id){
@@ -7018,7 +7043,7 @@ function dayNotes(k){
     /* Words typed into a note on one device and "arriving" on another the
        same day are the same words: the typing counts, the arrival does not. */
     var arr=e.typed?0:(e.arrived.length?Math.max.apply(null,e.arrived):0);
-    return { id:id, typed:e.typed, arrived:arr, dup:sumArr-arr, total:e.typed+arr, by:e.by, excluded:!!excluded[id] };
+    return { id:id, typed:e.typed, arrived:arr, dup:sumArr-arr+(e.drop||0), total:e.typed+arr, by:e.by, excluded:!!excluded[id] };
   }).sort(function(a,b){ return b.total-a.total });
   return { notes:notes, devices:devices };
 }
@@ -13019,7 +13044,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="116";
+var BUILD="117";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
