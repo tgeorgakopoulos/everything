@@ -6890,7 +6890,12 @@ function noteArrival(i){
   if(!i||isSys(i)) return;
   if(WC_FRESH===null) WC_FRESH=!Object.keys(WC).length;
   var c=WC[i.id], n=wordsOf(i);
-  if(!WC_FRESH&&fromElsewhere(i)&&countsArrivals()){
+  /* Only what was written lately: an arrival whose last change is more than
+     two days old is a note this device had not yet received, not new
+     writing — counting it filed whole old notes as written today, or on
+     the day they were last touched months ago. */
+  var recent=(Date.now()-(i.modified||0))<2*864e5;
+  if(!WC_FRESH&&recent&&fromElsewhere(i)&&countsArrivals()){
     var d=n-(c?c.n:0);
     if(d>0){                       // added; what was deleted there is not subtracted
       var when=new Date(i.modified||Date.now()), pad=function(x){ return (x<10?"0":"")+x };
@@ -6951,12 +6956,20 @@ function tallyWords(){
   saveWC();
   if(any) paintWordsToday();
 }
+/* Words were first counted on 12 November 2026. A day before that in any
+   record is not writing that was counted but a library that arrived late:
+   a device that had only part of the library (the Safari app, before the
+   sync fix of version 114) received the rest as if it were new and filed
+   it under the day each note was last changed — August, October. Those
+   days are left out. */
+var WORDS_START="2026-11-12";
 /* Every device's record, added up: { "2026-11-12": {w, b:{tag:n}} }. */
 function allDays(){
   var out={};
   S.items.forEach(function(i){
     if(!i.stats) return;
     Object.keys(i.stats.days).forEach(function(k){
+      if(k<WORDS_START) return;
       var src=i.stats.days[k], o=out[k]||(out[k]={w:0,b:{},c:{}});
       o.w+=src.w||0;
       Object.keys(src.b||{}).forEach(function(t){ o.b[t]=(o.b[t]||0)+src.b[t] });
@@ -7001,8 +7014,10 @@ function dayNotes(k){
     });
   });
   var notes=Object.keys(per).map(function(id){
-    var e=per[id], arr=e.arrived.length?Math.max.apply(null,e.arrived):0;
-    var sumArr=e.arrived.reduce(function(a,b){ return a+b },0);
+    var e=per[id], sumArr=e.arrived.reduce(function(a,b){ return a+b },0);
+    /* Words typed into a note on one device and "arriving" on another the
+       same day are the same words: the typing counts, the arrival does not. */
+    var arr=e.typed?0:(e.arrived.length?Math.max.apply(null,e.arrived):0);
     return { id:id, typed:e.typed, arrived:arr, dup:sumArr-arr, total:e.typed+arr, by:e.by, excluded:!!excluded[id] };
   }).sort(function(a,b){ return b.total-a.total });
   return { notes:notes, devices:devices };
@@ -13004,7 +13019,7 @@ window.addEventListener("resize",fitBrand);
    copy on the web always says exactly which one it is — which matters
    the moment somebody says "it does X" and the answer depends on
    whether they have the build where X was fixed. */
-var BUILD="115";
+var BUILD="116";
 
 /* Every device on the same version. A device that has not been reloaded
    since a new version went up is running the old one — and a feature the
